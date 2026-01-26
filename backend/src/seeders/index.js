@@ -121,15 +121,27 @@ const seedAdminUser = async () => {
   
   const admin = await User.create({
     email: 'admin@labor.gov.sz',
-    password: 'Admin@123', // Will be hashed by the model
+    password: 'Admin@123',
     firstName: 'System',
     lastName: 'Administrator',
+    nationalId: 'ADMIN123',
+    dateOfBirth: '1980-01-01',
+    gender: 'male',
+    phoneNumber: '+26876000000',
     role: 'admin',
     region: 'manzini',
+    district: 'Manzini',
+    address: 'Ministry of Labour Headquarters',
     educationLevel: 'postgraduate',
+    currentInstitution: 'Ministry of Labour',
+    employmentStatus: 'employed',
+    currentOccupation: 'System Administrator',
     isActive: true,
     isEmailVerified: true,
-    preferredLanguage: 'en'
+    preferredLanguage: 'en',
+    requiresAccessibility: false,
+    accessibilityNeeds: {},
+    lastLogin: new Date()
   });
 
   console.log('✅ Admin user created');
@@ -148,14 +160,25 @@ const seedTestCounselor = async () => {
     password: 'Counselor@123',
     firstName: 'Test',
     lastName: 'Counselor',
+    nationalId: 'COUNS123',
+    dateOfBirth: '1985-05-15',
+    gender: 'female',
+    phoneNumber: '+26876111111',
     role: 'counselor',
     region: 'manzini',
+    district: 'Manzini',
+    address: 'Ministry of Labour Headquarters',
     organization: 'Ministry of Labour and Social Security',
     counselorCode: 'COUNS001',
     educationLevel: 'degree',
+    currentInstitution: 'Ministry of Labour',
+    employmentStatus: 'employed',
+    currentOccupation: 'Career Counselor',
     isActive: true,
     isEmailVerified: true,
-    preferredLanguage: 'en'
+    preferredLanguage: 'en',
+    requiresAccessibility: false,
+    accessibilityNeeds: {}
   });
 
   console.log('✅ Test counselor created');
@@ -173,15 +196,23 @@ const seedTestStudent = async () => {
     password: 'Student@123',
     firstName: 'Test',
     lastName: 'Student',
+    nationalId: 'STUD123',
+    dateOfBirth: '2005-03-20',
+    gender: 'other',
+    phoneNumber: '+26876222222',
     role: 'user',
     region: 'manzini',
+    district: 'Manzini',
+    address: '123 Test Street',
     educationLevel: 'senior_secondary',
     gradeLevel: 'Form 5',
     currentInstitution: 'Test High School',
     employmentStatus: 'student',
     isActive: true,
     isEmailVerified: true,
-    preferredLanguage: 'en'
+    preferredLanguage: 'en',
+    requiresAccessibility: true,
+    accessibilityNeeds: { screenReader: true, fontSize: 'large' }
   });
 
   console.log('✅ Test student created');

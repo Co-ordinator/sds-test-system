@@ -5,12 +5,12 @@
 The Online Self-Directed Search (SDS) Test System database is designed to support Holland's RIASEC career assessment model for the Ministry of Labour and Social Security of Eswatini.
 
 ### Key Features
-- ✅ **RIASEC Model Implementation** - Full support for Realistic, Investigative, Artistic, Social, Enterprising, and Conventional assessment
-- ✅ **Multi-language Support** - English and siSwati
-- ✅ **Comprehensive Audit Trail** - Complete logging for compliance
-- ✅ **Data Protection Compliant** - Aligned with Eswatini Data Protection Act 2022
-- ✅ **Scalable Architecture** - Supports 500+ concurrent users
-- ✅ **Career Resources Integration** - Links to local institutions and opportunities
+- **RIASEC Model Implementation** - Full support for Realistic, Investigative, Artistic, Social, Enterprising, and Conventional assessment
+- **Multi-language Support** - English and siSwati
+- **Comprehensive Audit Trail** - Complete logging for compliance
+- **Data Protection Compliant** - Aligned with Eswatini Data Protection Act 2022
+- **Scalable Architecture** - Supports 500+ concurrent users
+- **Career Resources Integration** - Links to local institutions and opportunities
 
 ---
 
@@ -217,30 +217,32 @@ Educational institutions in Eswatini
 #### **audit_logs**
 Comprehensive activity logging for compliance
 
-**Key Fields:**
-- `userId` - Who performed action
-- `action` - What was done (50+ action types)
-- `resourceType`, `resourceId` - What was affected
-- `ipAddress`, `userAgent` - Request metadata
-- `requestMethod`, `requestPath` - API details
-- `changesBefore`, `changesAfter` - State tracking
-- `errorOccurred`, `errorMessage` - Error logging
-- `isSuspicious`, `securityLevel` - Security flags
-- `dataProtectionImpact` - GDPR/DPA compliance
-- `requiresReview` - Manual review flag
+**Fields:**
+- `id` - UUID primary key
+- `userId` - UUID (nullable foreign key)
+- `actionType` - ENUM(LOGIN, REGISTER, TEST_COMPLETE, etc)
+- `description` - String (human-readable summary)
+- `details` - JSONB (technical details/state changes)
+- `ipAddress` - String (client IP)
+- `userAgent` - String (client browser/device)
+- `createdAt` - Timestamp
 
 **Action Types:**
-- Authentication (login, logout, password reset)
-- Test actions (started, completed, viewed)
-- User management (created, updated, deleted)
-- Content management (test/question CRUD)
-- Data access (reports, exports, analytics)
-- Security events (unauthorized access, suspicious activity)
+- Authentication: LOGIN, LOGOUT, REGISTER, PASSWORD_RESET
+- Testing: TEST_START, TEST_COMPLETE
+- Profile: PROFILE_UPDATE
+- Security: ACCESS_DENIED, SUSPICIOUS_ACTIVITY
+- Admin: USER_DELETION, SYSTEM_UPDATE
 
-**Static Methods:**
-- `logAction(params)` - Standard logging
-- `logError(params)` - Error tracking
-- `logSecurityEvent(params)` - Security monitoring
+**Logging Pattern:**
+```javascript
+logger.info({
+  actionType: 'LOGIN',
+  message: 'User logged in',
+  req: requestObject,
+  details: { userId: 'abc123' }
+});
+```
 
 ---
 
@@ -380,8 +382,8 @@ node scripts/setup.js --seed
 npm run dev
 
 # Check logs for:
-# ✅ Database connection established
-# ✅ Database models synchronized
+# Database connection established
+# Database models synchronized
 ```
 
 ---
