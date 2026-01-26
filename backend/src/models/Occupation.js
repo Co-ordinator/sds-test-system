@@ -1,6 +1,7 @@
 module.exports = (sequelize, DataTypes) => {
   const Occupation = sequelize.define('Occupation', {
-    code: { type: DataTypes.STRING(3), allowNull: false }, // Holland 3-letter code e.g., 'RAC'
+    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+    code: { type: DataTypes.STRING(3), allowNull: false, unique: true }, // Holland 3-letter code e.g., 'RAC'
     name: { type: DataTypes.STRING, allowNull: false },
     hollandCodes: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
     primaryRiasec: { type: DataTypes.STRING(1), allowNull: true },
@@ -8,12 +9,12 @@ module.exports = (sequelize, DataTypes) => {
     description: { type: DataTypes.TEXT, allowNull: true },
     category: { type: DataTypes.STRING, allowNull: true },
     educationLevel: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: true,
       field: 'education_level',
       references: {
         model: 'education_levels',
-        key: 'level'
+        key: 'id'
       }
     },
     educationRequired: { type: DataTypes.STRING, allowNull: true },
@@ -41,7 +42,7 @@ module.exports = (sequelize, DataTypes) => {
   Occupation.associate = (models) => {
     Occupation.belongsTo(models.EducationLevel, {
       foreignKey: 'educationLevel',
-      targetKey: 'level',
+      targetKey: 'id',
       as: 'education'
     });
   };

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ResendVerification from '../components/auth/ResendVerification';
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, globalSignOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [serverError, setServerError] = useState('');
@@ -64,16 +64,16 @@ const Login = () => {
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700">National ID (PIN)</label>
+              <label className="block text-sm font-medium text-gray-700">Email or Student ID</label>
               <input
-                {...register("nationalId", { 
-                  required: "National ID is required",
-                  pattern: { value: /^\d{13}$/, message: "Must be a 13-digit number" }
+                {...register("identifier", { 
+                  required: "Email or Student ID is required",
+                  minLength: { value: 3, message: "Must be at least 3 characters" }
                 })}
-                className={`mt-1 block w-full border ${errors.nationalId ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm p-2`}
-                placeholder="920220..."
+                className={`mt-1 block w-full border ${errors.identifier ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm p-2`}
+                placeholder="student123 or user@example.com"
               />
-              {errors.nationalId && <p className="mt-1 text-xs text-red-500">{errors.nationalId.message}</p>}
+              {errors.identifier && <p className="mt-1 text-xs text-red-500">{errors.identifier.message}</p>}
             </div>
 
             <div>
@@ -99,6 +99,16 @@ const Login = () => {
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-700 hover:bg-blue-800 disabled:bg-blue-300"
               >
                 {isSubmitting ? "Signing in..." : "Sign In"}
+              </button>
+            </div>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={globalSignOut}
+                className="text-sm text-gray-600 hover:text-gray-800 underline"
+              >
+                Global Sign Out (clear cached data)
               </button>
             </div>
           </form>

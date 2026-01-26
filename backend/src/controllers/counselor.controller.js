@@ -1,5 +1,6 @@
 const { User, Assessment } = require('../models');
 const logger = require('../utils/logger');
+const { bulkCreateStudents } = require('../services/studentImport.service');
 
 /**
  * Counselor Controller
@@ -129,7 +130,44 @@ const getInstitutionStats = async (req, res, next) => {
   }
 };
 
+const importStudents = async (req, res, next) => {
+  try {
+    const counselor = await User.findByPk(req.user.id);
+    if (!counselor || counselor.role !== 'counselor') {
+      return res.status(403).json({ status: 'error', message: 'Unauthorized' });
+    }
+
+    if (!req.body || typeof req.body !== 'string' || !req.body.trim()) {
+      return res.status(400).json({ status: 'error', message: 'CSV data is required' });
+    }
+
+    if (!counselor.institutionId) {
+      return res.status(400).json({ status: 'error', message: 'Counselor is not linked to an institution' });
+    }
+
+    const credentials = await bulkCreateStudents(req.body, counselor.institutionId);
+
+    logger.info({
+      actionType: 'COUNSELOR_STUDENTS_IMPORTED',
+      message: `Counselor ${counselor.id} imported ${credentials.length} students`,
+      req,
+      details: { counselorId: counselor.id, institutionId: counselor.institutionId, count: credentials.length }
+    });
+
+    return res.status(201).json({ status: 'success', data: { credentials } });
+  } catch (error) {
+    logger.error({
+      actionType: 'COUNSELOR_STUDENTS_IMPORT_FAILED',
+      message: 'Failed to import students',
+      req,
+      details: { error: error.message, stack: error.stack, counselorId: req.user?.id }
+    });
+    return next(error);
+  }
+};
+
 module.exports = {
   getMyStudents,
-  getInstitutionStats
+  getInstitutionStats,
+  importStudents
 };

@@ -1,9 +1,15 @@
 module.exports = (sequelize, DataTypes) => {
   const EducationLevel = sequelize.define('EducationLevel', {
-    level: {
-      type: DataTypes.INTEGER,
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
       allowNull: false
+    },
+    level: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      unique: true
     },
     description: {
       type: DataTypes.STRING,
@@ -17,12 +23,12 @@ module.exports = (sequelize, DataTypes) => {
   EducationLevel.associate = (models) => {
     EducationLevel.hasMany(models.Occupation, {
       foreignKey: 'educationLevel',
-      sourceKey: 'level',
+      sourceKey: 'id',
       as: 'occupations'
     });
     EducationLevel.hasMany(models.User, {
       foreignKey: 'educationLevel',
-      sourceKey: 'level',
+      sourceKey: 'id',
       as: 'users'
     });
   };

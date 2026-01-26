@@ -31,12 +31,12 @@ module.exports = (sequelize, DataTypes) => {
     
     // Captured at the time of test to ensure historical accuracy
     educationLevelAtTest: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: true,
       field: 'education_level_at_test',
       references: {
         model: 'education_levels',
-        key: 'level'
+        key: 'id'
       },
       comment: "Levels 1-5 from SDS Appendix"
     },

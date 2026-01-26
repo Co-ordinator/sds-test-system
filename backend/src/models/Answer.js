@@ -11,7 +11,7 @@ module.exports = (sequelize, DataTypes) => {
       field: 'assessment_id'
     },
     questionId: {
-      type: DataTypes.INTEGER, // References the 228 questions
+      type: DataTypes.UUID,
       allowNull: false,
       field: 'question_id'
     },

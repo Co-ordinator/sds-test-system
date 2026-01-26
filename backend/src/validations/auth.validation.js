@@ -49,9 +49,9 @@ const validateNationalId = (value, helpers) => {
 const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
 
 const register = Joi.object({
-  email: Joi.string().email().required().messages({
-    'string.email': 'Please provide a valid email address',
-    'any.required': 'Email is required'
+  username: Joi.string().alphanum().min(3).max(50).optional(),
+  email: Joi.string().email().optional().messages({
+    'string.email': 'Please provide a valid email address'
   }),
   password: Joi.string().pattern(passwordPattern).required().messages({
     'string.pattern.base': 'Password must be at least 8 characters and contain both letters and numbers',
@@ -92,12 +92,11 @@ const register = Joi.object({
   phoneNumber: Joi.string().pattern(/^\+268\d{8}$/).optional().messages({
     'string.pattern.base': 'Phone number must be in Eswatini format (+268 followed by 8 digits)'
   })
-});
+}).or('email', 'username');
 
 const login = Joi.object({
-  email: Joi.string().email().required().messages({
-    'string.email': 'Please provide a valid email address',
-    'any.required': 'Email is required'
+  identifier: Joi.string().required().messages({
+    'any.required': 'Email or Student ID is required'
   }),
   password: Joi.string().required().messages({
     'any.required': 'Password is required'

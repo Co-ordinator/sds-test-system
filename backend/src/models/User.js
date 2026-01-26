@@ -46,10 +46,15 @@ module.exports = (sequelize, DataTypes) => {
     },
     
     // Authentication
+    username: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: true
+    },
     email: {
       type: DataTypes.STRING,
       unique: true,
-      allowNull: false,
+      allowNull: true,
       validate: {
         isEmail: true
       }
@@ -111,12 +116,12 @@ module.exports = (sequelize, DataTypes) => {
     
     // Educational Background
     educationLevel: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: true,
       field: 'education_level',
       references: {
         model: 'education_levels',
-        key: 'level'
+        key: 'id'
       }
     },
     currentInstitution: {
@@ -173,6 +178,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       field: 'is_email_verified'
+    },
+    createdByCounselor: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: 'created_by_counselor'
     },
     emailVerificationToken: {
       type: DataTypes.STRING,
@@ -248,6 +258,7 @@ module.exports = (sequelize, DataTypes) => {
     timestamps: true,
     underscored: true,
     indexes: [
+      { fields: ['username'], unique: true },
       { fields: ['email'], unique: true },
       { fields: ['national_id'], unique: true },
       { fields: ['institution_id'] },
