@@ -1,22 +1,38 @@
-const { User, AuditLog } = require('../models');
+const { User, AuditLog, Assessment } = require('../models');
+const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 
 module.exports = {
-  // Get all users
+  // Get all users with optional filters
   getAllUsers: async (req, res, next) => {
     try {
+      const { role, educationLevel, search } = req.query;
+
+      const where = {};
+      if (role) where.role = role;
+      if (educationLevel) where.educationLevel = educationLevel;
+      if (search) {
+        where[Op.or] = [
+          { email: { [Op.iLike]: `%${search}%` } },
+          { firstName: { [Op.iLike]: `%${search}%` } },
+          { lastName: { [Op.iLike]: `%${search}%` } }
+        ];
+      }
+
       logger.info({
         actionType: 'ADMIN_ACTION',
-        message: 'Fetching all users',
+        message: 'Fetching users',
         req,
         details: {
-          adminId: req.user?.id
+          adminId: req.user?.id,
+          filters: { role, educationLevel, search }
         }
       });
       
       const users = await User.findAll({
         attributes: { exclude: ['password'] },
-        order: [['createdAt', 'DESC']]
+        order: [['createdAt', 'DESC']],
+        where
       });
 
       logger.info({
@@ -126,6 +142,18 @@ module.exports = {
       }
 
       await user.destroy();
+      await AuditLog.create({
+        userId: req.user?.id,
+        actionType: 'USER_DELETED',
+        description: 'User account deleted by admin',
+        details: {
+          resourceType: 'user',
+          resourceId: req.params.id,
+          requestMethod: req.method
+        },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
       
       logger.info({
         actionType: 'USER_DELETION',
@@ -165,11 +193,38 @@ module.exports = {
           adminId: req.user?.id
         }
       });
-      
-      // TODO: Implement analytics
-      res.status(200).json({
+
+      const [studentCount, counselorCount] = await Promise.all([
+        User.count({ where: { role: 'user' } }),
+        User.count({ where: { role: 'counselor' } })
+      ]);
+
+      const totalAssessments = await Assessment.count();
+      const completedAssessments = await Assessment.count({ where: { status: 'completed' } });
+      const completionRate = totalAssessments === 0 ? 0 : (completedAssessments / totalAssessments) * 100;
+
+      const averages = await Assessment.findOne({
+        attributes: [
+          [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_r')), 'avgR'],
+          [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_i')), 'avgI'],
+          [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_a')), 'avgA'],
+          [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_s')), 'avgS'],
+          [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_e')), 'avgE'],
+          [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_c')), 'avgC']
+        ],
+        raw: true
+      });
+
+      return res.status(200).json({
         status: 'success',
-        message: 'Analytics endpoint'
+        data: {
+          totals: {
+            students: studentCount,
+            counselors: counselorCount
+          },
+          completionRate: Number(completionRate.toFixed(2)),
+          riasecAverages: averages
+        }
       });
     } catch (error) {
       logger.error({
@@ -178,7 +233,8 @@ module.exports = {
         req,
         details: {
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
+          adminId: req.user?.id
         }
       });
       next(error);
@@ -217,6 +273,20 @@ module.exports = {
         data: { logs }
       });
     } catch (error) {
+      await AuditLog.create({
+        userId: req.user?.id,
+        actionType: 'AUDIT_LOG_FETCH_FAILED',
+        description: 'Failed to fetch audit logs',
+        details: {
+          resourceType: 'audit_log',
+          requestMethod: req.method,
+          isSuspicious: true,
+          securityLevel: 'medium',
+          error: error.message
+        },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
       logger.error({
         actionType: 'ADMIN_ACTION_FAILED',
         message: 'Failed to fetch audit logs',

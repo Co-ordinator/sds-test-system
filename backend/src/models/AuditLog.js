@@ -42,8 +42,20 @@ module.exports = (sequelize) => {
     }
   }, {
     timestamps: true,
-    underscored: true
+    underscored: true,
+    indexes: [
+      { fields: ['user_id'] },
+      { fields: ['action_type'] },
+      { fields: ['created_at'] }
+    ]
   });
+
+  AuditLog.associate = (models) => {
+    AuditLog.belongsTo(models.User, {
+      foreignKey: 'userId',
+      as: 'user'
+    });
+  };
 
   return AuditLog;
 };

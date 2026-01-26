@@ -1,7 +1,49 @@
 const Joi = require('joi');
 
-// Eswatini national ID pattern (alphanumeric, 7-10 chars)
-const nationalIdPattern = /^[A-Za-z0-9]{7,10}$/;
+// Luhn algorithm implementation
+const luhnCheck = (num) => {
+  const arr = (num + '').split('').reverse().map(x => parseInt(x));
+  const lastDigit = arr.shift();
+  let sum = arr.reduce((acc, val, i) => {
+    if (i % 2 === 0) val *= 2;
+    if (val > 9) val -= 9;
+    return acc + val;
+  }, 0);
+  sum += lastDigit;
+  return sum % 10 === 0;
+};
+
+// Date validation for first 6 digits (YYMMDD)
+const isValidDate = (yyMMdd) => {
+  const yy = parseInt(yyMMdd.substring(0, 2));
+  const mm = parseInt(yyMMdd.substring(2, 4)) - 1; // JS months are 0-indexed
+  const dd = parseInt(yyMMdd.substring(4, 6));
+  
+  if (mm < 0 || mm > 11) return false;
+  
+  const date = new Date(2000 + yy, mm, dd);
+  return date && 
+    date.getFullYear() === 2000 + yy && 
+    date.getMonth() === mm && 
+    date.getDate() === dd;
+};
+
+// National ID validation (13 digits, valid date, Luhn check)
+const validateNationalId = (value, helpers) => {
+  if (!/^\d{13}$/.test(value)) {
+    return helpers.error('string.pattern.base');
+  }
+  
+  if (!isValidDate(value.substring(0, 6))) {
+    return helpers.error('date.invalid');
+  }
+  
+  if (!luhnCheck(value)) {
+    return helpers.error('luhn.invalid');
+  }
+  
+  return value;
+};
 
 // Password requirements: min 8 chars, at least 1 letter and 1 number
 const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
@@ -21,8 +63,10 @@ const register = Joi.object({
   lastName: Joi.string().required().messages({
     'any.required': 'Last name is required'
   }),
-  nationalId: Joi.string().pattern(nationalIdPattern).required().messages({
-    'string.pattern.base': 'National ID must be alphanumeric (7-10 characters)',
+  nationalId: Joi.string().custom(validateNationalId, 'National ID validation').required().messages({
+    'string.pattern.base': 'Invalid National ID. Must be exactly 13 digits',
+    'date.invalid': 'Invalid National ID. First 6 digits must represent a valid date (YYMMDD)',
+    'luhn.invalid': 'Invalid National ID. Failed checksum verification',
     'any.required': 'National ID is required'
   }),
   role: Joi.string().valid('admin', 'counselor', 'user').required().messages({
@@ -38,6 +82,11 @@ const register = Joi.object({
     'date.format': 'Date of birth must be in YYYY-MM-DD format',
     'date.less': 'Date of birth must be in the past',
     'any.required': 'Date of birth is required'
+  }),
+  consent: Joi.boolean().valid(true).required().messages({
+    'boolean.base': 'You must accept the data processing terms',
+    'any.only': 'You must accept the data processing terms to register',
+    'any.required': 'You must accept the data processing terms to register'
   }),
   gender: Joi.string().valid('male', 'female', 'other', 'prefer_not_to_say').optional(),
   phoneNumber: Joi.string().pattern(/^\+268\d{8}$/).optional().messages({

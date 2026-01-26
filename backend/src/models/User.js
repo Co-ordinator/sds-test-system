@@ -1,11 +1,48 @@
 const bcrypt = require('bcrypt');
 
+// Helper function to parse national ID
+const parseNationalId = (nationalId) => {
+  if (!nationalId || nationalId.length !== 13) return null;
+  
+  // Extract date parts (first 6 digits: YYMMDD)
+  const yy = parseInt(nationalId.substring(0, 2));
+  const mm = parseInt(nationalId.substring(2, 4)) - 1; // JS months are 0-indexed
+  const dd = parseInt(nationalId.substring(4, 6));
+  
+  // Determine century (YY > current year = 19xx, else 20xx)
+  const currentYearShort = new Date().getFullYear() % 100;
+  const century = yy > currentYearShort ? 1900 : 2000;
+  const fullYear = century + yy;
+  
+  // Extract gender digits (positions 7-10)
+  const genderDigits = parseInt(nationalId.substring(6, 10));
+  const gender = genderDigits < 5000 ? 'female' : 'male';
+  
+  return {
+    dateOfBirth: new Date(fullYear, mm, dd).toISOString().split('T')[0],
+    gender
+  };
+};
+
 module.exports = (sequelize, DataTypes) => {
   const User = sequelize.define('User', {
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
+    },
+    
+    // Consent Tracking
+    isConsentGiven: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      field: 'is_consent_given'
+    },
+    consentDate: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'consent_date'
     },
     
     // Authentication
@@ -37,7 +74,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       unique: true,
       allowNull: true,
-      field: 'national_id'
+      field: 'national_id',
+      validate: {
+        len: [13, 13],
+        isNumeric: true
+      }
     },
     dateOfBirth: {
       type: DataTypes.DATEONLY,
@@ -70,18 +111,13 @@ module.exports = (sequelize, DataTypes) => {
     
     // Educational Background
     educationLevel: {
-      type: DataTypes.ENUM(
-        'primary',
-        'junior_secondary',
-        'senior_secondary',
-        'tvet',
-        'diploma',
-        'undergraduate',
-        'postgraduate',
-        'other'
-      ),
+      type: DataTypes.INTEGER,
       allowNull: true,
-      field: 'education_level'
+      field: 'education_level',
+      references: {
+        model: 'education_levels',
+        key: 'level'
+      }
     },
     currentInstitution: {
       type: DataTypes.STRING,
@@ -110,6 +146,16 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: true,
       field: 'current_occupation'
+    },
+
+    institutionId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'institution_id',
+      references: {
+        model: 'institutions',
+        key: 'id'
+      }
     },
     
     // User Role & Status
@@ -175,6 +221,16 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'password_reset_expires'
     },
+    refreshToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'refresh_token'
+    },
+    refreshTokenExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'refresh_token_expires'
+    },
     
     // Counselor-specific fields
     counselorCode: {
@@ -191,16 +247,45 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'users',
     timestamps: true,
     underscored: true,
+    indexes: [
+      { fields: ['email'], unique: true },
+      { fields: ['national_id'], unique: true },
+      { fields: ['institution_id'] },
+      { fields: ['role'] },
+      { fields: ['education_level'] },
+      { fields: ['is_active'] },
+      { fields: ['is_email_verified'] }
+    ],
     
     hooks: {
       beforeCreate: async (user) => {
+        // Hash password if present
         if (user.password) {
           user.password = await bcrypt.hash(user.password, 10);
         }
+        
+        // Parse national ID if present
+        if (user.nationalId) {
+          const parsedData = parseNationalId(user.nationalId);
+          if (parsedData) {
+            user.dateOfBirth = parsedData.dateOfBirth;
+            user.gender = parsedData.gender;
+          }
+        }
       },
       beforeUpdate: async (user) => {
+        // Hash password if changed
         if (user.changed('password')) {
           user.password = await bcrypt.hash(user.password, 10);
+        }
+        
+        // Parse national ID if changed
+        if (user.changed('nationalId') && user.nationalId) {
+          const parsedData = parseNationalId(user.nationalId);
+          if (parsedData) {
+            user.dateOfBirth = parsedData.dateOfBirth;
+            user.gender = parsedData.gender;
+          }
         }
       }
     }
@@ -217,6 +302,8 @@ module.exports = (sequelize, DataTypes) => {
     delete values.passwordResetToken;
     delete values.passwordResetExpires;
     delete values.emailVerificationToken;
+    delete values.refreshToken;
+    delete values.refreshTokenExpires;
     return values;
   };
   
@@ -226,14 +313,25 @@ module.exports = (sequelize, DataTypes) => {
   
   // Associations
   User.associate = (models) => {
-    User.hasMany(models.TestAttempt, {
+    User.hasMany(models.Assessment, {
       foreignKey: 'userId',
-      as: 'testAttempts'
+      as: 'assessments'
     });
     
     User.hasMany(models.AuditLog, {
       foreignKey: 'userId',
       as: 'auditLogs'
+    });
+
+    User.belongsTo(models.EducationLevel, {
+      foreignKey: 'educationLevel',
+      targetKey: 'level',
+      as: 'education'
+    });
+
+    User.belongsTo(models.Institution, {
+      foreignKey: 'institutionId',
+      as: 'institution'
     });
   };
   

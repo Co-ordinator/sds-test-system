@@ -270,6 +270,7 @@ recommendations = matchingOccupations
 ```
 POST   /api/v1/auth/register
 POST   /api/v1/auth/login
+POST   /api/v1/auth/refresh-token
 POST   /api/v1/auth/logout
 POST   /api/v1/auth/forgot-password
 POST   /api/v1/auth/reset-password
@@ -313,7 +314,7 @@ GET    /api/v1/admin/audit-logs
 
 ### Phase 1: Core Functionality (Week 1-2)
 1. ✅ Database models - DONE
-2. 🔨 Authentication API (register, login, JWT)
+2. ✅ Authentication API (register, login, JWT)
 3. 🔨 Test API (get tests, sections, questions)
 4. 🔨 Test-taking API (start, save, complete)
 5. 🔨 Scoring algorithm implementation

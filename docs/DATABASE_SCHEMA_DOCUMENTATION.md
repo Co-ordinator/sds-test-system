@@ -26,13 +26,28 @@ Stores all system users (students, counselors, administrators)
 - `email` - Unique email address
 - `password` - Bcrypt hashed password
 - `firstName`, `lastName` - User names
-- `nationalId` - Eswatini National ID
+- `nationalId` - Eswatini National ID (13 digits, numeric, nullable)
 - `role` - `admin` | `counselor` | `user`
 - `region` - `hhohho` | `manzini` | `lubombo` | `shiselweni`
-- `educationLevel` - Current education level
+- `district`, `address`
+- `educationLevel` - FK → education_levels.level
 - `employmentStatus` - Current employment status
+- `currentOccupation`
+- `institutionId` - FK → institutions.id
 - `preferredLanguage` - `en` | `ss` (English/siSwati)
 - `accessibilityNeeds` - JSONB for WCAG compliance
+- `isConsentGiven`, `consentDate`
+- `isActive`
+- `isEmailVerified`, `emailVerificationToken`, `emailVerificationExpires`
+- `phoneNumber`
+- `dateOfBirth`, `gender`
+- `currentInstitution`, `gradeLevel`
+- `requiresAccessibility`
+- `lastLogin`
+- `passwordResetToken`, `passwordResetExpires`
+- `refreshToken`, `refreshTokenExpires`
+- `counselorCode` (unique, nullable)
+- `organization`
 
 **Security Features:**
 - Password hashing via bcrypt (10 rounds)
@@ -44,111 +59,72 @@ Stores all system users (students, counselors, administrators)
 
 ### 2. Test Structure
 
-#### **tests**
-Master test definitions (currently SDS 1.0)
-
-**Key Fields:**
-- `id` (UUID)
-- `name`, `nameSwati` - Test names
-- `version` - Version number
-- `estimatedDuration` - Expected completion time (minutes)
-- `isActive` - Enable/disable tests
-
-#### **test_sections**
-Sections within each test (Activities, Competencies, Occupations, Self-Estimates)
-
-**Key Fields:**
-- `testId` - Foreign key to tests
-- `sectionType` - `activities` | `competencies` | `occupations` | `self_estimates`
-- `orderIndex` - Display order
-- `isRequired` - Mandatory sections
-
 #### **questions**
-Individual assessment questions
+Individual assessment questions (static bank)
 
 **Key Fields:**
-- `sectionId` - Foreign key to test_sections
-- `questionText`, `questionTextSwati` - Question content
-- `riasecCategory` - `R` | `I` | `A` | `S` | `E` | `C`
-- `questionType` - `yes_no` | `rating_scale` | `multiple_choice`
-- `scaleMin`, `scaleMax` - For rating questions
-- `orderIndex` - Display order
+- `id` (PK, integer, auto-increment)
+- `text` - Question text
+- `section` - `activities` | `competencies` | `occupations` | `self_estimates`
+- `riasecType` - `R` | `I` | `A` | `S` | `E` | `C`
+- `order` - Required display order
 
-**RIASEC Categories:**
-- **R** - Realistic (hands-on, practical)
-- **I** - Investigative (analytical, scientific)
-- **A** - Artistic (creative, expressive)
-- **S** - Social (helping, teaching)
-- **E** - Enterprising (leading, persuading)
-- **C** - Conventional (organizing, detail-oriented)
+**Validation Notes:**
+- `order` is required (no nulls)
 
 ---
 
 ### 3. Test Taking & Responses
 
-#### **test_attempts**
-Tracks each user's test-taking session
+#### **assessments**
+Tracks each user's SDS assessment session
 
 **Key Fields:**
-- `userId` - Test taker
-- `testId` - Which test
-- `attemptNumber` - Retry count
-- `status` - `not_started` | `in_progress` | `completed` | `abandoned`
-- `startedAt`, `completedAt` - Timestamps
-- `timeSpent` - Total time in seconds
-- `progressPercentage` - Completion tracking
-- `currentSectionId` - Resume capability
-- `supervisedBy` - Counselor oversight (optional)
+- `id` (UUID) - Primary key
+- `userId` - Test taker (FK → users.id)
+- `status` - `in_progress` | `completed` | `expired`
+- `progress` - Decimal percentage (0-100)
+- `hollandCode` - 3-letter code (e.g., "RIA")
+- `scoreR`, `scoreI`, `scoreA`, `scoreS`, `scoreE`, `scoreC` - Raw RIASEC totals
+- `educationLevelAtTest` - Snapshot FK (→ education_levels.level)
+- `completedAt` - Timestamp of completion
+- `createdAt`, `updatedAt`
 
-**Features:**
-- Progress tracking for resume capability
-- Device info for analytics
-- Session data for state management
-- Counselor supervision support
+**Indexes:**
+- user_id, status, completed_at, user_id+status, holland_code, created_at
 
-#### **test_responses**
-Individual question responses
+**Validation Notes:**
+- `status` must be one of: in_progress, completed, expired
+
+#### **answers**
+Individual responses per question in an assessment
 
 **Key Fields:**
-- `attemptId` - Which test attempt
-- `questionId` - Which question
-- `responseValue` - User's answer
-- `responseScore` - Calculated score
-- `timeSpent` - Time on this question
-- `isModified` - Changed answer tracking
-- `modificationCount` - Number of changes
+- `id` (UUID) - Primary key
+- `assessmentId` - FK → assessments.id (cascade delete)
+- `questionId` - FK → questions.id
+- `value` - `YES` | `NO` | `1`-`6` (validated)
+- `section` - `activities` | `competencies` | `occupations` | `self_estimates`
+- `riasecType` - `R` | `I` | `A` | `S` | `E` | `C`
+- `createdAt`, `updatedAt`
 
-**Analytics:**
-- First response timestamp
-- Modification tracking
-- Time analysis per question
+**Indexes:**
+- assessment_id+question_id (unique)
+- assessment_id, question_id, section, riasec_type, assessment_id+section
+
+**Validation Notes:**
+- `value` must be one of: YES, NO, 1, 2, 3, 4, 5, 6
 
 ---
 
 ### 4. Results & Scoring
 
-#### **test_results**
-RIASEC scores and Holland Code calculation
+RIASEC scoring is stored directly on **assessments**:
+- Raw totals: `scoreR`, `scoreI`, `scoreA`, `scoreS`, `scoreE`, `scoreC`
+- Holland code: `hollandCode` (3-letter)
+- Completion timestamp: `completedAt`
 
-**Key Fields:**
-- `attemptId` - One-to-one with test_attempts
-- `realisticScore`, `investigativeScore`, `artisticScore`, `socialScore`, `enterprisingScore`, `conventionalScore` - 0-100 scale
-- `hollandCode` - 3-letter code (e.g., 'SAE', 'RIA')
-- `primaryInterest`, `secondaryInterest`, `tertiaryInterest` - Top 3 categories
-- `sectionScores` - JSONB breakdown by section
-- `consistencyScore` - Response reliability
-- `profileDifferentiation` - Interest clarity
-- `interpretation` - Generated guidance text
-- `reportUrl` - PDF report location
-
-**Counselor Review:**
-- `reviewedBy` - Counselor ID
-- `reviewedAt` - Review timestamp
-- `counselorNotes` - Professional notes
-
-**Methods:**
-- `calculateHollandCode()` - Auto-generate code from scores
-- `getScoreByCategory(category)` - Retrieve individual scores
+Scoring derives from **answers** per section/riasecType; composite queries are optimized via indexes on section, riasec_type, and assessment_id combinations.
 
 ---
 
@@ -158,57 +134,38 @@ RIASEC scores and Holland Code calculation
 Career options mapped to RIASEC codes
 
 **Key Fields:**
-- `name`, `nameSwati` - Occupation names
+- `code` - 3-letter Holland code
+- `name` - Occupation name
 - `hollandCodes` - Array of matching codes
-- `primaryRiasec`, `secondaryRiasec` - Main categories
-- `educationRequired` - Entry requirements
-- `demandLevel` - Labor market demand
-- `availableInEswatini` - Local availability
-- `localDemand` - Eswatini-specific demand
-- `skills` - Required competencies
-- `averageSalary` - Compensation info
-
-#### **occupation_recommendations**
-Links test results to suggested careers
-
-**Key Fields:**
-- `resultId` - Test result
-- `occupationId` - Recommended occupation
-- `matchScore` - 0-100 compatibility
-- `rank` - Recommendation order
-- `matchExplanation` - Why this matches
-
-#### **careers**
-Detailed career pathway information
-
-**Key Fields:**
-- `name`, `field`, `subfield` - Career classification
-- `educationPathways` - JSONB with training routes
-- `employmentOutlook` - Market trends
-- `localDemand` - Eswatini needs
-- `governmentPriority` - National development alignment
-- `requiredSkills`, `softSkills` - Competencies
-- `careerProgression` - Advancement path
+- `primaryRiasec`, `secondaryRiasec`
+- `description`, `category`
+- `educationLevel` - FK → education_levels.level
+- `educationRequired` - Text
+- `demandLevel`, `localDemand`
+- `availableInEswatini` (boolean)
+- `skills` - Array of strings
 
 #### **institutions**
 Educational institutions in Eswatini
 
 **Key Fields:**
-- `name`, `acronym` - Institution identity
-- `type` - `university` | `college` | `tvet` | `vocational`
-- `region` - Geographic location
-- `programs` - JSONB course offerings
-- `bursariesAvailable` - Financial aid
-- `bursaryInfo` - JSONB scholarship details
-- `admissionRequirements` - Entry criteria
-- `facilities`, `studentServices` - Campus resources
+- `id` (UUID)
+- `name`, `nameSwati` (optional), `acronym`
+- `type` - `university` | `college` | `tvet` | `school` | `vocational` | `other`
+- `region`, `district`
+- `description`, `descriptionSwati`
+- `phoneNumber`, `email`, `website`
+- `accredited` (boolean)
+- `programs` - JSONB offerings
+- `bursariesAvailable` (boolean)
+- `facilities` - string[]
 
-**Major Institutions:**
-- UNESWA (University of Eswatini)
-- ECOT (Eswatini College of Technology)
-- GVTI (Gwamile Vocational and Commercial Training Institute)
-- SANU (Southern African Nazarene University)
-- Limkokwing University
+#### **education_levels**
+Lookup table for education level codes
+
+**Key Fields:**
+- `level` (integer) - Primary key
+- `description` (string, required)
 
 ---
 
@@ -244,24 +201,25 @@ logger.info({
 });
 ```
 
+**Validation Notes:**
+- `actionType` must match defined enum values in the model
+
 ---
 
 ## Relationships
 
 ### One-to-Many
-- User → TestAttempts (user can take multiple tests)
-- Test → TestSections (test has multiple sections)
-- TestSection → Questions (section has multiple questions)
-- TestAttempt → TestResponses (attempt has multiple responses)
-- TestResult → OccupationRecommendations (result has multiple recommendations)
+- User → Assessments (user can take multiple assessments)
+- Assessment → Answers (assessment has many answers)
+- Institution → Users (optional affiliation)
+- EducationLevel → Users (via educationLevel)
+- EducationLevel → Occupations (via educationLevel)
 
 ### One-to-One
-- TestAttempt ↔ TestResult (each attempt has one result)
+- (none currently — results are embedded on assessments)
 
 ### Many-to-Many
-- Occupation ↔ Career (through occupation_careers)
-- Occupation ↔ Institution (through occupation_institutions)
-- Career ↔ Institution (through career_institutions)
+- (none documented in current models)
 
 ---
 
@@ -270,22 +228,19 @@ logger.info({
 ### Performance Indexes
 ```sql
 -- User lookups
-users(email), users(national_id), users(role)
+users(email), users(national_id), users(role), users(institution_id), users(education_level), users(is_active), users(is_email_verified)
 
--- Test progress
-test_attempts(user_id, test_id), test_attempts(status)
+-- Assessments
+assessments(user_id), assessments(status), assessments(completed_at), assessments(user_id, status), assessments(holland_code), assessments(created_at)
 
--- Responses
-test_responses(attempt_id, question_id)
-
--- Results analysis
-test_results(holland_code), test_results(primary_interest)
+-- Answers
+answers(assessment_id, question_id) UNIQUE, answers(question_id), answers(assessment_id), answers(section), answers(riasec_type), answers(assessment_id, section)
 
 -- Career matching
 occupations(primary_riasec), occupations(holland_codes) USING GIN
 
 -- Audit trails
-audit_logs(user_id), audit_logs(action), audit_logs(created_at)
+audit_logs(user_id), audit_logs(action_type), audit_logs(created_at)
 ```
 
 ---
