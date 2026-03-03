@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const response = await api.post('/api/v1/auth/login', credentials);
       localStorage.setItem('token', response.data.token);
-      setUser(response.data.user);
+      setUser(response.data.data?.user ?? response.data.user);
       setIsAuthenticated(true);
       return response.data;
     } catch (err) {
@@ -41,6 +41,12 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const setSession = (token, userData) => {
+    if (token) localStorage.setItem('token', token);
+    setUser(userData ?? null);
+    setIsAuthenticated(!!userData);
   };
 
   const logout = async () => {
@@ -60,7 +66,8 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     loading,
     login,
-    logout
+    logout,
+    setSession
   };
 
   return (

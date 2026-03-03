@@ -18,12 +18,13 @@ import AdminDashboard from './pages/AdminDashboard';
 import CounsellorDashboard from './pages/CounsellorDashboard';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
+import Onboarding from './pages/Onboarding';
 import './index.css';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -33,6 +34,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           
           {/* Error Pages */}
           <Route path="/unauthorized" element={<Unauthorized />} />
@@ -80,8 +82,8 @@ function App() {
           {/* Catch-all Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

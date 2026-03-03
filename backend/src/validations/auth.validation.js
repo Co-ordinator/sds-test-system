@@ -48,51 +48,28 @@ const validateNationalId = (value, helpers) => {
 // Password requirements: min 8 chars, at least 1 letter and 1 number
 const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
 
+const phonePattern = /^\+268\d{8}$/;
+
+// Simple registration: email OR phone, password, consent. One identifier required.
 const register = Joi.object({
-  username: Joi.string().alphanum().min(3).max(50).optional(),
-  email: Joi.string().email().optional().messages({
+  email: Joi.string().email().allow('', null).optional().messages({
     'string.email': 'Please provide a valid email address'
+  }),
+  phoneNumber: Joi.string().pattern(phonePattern).allow('', null).optional().messages({
+    'string.pattern.base': 'Phone must be in Eswatini format (+268 followed by 8 digits)'
   }),
   password: Joi.string().pattern(passwordPattern).required().messages({
     'string.pattern.base': 'Password must be at least 8 characters and contain both letters and numbers',
     'any.required': 'Password is required'
   }),
-  firstName: Joi.string().required().messages({
-    'any.required': 'First name is required'
-  }),
-  lastName: Joi.string().required().messages({
-    'any.required': 'Last name is required'
-  }),
-  nationalId: Joi.string().custom(validateNationalId, 'National ID validation').required().messages({
-    'string.pattern.base': 'Invalid National ID. Must be exactly 13 digits',
-    'date.invalid': 'Invalid National ID. First 6 digits must represent a valid date (YYMMDD)',
-    'luhn.invalid': 'Invalid National ID. Failed checksum verification',
-    'any.required': 'National ID is required'
-  }),
-  role: Joi.string().valid('admin', 'counselor', 'user').required().messages({
-    'any.only': 'Role must be one of admin, counselor, or user',
-    'any.required': 'Role is required'
-  }),
-  region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').required().messages({
-    'any.only': 'Region must be one of hhohho, manzini, lubombo, or shiselweni',
-    'any.required': 'Region is required'
-  }),
-  dateOfBirth: Joi.date().iso().less('now').required().messages({
-    'date.base': 'Date of birth must be a valid date',
-    'date.format': 'Date of birth must be in YYYY-MM-DD format',
-    'date.less': 'Date of birth must be in the past',
-    'any.required': 'Date of birth is required'
-  }),
   consent: Joi.boolean().valid(true).required().messages({
     'boolean.base': 'You must accept the data processing terms',
     'any.only': 'You must accept the data processing terms to register',
     'any.required': 'You must accept the data processing terms to register'
-  }),
-  gender: Joi.string().valid('male', 'female', 'other', 'prefer_not_to_say').optional(),
-  phoneNumber: Joi.string().pattern(/^\+268\d{8}$/).optional().messages({
-    'string.pattern.base': 'Phone number must be in Eswatini format (+268 followed by 8 digits)'
   })
-}).or('email', 'username');
+}).or('email', 'phoneNumber').messages({
+  'object.missing': 'Email or phone is required'
+});
 
 const login = Joi.object({
   identifier: Joi.string().required().messages({

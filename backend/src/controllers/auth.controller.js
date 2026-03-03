@@ -35,136 +35,113 @@ const setRefreshTokenCookie = (res, token) => {
   });
 };
 
-// Register new user
+// Register new user (email OR phone, password, consent; verify email only when email provided)
 const register = async (req, res, next) => {
   try {
-    const { 
-      email, 
-      password, 
-      firstName, 
-      lastName, 
-      nationalId, 
-      role, 
-      region,
-      dateOfBirth,
-      gender,
-      phoneNumber,
-      educationLevel,
-      employmentStatus,
-      preferredLanguage,
-      consent
-    } = req.body;
-    
-    // Validate consent
+    const { email, password, phoneNumber, consent } = req.body;
+    const hasEmail = email && String(email).trim().length > 0;
+    const hasPhone = phoneNumber && String(phoneNumber).trim().length > 0;
+
     if (!consent) {
       logger.warn({
         actionType: 'REGISTER_FAILED',
         message: 'Registration attempted without consent',
         req,
-        details: {
-          email: email
-        }
+        details: { email: email || phoneNumber }
       });
       return res.status(400).json({
         status: 'error',
         message: 'You must accept the data processing terms to register.'
       });
     }
-    
-    // Prevent self-registration of admin users
-    if (role === 'admin') {
-      return res.status(403).json({
+
+    if (!hasEmail && !hasPhone) {
+      return res.status(400).json({
         status: 'error',
-        message: 'Admin registration not allowed'
+        message: 'Email or phone is required'
       });
     }
 
-    // Generate email verification token
     const emailToken = crypto.randomBytes(32).toString('hex');
     const emailTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     const user = await User.create({
-      email,
+      email: hasEmail ? email.trim() : null,
       password,
-      firstName,
-      lastName,
-      nationalId,
-      role,
-      region,
-      dateOfBirth,
-      gender,
-      phoneNumber,
-      educationLevel,
-      employmentStatus,
-      preferredLanguage,
+      firstName: 'Pending',
+      lastName: 'User',
+      role: 'user',
+      phoneNumber: hasPhone ? phoneNumber.trim() : null,
       isConsentGiven: true,
       consentDate: new Date(),
-      emailVerificationToken: emailToken,
-      emailVerificationExpires: emailTokenExpires
+      emailVerificationToken: hasEmail ? emailToken : null,
+      emailVerificationExpires: hasEmail ? emailTokenExpires : null
     });
 
     logger.info({
       actionType: 'REGISTER',
-      message: `User registered: ${user.email}`,
+      message: `User registered: ${user.email || user.phoneNumber}`,
       req,
       details: {
         email: user.email,
+        phoneNumber: user.phoneNumber,
         role: user.role
       }
     });
 
-    // Send welcome and verification email
-    try {
-      await sendEmail({
-        email: user.email,
-        subject: 'Welcome to SDS Test System - Verify Your Email',
-        template: 'welcome-verify',
-        context: {
-          firstName: user.firstName,
-          lastName: user.lastName,
+    // Send welcome and verification email only when user has email
+    if (user.email) {
+      try {
+        await sendEmail({
           email: user.email,
-          region: user.region,
-          verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}`
-        }
-      });
-
-      await AuditLog.create({
-        userId: user.id,
-        actionType: 'WELCOME_EMAIL_SENT',
-        description: 'Welcome email sent',
-        details: {
-          resourceType: 'email',
-          resourceId: user.id,
-          requestMethod: 'POST',
-          requestPath: '/api/v1/auth/register'
-        },
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
-      });
-    } catch (emailError) {
-      logger.error({
-        actionType: 'REGISTER_FAILED',
-        message: 'Email sending error',
-        req,
-        details: {
-          error: emailError.message,
-          stack: emailError.stack
-        }
-      });
-      await AuditLog.create({
-        userId: user.id,
-        actionType: 'EMAIL_FAILURE',
-        description: 'Failed to send welcome email',
-        details: {
-          resourceType: 'email',
-          resourceId: user.id,
-          errorMessage: emailError.message,
-          requestMethod: 'POST',
-          requestPath: '/api/v1/auth/register'
-        },
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent']
-      });
+          subject: 'Welcome to SDS Test System - Verify Your Email',
+          template: 'welcome-verify',
+          context: {
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            region: user.region,
+            verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}`
+          }
+        });
+        await AuditLog.create({
+          userId: user.id,
+          actionType: 'WELCOME_EMAIL_SENT',
+          description: 'Welcome email sent',
+          details: {
+            resourceType: 'email',
+            resourceId: user.id,
+            requestMethod: 'POST',
+            requestPath: '/api/v1/auth/register'
+          },
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+      } catch (emailError) {
+        logger.error({
+          actionType: 'REGISTER_FAILED',
+          message: 'Email sending error',
+          req,
+          details: {
+            error: emailError.message,
+            stack: emailError.stack
+          }
+        });
+        await AuditLog.create({
+          userId: user.id,
+          actionType: 'EMAIL_FAILURE',
+          description: 'Failed to send welcome email',
+          details: {
+            resourceType: 'email',
+            resourceId: user.id,
+            errorMessage: emailError.message,
+            requestMethod: 'POST',
+            requestPath: '/api/v1/auth/register'
+          },
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent']
+        });
+      }
     }
 
     // Log registration
@@ -256,9 +233,20 @@ const verifyEmail = async (req, res, next) => {
       userAgent: req.headers['user-agent']
     });
 
+    const token = signToken(user.id, user.role);
+    const refreshToken = signRefreshToken(user.id, user.role);
+    user.refreshToken = refreshToken;
+    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await user.save();
+    setRefreshTokenCookie(res, refreshToken);
+
     res.status(200).json({
       status: 'success',
-      message: 'Email successfully verified!'
+      message: 'Email successfully verified!',
+      token,
+      data: {
+        user: user.toJSON()
+      }
     });
   } catch (error) {
     logger.error({
