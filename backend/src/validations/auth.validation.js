@@ -114,8 +114,35 @@ const resetPassword = Joi.object({
   })
 });
 
+const updateProfile = Joi.object({
+  phoneNumber: Joi.string().pattern(/^\+268\d{8}$/).allow('', null),
+  region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').allow('', null),
+  district: Joi.string().allow('', null),
+  address: Joi.string().allow('', null),
+  educationLevel: Joi.string().uuid().allow('', null),
+  currentInstitution: Joi.string().allow('', null),
+  gradeLevel: Joi.string().allow('', null),
+  employmentStatus: Joi.string().valid('student', 'employed', 'unemployed', 'self_employed', 'other').allow('', null),
+  currentOccupation: Joi.string().allow('', null),
+  preferredLanguage: Joi.string().valid('en', 'ss').allow('', null),
+  requiresAccessibility: Joi.boolean().allow(null),
+  accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).allow(null)
+}).min(1);
+
+const forgotPasswordBody = Joi.object({
+  identifier: Joi.string().optional(),
+  email: Joi.string().email().optional()
+}).or('identifier', 'email');
+
+const resendVerification = Joi.object({
+  email: Joi.string().email().required().messages({ 'any.required': 'Email is required' })
+});
+
 module.exports = {
   register,
   login,
-  resetPassword
+  resetPassword,
+  updateProfile,
+  forgotPasswordBody,
+  resendVerification
 };

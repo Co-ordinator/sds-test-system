@@ -1,4 +1,4 @@
-const logger = require('../config/logger');
+const logger = require('../utils/logger');
 
 const errorHandler = (err, req, res, next) => {
   if (process.env.NODE_ENV === 'production') {

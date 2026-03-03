@@ -4,14 +4,11 @@ import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import api from '../services/api';
 
 const AdminDashboard = () => {
-  // Mock Data for Charts
-  const riasecData = [
-    { name: 'R', value: 75 }, { name: 'I', value: 68 }, { name: 'A', value: 55 },
-    { name: 'S', value: 82 }, { name: 'E', value: 70 }, { name: 'C', value: 60 },
-  ];
-
   const [activeTab, setActiveTab] = useState('users');
   const [institutions, setInstitutions] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [instSearch, setInstSearch] = useState('');
   const [newInst, setNewInst] = useState({ name: '', type: 'school', region: 'hhohho' });
   const [isSaving, setIsSaving] = useState(false);
@@ -21,12 +18,50 @@ const AdminDashboard = () => {
       try {
         const res = await api.get('/api/v1/institutions');
         setInstitutions(res.data?.data?.institutions || []);
-      } catch (err) {
+      } catch {
         setInstitutions([]);
       }
     };
     loadInstitutions();
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const loadUsers = async () => {
+      try {
+        const res = await api.get('/api/v1/admin/users');
+        setUsers(res.data?.data?.users || []);
+      } catch {
+        setUsers([]);
+      }
+    };
+    loadUsers();
+  }, [activeTab]);
+
+  useEffect(() => {
+    const loadAnalytics = async () => {
+      try {
+        const res = await api.get('/api/v1/admin/analytics');
+        setAnalytics(res.data?.data || null);
+      } catch {
+        setAnalytics(null);
+      }
+    };
+    loadAnalytics();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'settings') return;
+    const loadAuditLogs = async () => {
+      try {
+        const res = await api.get('/api/v1/admin/audit-logs');
+        setAuditLogs(res.data?.data?.logs || []);
+      } catch {
+        setAuditLogs([]);
+      }
+    };
+    loadAuditLogs();
+  }, [activeTab]);
 
   const filteredInstitutions = useMemo(() => {
     if (!instSearch) return institutions;
@@ -57,10 +92,10 @@ const AdminDashboard = () => {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <MetricCard title="Total Users" value="15,245" Icon={Users} />
-        <MetricCard title="Tests Completed" value="8,912" Icon={FileCheck} />
-        <MetricCard title="Active Users (30 Days)" value="3,100" Icon={Activity} />
-        <MetricCard title="Institutions Registered" value={institutions.length.toString()} Icon={Building2} />
+        <MetricCard title="Total Users" value={analytics?.totals?.users ?? users.length ?? '–'} Icon={Users} />
+        <MetricCard title="Tests Completed" value={analytics?.totals?.completedAssessments ?? '–'} Icon={FileCheck} />
+        <MetricCard title="Completion Rate" value={analytics?.completionRate != null ? `${analytics.completionRate}%` : '–'} Icon={Activity} />
+        <MetricCard title="Institutions" value={institutions.length.toString()} Icon={Building2} />
       </div>
 
       {/* Tabs / Quick Actions */}
@@ -81,25 +116,34 @@ const AdminDashboard = () => {
 
       {activeTab === 'users' && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b flex justify-between items-center">
-            <h3 className="font-bold">Test Taker Management</h3>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Apply Filters</button>
+          <div className="p-6 border-b">
+            <h3 className="font-bold text-slate-800">User Management</h3>
           </div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-slate-500 uppercase">
-              <tr>
-                <th className="p-4">Name</th>
-                <th className="p-4">Email</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Score</th>
-                <th className="p-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              <TableRow name="Alice Johnson" email="alice.j@example.com" status="Completed" score="85%" />
-              <TableRow name="Bob Williams" email="bob.w@example.com" status="In Progress" score="60%" />
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-slate-500 uppercase">
+                <tr>
+                  <th className="p-4">Name</th>
+                  <th className="p-4">Email</th>
+                  <th className="p-4">Role</th>
+                  <th className="p-4">Region</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {users.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50">
+                    <td className="p-4 font-medium text-slate-800">{u.firstName} {u.lastName}</td>
+                    <td className="p-4 text-slate-600">{u.email || '–'}</td>
+                    <td className="p-4"><span className="capitalize">{u.role}</span></td>
+                    <td className="p-4 text-slate-600 capitalize">{u.region || '–'}</td>
+                  </tr>
+                ))}
+                {users.length === 0 && (
+                  <tr><td colSpan={4} className="p-4 text-slate-400">No users found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -204,17 +248,66 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Analytics Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <ChartCard title="RIASEC Score Distribution">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={riasecData}><Bar dataKey="value" fill="#5D5FEF" radius={[4, 4, 0, 0]} /></BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
-        <ChartCard title="Test Completion Rates">
-            {/* Donut Chart logic here */}
-        </ChartCard>
-      </div>
+      {activeTab === 'reports' && analytics && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <ChartCard title="RIASEC Averages">
+            {analytics.riasecAverages && (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart
+                  data={[
+                    { name: 'R', value: Number(analytics.riasecAverages.avgR || 0) },
+                    { name: 'I', value: Number(analytics.riasecAverages.avgI || 0) },
+                    { name: 'A', value: Number(analytics.riasecAverages.avgA || 0) },
+                    { name: 'S', value: Number(analytics.riasecAverages.avgS || 0) },
+                    { name: 'E', value: Number(analytics.riasecAverages.avgE || 0) },
+                    { name: 'C', value: Number(analytics.riasecAverages.avgC || 0) }
+                  ]}
+                >
+                  <Bar dataKey="value" fill="#5D5FEF" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
+          <ChartCard title="Summary">
+            <div className="space-y-2 text-sm">
+              <p><span className="font-medium">Completion rate:</span> {analytics.completionRate}%</p>
+              <p><span className="font-medium">Total assessments:</span> {analytics.totals?.assessments ?? '–'}</p>
+              <p><span className="font-medium">Completed:</span> {analytics.totals?.completedAssessments ?? '–'}</p>
+            </div>
+          </ChartCard>
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b">
+            <h3 className="font-bold text-slate-800">Audit logs (latest 100)</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-slate-500 uppercase">
+                <tr>
+                  <th className="p-4">Time</th>
+                  <th className="p-4">Action</th>
+                  <th className="p-4">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {auditLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-gray-50">
+                    <td className="p-4 text-slate-600">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '–'}</td>
+                    <td className="p-4 font-medium">{log.actionType || '–'}</td>
+                    <td className="p-4 text-slate-600">{log.description || '–'}</td>
+                  </tr>
+                ))}
+                {auditLogs.length === 0 && (
+                  <tr><td colSpan={3} className="p-4 text-slate-400">No audit logs.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -231,24 +324,6 @@ const MetricCard = ({ title, value, Icon }) => (
       </div>
     </div>
   </div>
-);
-
-const TableRow = ({ name, email, status, score }) => (
-  <tr className="hover:bg-gray-50">
-    <td className="p-4 font-medium">{name}</td>
-    <td className="p-4 text-slate-500">{email}</td>
-    <td className="p-4">
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-        status === 'Completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-      }`}>
-        {status}
-      </span>
-    </td>
-    <td className="p-4 font-medium">{score}</td>
-    <td className="p-4">
-      <button className="text-blue-600 hover:text-blue-700 text-sm">View Details</button>
-    </td>
-  </tr>
 );
 
 const ChartCard = ({ title, children }) => (

@@ -34,23 +34,56 @@ export default function Profile() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await api.get('/api/v1/auth/users/me');
-        setUserData(response.data);
-        reset(response.data); // Populate form with existing data
+        const response = await api.get('/api/v1/auth/me');
+        const user = response.data?.data?.user || response.data?.user;
+        if (user) {
+          setUserData(user);
+          reset(user);
+        }
       } catch (err) {
-        // Handle error
+        setUserData({});
       }
     };
-    
+
     fetchUserData();
   }, [reset]);
 
   const onSubmit = async (data) => {
     try {
-      await api.patch('/api/v1/auth/users/me', data);
-      // Handle success
+      await api.patch('/api/v1/auth/me', data);
+      setUserData((prev) => ({ ...prev, ...data }));
     } catch (err) {
-      // Handle error
+      console.error(err.response?.data?.message || 'Update failed');
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      const res = await api.get('/api/v1/auth/users/me/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `my-sds-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err.response?.data?.message || 'Export failed');
+    }
+  };
+
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirm !== 'DELETE') return;
+    setIsDeleting(true);
+    try {
+      await api.delete('/api/v1/auth/users/me/account');
+      localStorage.removeItem('token');
+      window.location.href = '/';
+    } catch (err) {
+      console.error(err.response?.data?.message || 'Deletion failed');
+      setIsDeleting(false);
     }
   };
 
@@ -218,6 +251,40 @@ export default function Profile() {
           </button>
         </div>
       </form>
+
+      {/* Data subject rights */}
+      <div className="mt-10 bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <h2 className="text-lg font-medium text-gray-800 mb-2">Your data rights</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Under data protection law you can request a copy of your data or request account deletion.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <button
+            type="button"
+            onClick={handleExportData}
+            className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            Export my data
+          </button>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Type DELETE to confirm"
+              value={deleteConfirm}
+              onChange={(e) => setDeleteConfirm(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm w-48"
+            />
+            <button
+              type="button"
+              onClick={handleDeleteAccount}
+              disabled={deleteConfirm !== 'DELETE' || isDeleting}
+              className="px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeleting ? 'Deleting…' : 'Delete account'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

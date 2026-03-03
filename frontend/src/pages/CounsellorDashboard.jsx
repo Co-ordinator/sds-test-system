@@ -1,73 +1,54 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Users, FileCheck, Calendar, TrendingUp, Search, Filter, Download, Eye, Building2 } from 'lucide-react';
+import { Users, FileCheck, TrendingUp, Eye, Building2 } from 'lucide-react';
 import api from '../services/api';
 
 const CounsellorDashboard = () => {
   const { user } = useAuth();
-
-  // Mock data for the dashboard
-  const stats = [
-    { title: 'Total Students', value: '156', icon: Users, color: 'bg-blue-50 text-blue-600' },
-    { title: 'Tests Completed', value: '89', icon: FileCheck, color: 'bg-green-50 text-green-600' },
-    { title: 'Appointments Today', value: '4', icon: Calendar, color: 'bg-purple-50 text-purple-600' },
-    { title: 'Completion Rate', value: '78%', icon: TrendingUp, color: 'bg-orange-50 text-orange-600' },
-  ];
-
+  const navigate = useNavigate();
+  const [students, setStudents] = useState([]);
+  const [stats, setStats] = useState(null);
   const [institutions, setInstitutions] = useState([]);
-  const [selectedInstitution, setSelectedInstitution] = useState('');
-  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    const loadInstitutions = async () => {
+    const load = async () => {
       try {
-        const res = await api.get('/api/v1/institutions');
-        setInstitutions(res.data?.data?.institutions || []);
-      } catch (err) {
+        const [studentsRes, statsRes, instRes] = await Promise.all([
+          api.get('/api/v1/counselor/students'),
+          api.get('/api/v1/counselor/institution-stats').catch(() => ({ data: { data: null } })),
+          api.get('/api/v1/institutions')
+        ]);
+        setStudents(studentsRes.data?.data?.students || []);
+        setStats(statsRes.data?.data || null);
+        setInstitutions(instRes.data?.data?.institutions || []);
+      } catch {
+        setStudents([]);
+        setStats(null);
         setInstitutions([]);
       }
     };
-    loadInstitutions();
+    load();
   }, []);
 
-  const recentTests = [
-    { id: 1, student: 'Alice Johnson', date: '2024-01-25', status: 'Completed', score: '85%', type: 'SDS Assessment', institutionId: 'inst-1', institutionName: 'UNESWA' },
-    { id: 2, student: 'Bob Smith', date: '2024-01-24', status: 'In Progress', score: '45%', type: 'SDS Assessment', institutionId: 'inst-2', institutionName: 'ECOT' },
-    { id: 3, student: 'Carol Davis', date: '2024-01-24', status: 'Completed', score: '92%', type: 'SDS Assessment', institutionId: 'inst-1', institutionName: 'UNESWA' },
-    { id: 4, student: 'David Wilson', date: '2024-01-23', status: 'Pending', score: '-', type: 'SDS Assessment', institutionId: 'inst-3', institutionName: 'SANU' },
-  ];
+  const recentTests = students.map((s) => ({
+    id: s.id,
+    student: `${s.firstName} ${s.lastName}`,
+    email: s.email,
+    latestAssessment: s.latestAssessment,
+    date: s.latestAssessment?.completedAt || s.latestAssessment?.createdAt,
+    status: s.latestAssessment?.status === 'completed' ? 'Completed' : s.latestAssessment?.status === 'in_progress' ? 'In Progress' : 'Pending',
+    score: s.latestAssessment?.status === 'completed' ? (s.latestAssessment?.hollandCode || '–') : (s.latestAssessment?.progress != null ? `${Math.round(s.latestAssessment.progress)}%` : '–'),
+    assessmentId: s.latestAssessment?.id
+  })).filter((t) => t.latestAssessment).sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
-  const filteredTests = useMemo(() => {
-    if (!selectedInstitution) return recentTests;
-    return recentTests.filter((t) => t.institutionId === selectedInstitution);
-  }, [recentTests, selectedInstitution]);
-
-  const handleExport = async (format) => {
-    setIsExporting(true);
-    try {
-      const res = await api.get('/api/v1/results/export', {
-        params: { institutionId: selectedInstitution || undefined, format: format.toLowerCase() },
-        responseType: 'blob'
-      });
-      const blob = new Blob([res.data], { type: format === 'CSV' ? 'text/csv' : 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `report${selectedInstitution ? `-${selectedInstitution}` : ''}.${format === 'CSV' ? 'csv' : 'pdf'}`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      // optional: add toast/notification
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const appointments = [
-    { id: 1, student: 'Emma Thompson', time: '09:00 AM', type: 'Career Guidance', status: 'Confirmed' },
-    { id: 2, student: 'Frank Miller', time: '10:30 AM', type: 'Results Review', status: 'Confirmed' },
-    { id: 3, student: 'Grace Lee', time: '02:00 PM', type: 'Career Guidance', status: 'Pending' },
-    { id: 4, student: 'Henry Brown', time: '03:30 PM', type: 'Follow-up', status: 'Confirmed' },
+  const totalStudents = students.length;
+  const completedCount = recentTests.filter((t) => t.status === 'Completed').length;
+  const completionRate = totalStudents > 0 ? Math.round((completedCount / totalStudents) * 100) : 0;
+  const statCards = [
+    { title: 'Total Students', value: String(totalStudents), icon: Users, color: 'bg-blue-50 text-blue-600' },
+    { title: 'Tests Completed', value: String(completedCount), icon: FileCheck, color: 'bg-green-50 text-green-600' },
+    { title: 'Completion Rate', value: `${completionRate}%`, icon: TrendingUp, color: 'bg-orange-50 text-orange-600' },
   ];
 
   return (
@@ -79,8 +60,8 @@ const CounsellorDashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {statCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
@@ -100,44 +81,9 @@ const CounsellorDashboard = () => {
         {/* Recent Tests - Takes 2 columns */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-50">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <FileCheck className="w-5 h-5 text-slate-400" />
-                <h3 className="font-bold text-slate-800">Recent Test Activity</h3>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Building2 className="w-4 h-4" />
-                  <select
-                    className="border border-gray-200 rounded-md px-3 py-1 text-sm"
-                    value={selectedInstitution}
-                    onChange={(e) => setSelectedInstitution(e.target.value)}
-                  >
-                    <option value="">All institutions</option>
-                    {institutions.map((inst) => (
-                      <option key={inst.id} value={inst.id}>{inst.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="p-2 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-1 text-slate-600"
-                    onClick={() => handleExport('CSV')}
-                    disabled={isExporting}
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="text-xs">CSV</span>
-                  </button>
-                  <button
-                    className="p-2 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-1 text-slate-600"
-                    onClick={() => handleExport('PDF')}
-                    disabled={isExporting}
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="text-xs">PDF</span>
-                  </button>
-                </div>
-              </div>
+            <div className="flex items-center gap-2">
+              <FileCheck className="w-5 h-5 text-slate-400" />
+              <h3 className="font-bold text-slate-800">Recent Test Activity</h3>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -153,24 +99,33 @@ const CounsellorDashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {filteredTests.map((test) => (
+                {recentTests.length === 0 && (
+                  <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500">No students with assessments yet.</td></tr>
+                )}
+                {recentTests.map((test) => (
                   <tr key={test.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
                         <p className="text-sm font-medium text-slate-700">{test.student}</p>
-                        <p className="text-xs text-slate-400 flex items-center gap-1"><Building2 className="w-3 h-3" /> {test.institutionName || 'N/A'}</p>
+                        <p className="text-xs text-slate-400">{test.email || '–'}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{test.date}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{test.type}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">{test.date ? new Date(test.date).toLocaleDateString() : '–'}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">SDS Assessment</td>
                     <td className="px-6 py-4">
                       <StatusBadge status={test.status} />
                     </td>
                     <td className="px-6 py-4 text-sm font-mono text-slate-600">{test.score}</td>
                     <td className="px-6 py-4">
-                      <button className="text-slate-600 hover:text-slate-700 p-1">
-                        <Eye className="w-4 h-4" />
-                      </button>
+                      {test.status === 'Completed' && test.assessmentId && (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/results', { state: { assessmentId: test.assessmentId } })}
+                          className="text-indigo-600 hover:text-indigo-700 text-sm"
+                        >
+                          View results
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -182,30 +137,23 @@ const CounsellorDashboard = () => {
           </div>
         </div>
 
-        {/* Today's Appointments */}
+        {/* Student list summary */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-50">
             <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-slate-400" />
-              <h3 className="font-bold text-slate-800">Today's Appointments</h3>
+              <Building2 className="w-5 h-5 text-slate-400" />
+              <h3 className="font-bold text-slate-800">Your students</h3>
             </div>
           </div>
-          <div className="divide-y divide-gray-50">
-            {appointments.map((appointment) => (
-              <div key={appointment.id} className="p-4 hover:bg-gray-50/50 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-700">{appointment.student}</p>
-                    <p className="text-xs text-slate-500 mt-1">{appointment.time}</p>
-                    <p className="text-xs text-slate-400 mt-1">{appointment.type}</p>
-                  </div>
-                  <StatusBadge status={appointment.status} />
-                </div>
+          <div className="divide-y divide-gray-50 p-4">
+            {students.slice(0, 10).map((s) => (
+              <div key={s.id} className="py-2">
+                <p className="text-sm font-medium text-slate-700">{s.firstName} {s.lastName}</p>
+                <p className="text-xs text-slate-500">{s.email || '–'}</p>
               </div>
             ))}
-          </div>
-          <div className="p-4 bg-gray-50/50 text-center">
-            <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">View All Appointments</button>
+            {students.length === 0 && <p className="text-slate-500 text-sm">No students assigned.</p>}
+            {students.length > 10 && <p className="text-slate-400 text-xs pt-2">+ {students.length - 10} more</p>}
           </div>
         </div>
       </div>

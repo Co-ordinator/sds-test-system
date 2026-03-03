@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morganMiddleware = require('./middleware/logging.middleware');
-const errorHandler = require('./middleware/errorHandler.middleware');
+const errorHandler = require('./middleware/errorHandling.middleware');
 const { globalLimiter } = require('./middleware/rateLimiting.middleware');
 require('dotenv').config();
 
@@ -50,12 +50,14 @@ app.use(globalLimiter);
 // Routes
 const authRoutes = require('./routes/auth.routes');
 const adminRoutes = require('./routes/admin.routes');
+const assessmentRoutes = require('./routes/assessment.routes');
 const resultRoutes = require('./routes/result.routes');
 const institutionRoutes = require('./routes/institution.routes');
 const counselorRoutes = require('./routes/counselor.routes');
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/assessments', assessmentRoutes);
 app.use('/api/v1/results', resultRoutes);
 app.use('/api/v1/institutions', institutionRoutes);
 app.use('/api/v1/counselor', counselorRoutes);

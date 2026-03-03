@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { User, AuditLog } = require('../models');
 const { logAuthAction } = require('../middleware/authentication.middleware');
-const { sendEmail } = require('../config/mail.config');
+const { sendEmail } = require('../config/email.config');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
 
@@ -432,23 +432,92 @@ const getMe = async (req, res, next) => {
   }
 };
 
-// Forgot password
+// Update current user profile (allowed fields only)
+const updateProfile = async (req, res, next) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    if (!user) {
+      return res.status(404).json({ status: 'error', message: 'User not found' });
+    }
+
+    const allowed = [
+      'phoneNumber', 'region', 'district', 'address', 'educationLevel',
+      'currentInstitution', 'gradeLevel', 'employmentStatus', 'currentOccupation',
+      'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds'
+    ];
+    const updates = {};
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key] === '' || req.body[key] === null ? null : req.body[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ status: 'error', message: 'No valid fields to update' });
+    }
+
+    await user.update(updates);
+
+    const updated = await User.findByPk(user.id, {
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken'] }
+    });
+
+    logger.info({
+      actionType: 'PROFILE_UPDATE',
+      message: `Profile updated: ${user.email}`,
+      req,
+      details: { userId: user.id }
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: { user: updated }
+    });
+  } catch (error) {
+    logger.error({
+      actionType: 'PROFILE_UPDATE_FAILED',
+      message: 'Failed to update profile',
+      req,
+      details: { error: error.message }
+    });
+    next(error);
+  }
+};
+
+// Forgot password (accepts email or identifier: email / nationalId)
 const forgotPassword = async (req, res, next) => {
   try {
-    const user = await User.findOne({ where: { email: req.body.email } });
-    
+    const identifier = (req.body.identifier || req.body.email || '').trim();
+    if (!identifier) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email or National ID is required'
+      });
+    }
+
+    const isEmail = identifier.includes('@');
+    const where = isEmail
+      ? { email: identifier }
+      : { nationalId: identifier };
+    const user = await User.findOne({ where });
+
     if (!user) {
       logger.warn({
         actionType: 'FORGOT_PASSWORD_FAILED',
         message: 'User not found',
         req,
-        details: {
-          email: req.body.email
-        }
+        details: { identifier: identifier.replace(/(?<=.).(?=.)/g, '*') }
       });
       return res.status(404).json({
         status: 'error',
-        message: 'No user found with that email'
+        message: 'No user found with that email or National ID'
+      });
+    }
+
+    if (!user.email) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Cannot send reset link: no email on file'
       });
     }
     
@@ -975,6 +1044,7 @@ module.exports = {
   register,
   login,
   getMe,
+  updateProfile,
   forgotPassword,
   resetPassword,
   verifyEmail,

@@ -21,14 +21,18 @@ router.post('/login', authLimiter, validate(authValidation.login), authControlle
 // Get current user profile
 router.get('/me', verifyToken, authController.getMe);
 
+// Update current user profile (PATCH /me or PATCH /users/me for compatibility)
+router.patch('/me', verifyToken, validate(authValidation.updateProfile), authController.updateProfile);
+router.patch('/users/me', verifyToken, validate(authValidation.updateProfile), authController.updateProfile);
+
 // Data Subject Rights - Export user data
 router.get('/users/me/export', verifyToken, authController.exportUserData);
 
 // Data Subject Rights - Delete user account
 router.delete('/users/me/account', verifyToken, authController.deleteUserAccount);
 
-// Forgot password
-router.post('/forgot-password', authController.forgotPassword);
+// Forgot password (body: identifier = email or nationalId, or email)
+router.post('/forgot-password', authLimiter, validate(authValidation.forgotPasswordBody), authController.forgotPassword);
 
 // Reset password
 router.post('/reset-password/:token', validate(authValidation.resetPassword), authController.resetPassword);

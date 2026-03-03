@@ -215,12 +215,17 @@ module.exports = {
         raw: true
       });
 
+      const totalUsers = await User.count();
+
       return res.status(200).json({
         status: 'success',
         data: {
           totals: {
+            users: totalUsers,
             students: studentCount,
-            counselors: counselorCount
+            counselors: counselorCount,
+            assessments: totalAssessments,
+            completedAssessments
           },
           completionRate: Number(completionRate.toFixed(2)),
           riasecAverages: averages

@@ -67,13 +67,13 @@ class ScoringService {
         status: 'completed',
         completedAt: new Date(),
         // Store the education level at time of completion for historical accuracy
-        educationLevelAtTest: assessment.user.currentEducationLevel 
+        educationLevelAtTest: assessment.user.educationLevel 
       }, { transaction });
 
       // 6. Fetch Matching Occupations based on Code AND Education Level (1-5)
       const recommendations = await this.getRecommendations(
         hollandCode, 
-        assessment.user.currentEducationLevel,
+        assessment.user.educationLevel,
         transaction
       );
 
