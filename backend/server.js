@@ -12,8 +12,8 @@ const start = async () => {
     logger.info('✅ Database connection established successfully');
 
     // Phase 2: Main sync
-    // await sequelize.sync({ force: process.env.NODE_ENV === 'development', alter: true });
-    // logger.info('✅ Database models synchronized');
+    await sequelize.sync({ force: process.env.NODE_ENV === 'development', alter: true });
+    logger.info('✅ Database models synchronized');
 
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
