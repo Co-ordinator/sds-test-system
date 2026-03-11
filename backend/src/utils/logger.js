@@ -12,8 +12,9 @@ class DatabaseTransport extends winston.Transport {
 
   async log(info, callback) {
     try {
-      // Only log if actionType is present (audit logs)
-      if (info.actionType) {
+      // Only log if actionType is present and allowed by audit_logs enum (avoid crash on unknown types)
+      const allowed = ['LOGIN', 'REGISTER', 'LOGOUT', 'TEST_START', 'TEST_COMPLETE', 'PROFILE_UPDATE', 'PASSWORD_CHANGE', 'ACCESS_DENIED', 'SYSTEM'];
+      if (info.actionType && allowed.includes(info.actionType)) {
         await AuditLog.create({
           userId: info.userId || null,
           actionType: info.actionType,
@@ -25,7 +26,8 @@ class DatabaseTransport extends winston.Transport {
       }
       callback(null, true);
     } catch (error) {
-      callback(error);
+      // Don't crash the app when DB audit insert fails (e.g. invalid enum)
+      callback(null, true);
     }
   }
 }

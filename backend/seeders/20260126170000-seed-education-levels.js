@@ -1,3 +1,5 @@
+const { v4: uuidv4 } = require('uuid');
+
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     const levels = [
@@ -10,6 +12,7 @@ module.exports = {
 
     const timestamp = new Date();
     await queryInterface.bulkInsert('education_levels', levels.map(l => ({
+      id: uuidv4(),
       ...l,
       created_at: timestamp,
       updated_at: timestamp

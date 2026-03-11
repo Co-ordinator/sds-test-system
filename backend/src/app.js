@@ -1,9 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 const morganMiddleware = require('./middleware/logging.middleware');
 const errorHandler = require('./middleware/errorHandling.middleware');
-const { globalLimiter } = require('./middleware/rateLimiting.middleware');
+const { apiLimiter } = require('./middleware/rateLimiting.middleware');
 require('dotenv').config();
 
 const app = express();
@@ -12,6 +13,7 @@ const app = express();
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(morganMiddleware);
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -44,8 +46,8 @@ app.use(helmet({
   frameguard: { action: 'deny' }
 }));
 
-// Global rate limiter
-app.use(globalLimiter);
+// API rate limiter
+app.use('/api/v1', apiLimiter);
 
 // Routes
 const authRoutes = require('./routes/auth.routes');

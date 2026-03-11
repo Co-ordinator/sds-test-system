@@ -242,6 +242,45 @@ module.exports = (sequelize, DataTypes) => {
       field: 'refresh_token_expires'
     },
     
+    // Extended user journey fields
+    userType: {
+      type: DataTypes.ENUM('school_student', 'university_student', 'professional', 'counselor', 'admin'),
+      allowNull: true,
+      field: 'user_type'
+    },
+    studentNumber: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: true,
+      field: 'student_number'
+    },
+    className: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'class_name'
+    },
+    studentCode: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: true,
+      field: 'student_code'
+    },
+    degreeProgram: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'degree_program'
+    },
+    yearOfStudy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'year_of_study'
+    },
+    yearsExperience: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'years_experience'
+    },
+
     // Counselor-specific fields
     counselorCode: {
       type: DataTypes.STRING,
@@ -261,8 +300,11 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['username'], unique: true },
       { fields: ['email'], unique: true },
       { fields: ['national_id'], unique: true },
+      { fields: ['student_number'], unique: true },
+      { fields: ['student_code'], unique: true },
       { fields: ['institution_id'] },
       { fields: ['role'] },
+      { fields: ['user_type'] },
       { fields: ['education_level'] },
       { fields: ['is_active'] },
       { fields: ['is_email_verified'] }
@@ -343,6 +385,11 @@ module.exports = (sequelize, DataTypes) => {
     User.belongsTo(models.Institution, {
       foreignKey: 'institutionId',
       as: 'institution'
+    });
+
+    User.hasOne(models.SchoolStudent, {
+      foreignKey: 'userId',
+      as: 'schoolStudent'
     });
   };
   

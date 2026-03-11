@@ -15,7 +15,15 @@ import TestResults from './pages/TestResults';
 import TestTakerDashboard from './pages/TestTakerDashboard';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminInstitutionsPage from './pages/admin/AdminInstitutionsPage';
+import AdminOccupationsPage from './pages/admin/AdminOccupationsPage';
+import AdminResultsPage from './pages/admin/AdminResultsPage';
+import AdminQuestionsPage from './pages/admin/AdminQuestionsPage';
+import AdminAuditPage from './pages/admin/AdminAuditPage';
+import Notifications from './pages/Notifications';
 import CounsellorDashboard from './pages/CounsellorDashboard';
+import Analytics from './pages/Analytics';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
 import Onboarding from './pages/Onboarding';
@@ -67,14 +75,59 @@ function App() {
           } />
 
           {/* Admin Routes */}
-          <Route path="/admin/*" element={
+          <Route path="/admin" element={
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminDashboard />
             </ProtectedRoute>
           } />
-          {/* Counselor Routes */}
+          <Route path="/admin/dashboard" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminUsersPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/institutions" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminInstitutionsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/occupations" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminOccupationsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/results" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminResultsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/questions" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminQuestionsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/audit" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminAuditPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/notifications" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Notifications />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/analytics" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Analytics />
+            </ProtectedRoute>
+          } />
+          {/* Counselor Routes — admin can also access student management */}
           <Route path="/counselor/*" element={
-            <ProtectedRoute allowedRoles={['counselor']}>
+            <ProtectedRoute allowedRoles={['counselor', 'admin']}>
               <CounsellorDashboard />
             </ProtectedRoute>
           } />

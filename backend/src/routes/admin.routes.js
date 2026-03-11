@@ -23,6 +23,7 @@ router.use(verifyToken, authorize(['admin']));
 // User management
 router.get('/users', AdminController.getAllUsers);
 router.get('/users/:id', AdminController.getUser);
+router.patch('/users/:id', AdminController.updateUser);
 router.delete('/users/:id', preventSelfDeletion, AdminController.deleteUser);
 
 // Question bank management
@@ -32,9 +33,7 @@ router.patch('/questions/:id', validate(updateQuestionSchema), QuestionControlle
 router.delete('/questions/:id', QuestionController.deleteQuestion);
 router.post(
   '/questions/import',
-  // Accept CSV uploads as raw text; JSON handled by default middleware
   express.text({ type: 'text/csv', limit: '10mb' }),
-  // For JSON body import validation
   (req, res, next) => {
     if (req.is('text/csv')) return next();
     return validate(importQuestionsSchema)(req, res, next);
@@ -61,6 +60,26 @@ router.get('/occupations/export', OccupationController.exportOccupations);
 
 // Analytics
 router.get('/analytics', AdminController.getAnalytics);
+router.get('/analytics/institutions', AdminController.getInstitutionAnalytics);
+router.get('/analytics/holland-distribution', AdminController.getHollandDistribution);
+router.get('/analytics/trend', AdminController.getAssessmentTrend);
+router.get('/analytics/regional', AdminController.getRegionalAnalytics);
+router.get('/analytics/knowledge-graph', AdminController.getKnowledgeGraphAnalytics);
+router.get('/analytics/export', AdminController.exportAnalytics);
+router.get('/analytics/segmentation', AdminController.getSegmentationAnalytics);
+router.get('/analytics/skills-pipeline', AdminController.getSkillsPipeline);
+
+// All assessments (admin view)
+router.get('/assessments', AdminController.getAllAssessments);
+
+// Data export
+router.get('/export/users', AdminController.exportUsers);
+router.get('/export/assessments', AdminController.exportAssessments);
+
+// Notifications
+router.get('/notifications', AdminController.getNotifications);
+router.patch('/notifications/:id/read', AdminController.markNotificationRead);
+router.post('/notifications/mark-all-read', AdminController.markAllNotificationsRead);
 
 // Audit logs
 router.get('/audit-logs', AdminController.getAuditLogs);

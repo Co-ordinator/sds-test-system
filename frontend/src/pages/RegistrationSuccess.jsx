@@ -55,7 +55,7 @@ export default function RegistrationSuccess() {
               <button
                 type="button"
                 onClick={() => setShowResendModal(true)}
-                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-opacity hover:opacity-95`}
+                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
                 style={{ backgroundColor: GOV.blue }}
               >
                 Resend verification link
@@ -63,7 +63,7 @@ export default function RegistrationSuccess() {
               <button
                 type="button"
                 onClick={() => navigate('/login')}
-                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-colors hover:bg-gray-50`}
+                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
                 style={{ borderColor: GOV.border, color: GOV.text }}
               >
                 Back to sign in

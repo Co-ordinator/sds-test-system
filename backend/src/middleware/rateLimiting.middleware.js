@@ -1,27 +1,32 @@
 const rateLimit = require('express-rate-limit');
 
-// Global limiter for all routes
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: {
-    status: 'error',
-    message: 'Too many requests from this IP, please try again after 15 minutes'
-  },
-  standardHeaders: true, // Return rate limit info in headers
-  legacyHeaders: false, // Disable legacy headers
-});
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isTest = process.env.NODE_ENV === 'test';
 
-// Auth limiter for login/register routes
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: {
-    status: 'error',
-    message: 'Too many attempts from this IP, please try again after 15 minutes'
-  },
+const baseConfig = {
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isDevelopment || isTest
+};
+
+const apiLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 15 * 60 * 1000,
+  max: 2000,
+  message: {
+    status: 'error',
+    message: 'Too many API requests from this IP, please try again after 15 minutes'
+  }
 });
 
-module.exports = { globalLimiter, authLimiter };
+const authLimiter = rateLimit({
+  ...baseConfig,
+  windowMs: 15 * 60 * 1000,
+  max: 25,
+  message: {
+    status: 'error',
+    message: 'Too many authentication attempts from this IP, please try again after 15 minutes'
+  }
+});
+
+module.exports = { apiLimiter, authLimiter };

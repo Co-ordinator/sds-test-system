@@ -13,10 +13,19 @@ export const AuthProvider = ({ children }) => {
   // Check for active session on initial load
   useEffect(() => {
     const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setUser(null);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await api.get('/api/v1/auth/me');
-        setUser(response.data);
-        setIsAuthenticated(true);
+        const userData = response.data?.data?.user ?? response.data?.user;
+        setUser(userData || null);
+        setIsAuthenticated(!!userData);
       } catch (err) {
         setUser(null);
         setIsAuthenticated(false);
@@ -30,7 +39,6 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      setLoading(true);
       const response = await api.post('/api/v1/auth/login', credentials);
       localStorage.setItem('token', response.data.token);
       setUser(response.data.data?.user ?? response.data.user);
@@ -38,8 +46,6 @@ export const AuthProvider = ({ children }) => {
       return response.data;
     } catch (err) {
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -85,13 +91,23 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
 
+  // Require email verification only when user has an email (phone-only users have no email to verify)
+  const needsEmailVerification = user?.email && !user?.isEmailVerified;
+  const isOnVerifyPage = window.location.pathname.includes('/verify-email');
+
+  const roleDashboard = (role) => {
+    if (role === 'admin') return '/admin';
+    if (role === 'counselor') return '/counselor';
+    return '/dashboard';
+  };
+
   useEffect(() => {
     if (!loading) {
       if (!isAuthenticated) {
         navigate('/login');
       } else if (allowedRoles && !allowedRoles.includes(user?.role)) {
-        navigate('/');
-      } else if (!user?.isEmailVerified && !window.location.pathname.includes('/verify-email')) {
+        navigate(roleDashboard(user?.role));
+      } else if (needsEmailVerification && !isOnVerifyPage) {
         navigate('/unauthorized', { 
           state: { 
             message: 'Please verify your email address to access this page',
@@ -100,10 +116,10 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
         });
       }
     }
-  }, [loading, isAuthenticated, user, allowedRoles, navigate]);
+  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage]);
 
-  if (loading || !isAuthenticated || (allowedRoles && !allowedRoles.includes(user?.role)) || (!user?.isEmailVerified && !window.location.pathname.includes('/verify-email'))) {
-    return null; // or loading spinner
+  if (loading || !isAuthenticated || (allowedRoles && !allowedRoles.includes(user?.role)) || (needsEmailVerification && !isOnVerifyPage)) {
+    return null;
   }
 
   return children;

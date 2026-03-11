@@ -15,16 +15,16 @@ export default function OnboardingLayout({ children }) {
 
       <button
         type="button"
-        className="absolute top-3 right-6 w-8 h-8 rounded-full flex items-center justify-center z-10"
-        style={{ backgroundColor: GOV.blueLight }}
+        className="absolute top-3 right-6 w-8 h-8 rounded-md flex items-center justify-center z-10 border"
+        style={{ backgroundColor: '#ffffff', borderColor: GOV.border }}
         aria-label="Help"
       >
         <span className="text-sm font-semibold" style={{ color: GOV.blue }}>?</span>
       </button>
 
-      <main className="flex-1 flex flex-col px-6 py-6">
-        <div className="max-w-lg mx-auto w-full flex-1 flex flex-col">
-          <Link to="/" className={`self-start ${LOGO.marginBottom}`} aria-label="Home">
+      <main className="flex-1 flex flex-col px-6 py-8">
+        <div className="max-w-xl mx-auto w-full flex-1 flex flex-col">
+          <Link to="/" className={`self-center ${LOGO.marginBottom}`} aria-label="Home">
             <img src="/siyinqaba.png" alt={LOGO_ALT} className={LOGO.className} />
           </Link>
           {children}

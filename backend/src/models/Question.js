@@ -25,6 +25,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false,
       comment: 'Used to maintain the sequence of the test'
+    },
+    questionCode: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      field: 'question_code',
+      comment: 'SDS question code e.g. R1, I12, SR1'
     }
   }, {
     tableName: 'questions',

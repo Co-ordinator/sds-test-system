@@ -81,6 +81,11 @@ For detailed information about the system:
 - **[Database Schema](docs/DATABASE_SCHEMA_DOCUMENTATION.md)** - Complete database structure and relationships
 - **[API Documentation](docs/API_DOCUMENTATION.md)** - Endpoint specifications and usage examples
 - **[Setup Guide](docs/SETUP_GUIDE.md)** - Installation and configuration instructions
+- **[Test Credentials](docs/TEST_CREDENTIALS.md)** - Default login credentials for testing:
+  - **Admin**: `admin@labor.gov.sz` / `Admin@123`
+  - **Counselors**: `counselor1@labor.gov.sz`, `counselor2@labor.gov.sz`, `counselor3@labor.gov.sz` / `Counselor@123`
+  - **School Students**: Username `20250101` through `20250301` / `Pass@2025`
+  - **Demo**: `student@test.sz` / `Student@123`
 
 ## Environment Variables
 See `.env.example` files in both frontend and backend directories for required variables.
@@ -93,3 +98,4 @@ For support or questions, contact Coordinator Gwebu at coordinator@bitsandpc.co.
 
 ## License
 MIT License
+

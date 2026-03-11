@@ -1,84 +1,292 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import {
+  Download, BookOpen, Building2, Award, ChevronDown, ChevronUp,
+  CheckCircle2, Briefcase, GraduationCap, Loader2, FileText, Mail, TrendingUp
+} from 'lucide-react';
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  Cell
+} from 'recharts';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { GOV, TYPO } from '../theme/government';
+import AssessmentShell from '../components/layout/AssessmentShell';
 
-const RIASEC_LABELS = {
-  R: 'Realistic',
-  I: 'Investigative',
-  A: 'Artistic',
-  S: 'Social',
-  E: 'Enterprising',
-  C: 'Conventional'
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONSTANTS & METADATA
+   ═══════════════════════════════════════════════════════════════════════════ */
+const RIASEC_META = {
+  R: {
+    label: 'Realistic', color: '#dc2626', lightBg: '#fef2f2',
+    description: 'You are practical and hands-on. You enjoy working with tools, machines, and physical objects. You thrive in environments that involve building, repairing, and working outdoors.',
+    traits: ['Practical', 'Mechanical', 'Athletic', 'Hands-on'],
+    icon: '🔧'
+  },
+  I: {
+    label: 'Investigative', color: '#2563eb', lightBg: '#eff6ff',
+    description: 'You are analytical and intellectual. You enjoy research, mathematics, and science. You prefer solving complex problems through careful observation and investigation.',
+    traits: ['Analytical', 'Scientific', 'Curious', 'Intellectual'],
+    icon: '🔬'
+  },
+  A: {
+    label: 'Artistic', color: '#7c3aed', lightBg: '#f5f3ff',
+    description: 'You are creative and expressive. You enjoy art, music, writing, and drama. You value aesthetics, originality, and freedom to express yourself.',
+    traits: ['Creative', 'Original', 'Expressive', 'Imaginative'],
+    icon: '🎨'
+  },
+  S: {
+    label: 'Social', color: '#059669', lightBg: '#ecfdf5',
+    description: 'You are empathetic and people-oriented. You enjoy teaching, counseling, and community service. You value cooperation, helping others, and making a positive impact.',
+    traits: ['Empathetic', 'Helpful', 'Cooperative', 'Patient'],
+    icon: '🤝'
+  },
+  E: {
+    label: 'Enterprising', color: '#d97706', lightBg: '#fffbeb',
+    description: 'You are ambitious and leadership-oriented. You enjoy business, management, and persuading others. You value achievement, influence, and taking initiative.',
+    traits: ['Ambitious', 'Persuasive', 'Confident', 'Energetic'],
+    icon: '📈'
+  },
+  C: {
+    label: 'Conventional', color: '#1e3a5f', lightBg: '#f0f4f8',
+    description: 'You are organized and detail-oriented. You enjoy working with data, numbers, and structured processes. You value order, accuracy, and efficiency.',
+    traits: ['Organized', 'Detail-oriented', 'Systematic', 'Reliable'],
+    icon: '📊'
+  }
 };
 
+const QUAL_LABELS = {
+  certificate: 'Certificate', diploma: 'Diploma', bachelor: "Bachelor's Degree",
+  honours: 'Honours Degree', postgrad_diploma: 'Postgrad Diploma',
+  masters: "Master's Degree", doctorate: 'Doctorate', short_course: 'Short Course',
+  tvet: 'TVET Programme', other: 'Qualification'
+};
+
+const DEMAND_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };
+const DEMAND_LABELS = { critical: 'Critical', very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low' };
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUB-COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+const DemandBadge = ({ level }) => {
+  if (!level) return null;
+  const color = DEMAND_COLORS[level] || '#6b7280';
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold" style={{ backgroundColor: `${color}15`, color }}>
+      <TrendingUp className="w-3 h-3" />
+      {DEMAND_LABELS[level] || level}
+    </span>
+  );
+};
+
+const ScoreBar = ({ letter, score, maxScore }) => {
+  const meta = RIASEC_META[letter];
+  const pct = maxScore > 0 ? Math.min((score / maxScore) * 100, 100) : 0;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: meta.color }}>
+            {letter}
+          </span>
+          <span className="text-xs font-medium" style={{ color: GOV.text }}>{meta.label}</span>
+        </div>
+        <span className="text-xs font-bold" style={{ color: meta.color }}>{score}</span>
+      </div>
+      <div className="w-full h-3 rounded-full overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: meta.color }} />
+      </div>
+    </div>
+  );
+};
+
+const HollandCodeCard = ({ letter, rank }) => {
+  const meta = RIASEC_META[letter];
+  if (!meta) return null;
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: `${meta.color}30` }}>
+      <div className="px-4 py-3" style={{ backgroundColor: meta.lightBg }}>
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{meta.icon}</span>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: meta.color }}>{rank}</span>
+              <span className="text-sm font-bold" style={{ color: meta.color }}>{meta.label}</span>
+            </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {meta.traits.map(t => (
+                <span key={t} className="text-xs px-1.5 py-0.5 rounded-md font-medium" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>{t}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="px-4 py-3">
+        <p className="text-xs leading-relaxed" style={{ color: GOV.textMuted }}>{meta.description}</p>
+      </div>
+    </div>
+  );
+};
+
+const CourseCard = ({ course }) => {
+  const [open, setOpen] = useState(false);
+  const reqs = course.requirements || [];
+  const institutions = (course.courseInstitutions || []).map(ci => ci.institution).filter(Boolean);
+  const qualLabel = QUAL_LABELS[course.qualificationType] || course.qualificationType;
+
+  return (
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: GOV.border }}>
+      <button type="button" onClick={() => setOpen(v => !v)}
+        className="w-full flex items-start justify-between p-4 text-left hover:bg-gray-50 transition-all duration-200 hover:shadow-sm active:scale-[0.99]">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: GOV.blueLight, color: GOV.blue }}>{qualLabel}</span>
+            {course.durationYears && (
+              <span className="text-xs" style={{ color: GOV.textHint }}>{course.durationYears} yr{Number(course.durationYears) !== 1 ? 's' : ''}</span>
+            )}
+          </div>
+          <p className="font-semibold text-sm" style={{ color: GOV.text }}>{course.name}</p>
+          {course.description && !open && (
+            <p className="text-xs mt-1 line-clamp-2" style={{ color: GOV.textMuted }}>{course.description}</p>
+          )}
+        </div>
+        <div className="ml-3 shrink-0" style={{ color: GOV.textHint }}>
+          {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </div>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t pt-3" style={{ borderColor: GOV.borderLight }}>
+          {course.description && <p className="text-sm" style={{ color: GOV.textMuted }}>{course.description}</p>}
+          {reqs.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: GOV.text }}>
+                <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#059669' }} /> Entry Requirements
+              </p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {reqs.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs rounded-md px-3 py-1.5" style={{ backgroundColor: GOV.blueLightAlt }}>
+                    <span style={{ color: GOV.text }}>{r.subject}</span>
+                    <span className="font-bold ml-2" style={{ color: r.isMandatory ? GOV.blue : GOV.textHint }}>
+                      {r.minimumGrade}{!r.isMandatory && ' *'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs mt-1.5" style={{ color: GOV.textHint }}>* recommended but not required</p>
+            </div>
+          )}
+          {institutions.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: GOV.text }}>
+                <Building2 className="w-3.5 h-3.5" style={{ color: GOV.blue }} /> Offered at
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {institutions.map(inst => (
+                  <span key={inst.id} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: GOV.blueLight, color: GOV.blue }}>
+                    {inst.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════════════════ */
 const TestResults = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const assessmentIdFromState = location.state?.assessmentId;
-
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [assessmentId, setAssessmentId] = useState(assessmentIdFromState);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    let assessmentId = assessmentIdFromState;
+  const getDashboardPath = () => {
+    if (user?.role === 'admin') return '/admin/dashboard';
+    if (user?.role === 'counselor') return '/counselor';
+    return '/dashboard';
+  };
 
+  useEffect(() => {
+    let id = assessmentIdFromState;
     const fetchResults = async () => {
       try {
-        if (!assessmentId) {
+        if (!id) {
           const listRes = await api.get('/api/v1/assessments');
           const list = listRes.data?.data?.assessments || [];
           const completed = list.find((a) => a.status === 'completed');
-          if (!completed) {
-            setError('No completed assessment found. Complete a test first.');
-            setLoading(false);
-            return;
-          }
-          assessmentId = completed.id;
+          if (!completed) { setError('No completed assessment found. Complete a test first.'); setLoading(false); return; }
+          id = completed.id;
+          setAssessmentId(id);
         }
-
-        const res = await api.get(`/api/v1/results/${assessmentId}`);
+        const res = await api.get(`/api/v1/results/${id}`);
         const payload = res.data?.data;
         if (payload) setData(payload);
         else setError('Results not found.');
       } catch (e) {
         setError(e.response?.data?.message || 'Failed to load results.');
-      } finally {
-        setLoading(false);
-      }
+      } finally { setLoading(false); }
     };
-
     fetchResults();
   }, [assessmentIdFromState]);
 
+  const handleDownloadPdf = async () => {
+    if (!assessmentId) return;
+    setDownloadingPdf(true);
+    try {
+      const res = await api.get(`/api/v1/results/${assessmentId}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a'); a.href = url;
+      a.download = `CareerReport_${assessmentId}.pdf`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch { alert('Failed to download PDF. Please try again.'); }
+    finally { setDownloadingPdf(false); }
+  };
+
+  const handleEmailResults = () => {
+    const subject = encodeURIComponent('My SDS Career Assessment Results');
+    const body = encodeURIComponent(
+      `I completed my Self-Directed Search (SDS) Career Assessment.\n\nHolland Code: ${hollandCode}\nProfile: ${hollandCode.split('').map(c => RIASEC_META[c]?.label).filter(Boolean).join(' · ')}\n\nView the full results on the Eswatini National Career Guidance Platform.`
+    );
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+  };
+
+  /* ── Loading / Error states ── */
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f8fafc' }}>
+        <div className="text-center">
+          <div className="inline-block w-10 h-10 border-4 rounded-full animate-spin" style={{ borderColor: GOV.borderLight, borderTopColor: GOV.blue }} />
+          <p className="text-sm mt-3" style={{ color: GOV.textHint }}>Loading your results…</p>
+        </div>
       </div>
     );
   }
 
   if (error && !data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md text-center">
-          <p className="text-slate-700 mb-4">{error}</p>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: '#f8fafc' }}>
+        <div className="bg-white rounded-md border p-8 max-w-md text-center" style={{ borderColor: GOV.border }}>
+          <Award className="w-10 h-10 mx-auto mb-3" style={{ color: GOV.textHint }} />
+          <p className="text-sm mb-4" style={{ color: GOV.text }}>{error}</p>
           <div className="flex gap-3 justify-center">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="px-4 py-2 bg-gray-100 text-slate-700 rounded-lg hover:bg-gray-200"
-            >
+            <button type="button" onClick={() => navigate(getDashboardPath())}
+              className="px-4 py-2 rounded-md text-sm font-semibold border bg-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ borderColor: GOV.border, color: GOV.text }}>
               Dashboard
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/test')}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              Take test
+            <button type="button" onClick={() => navigate('/test')}
+              className="px-4 py-2 rounded-md text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: GOV.blue }}>
+              Take Test
             </button>
           </div>
         </div>
@@ -86,96 +294,230 @@ const TestResults = () => {
     );
   }
 
+  /* ── Extract data ── */
   const assessment = data?.assessment || {};
-  const recommendations = data?.recommendations || [];
+  const recs = data?.recommendations || {};
+  const occupations = recs.occupations || [];
+  const courses = recs.courses || [];
+  const suggestedSubjects = recs.suggestedSubjects || [];
+
   const scores = {
-    R: assessment.scoreR ?? 0,
-    I: assessment.scoreI ?? 0,
-    A: assessment.scoreA ?? 0,
-    S: assessment.scoreS ?? 0,
-    E: assessment.scoreE ?? 0,
-    C: assessment.scoreC ?? 0
+    R: assessment.scoreR ?? 0, I: assessment.scoreI ?? 0, A: assessment.scoreA ?? 0,
+    S: assessment.scoreS ?? 0, E: assessment.scoreE ?? 0, C: assessment.scoreC ?? 0
   };
   const maxScore = Math.max(...Object.values(scores), 1);
   const hollandCode = assessment.hollandCode || '';
+  const userType = assessment.user?.userType || user?.userType;
+  const studentName = [assessment.user?.firstName || user?.firstName, assessment.user?.lastName || user?.lastName].filter(Boolean).join(' ') || 'Student';
 
+  const focusLabel = userType === 'professional'
+    ? 'Career Transition Opportunities'
+    : userType === 'university_student'
+      ? 'Graduate Career Pathways'
+      : 'Career Paths & Study Options';
+
+  /* ── Chart data ── */
+  const radarData = Object.entries(scores).map(([key, score]) => ({
+    type: key, label: RIASEC_META[key].label, score, fullMark: maxScore
+  }));
+
+  const barData = Object.entries(scores).map(([key, score]) => ({
+    name: key, label: RIASEC_META[key].label, score, color: RIASEC_META[key].color
+  }));
+
+  const hollandLetters = hollandCode.split('').filter(c => RIASEC_META[c]);
+  const completedDate = assessment.completedAt
+    ? new Date(assessment.completedAt).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
+    : new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold text-slate-800 mb-3">Your SDS Career Test Results</h1>
-          <p className="text-slate-600 leading-relaxed max-w-4xl text-sm">
-            Congratulations on completing your Self-Directed Search (SDS) Career Test! Below you will find your RIASEC scores, Holland Code, and career recommendations.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 mt-4">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 text-sm font-semibold"
-            >
-              Back to Dashboard
-            </button>
-          </div>
+    <AssessmentShell
+      title="Self-Directed Search (SDS) - Results"
+      contextLabel="Assessment Results"
+      actions={(
+        <>
+          <button type="button" onClick={handleDownloadPdf} disabled={downloadingPdf}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: GOV.blue }}>
+            {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloadingPdf ? 'Generating…' : 'Download PDF Report'}
+          </button>
+          <button type="button" onClick={() => navigate(getDashboardPath())}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
+            Dashboard
+          </button>
+          <button type="button" onClick={handleEmailResults}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
+            <Mail className="w-4 h-4" /> Email Results
+          </button>
+        </>
+      )}
+    >
+      <div className="bg-white rounded-md p-6 mb-6">
+        <p className="text-sm mb-4" style={{ color: GOV.textMuted }}>
+          Congratulations on completing your Self-Directed Search (SDS) Career Test! Below you will find a personalized overview of your RIASEC scores, an interpretation of your Holland Codes, and tailored career recommendations based on your unique profile.
+        </p>
+        <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: GOV.textHint }}>
+          <span>{studentName}</span>
+          <span>·</span>
+          <span>{completedDate}</span>
+          <span>·</span>
+          <span>Holland Code: <strong style={{ color: GOV.blue }}>{hollandCode}</strong></span>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-8 space-y-6">
+        {/* ── RIASEC Profile: Radar + Score Bars ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <h3 className="font-semibold text-slate-800 mb-2">Your RIASEC Scores</h3>
-            <p className="text-xs text-slate-500 mb-4">Your interests across the six RIASEC dimensions.</p>
-            <div className="space-y-3">
+          {/* Radar Chart */}
+          <div className="bg-white rounded-md p-6">
+            <h2 className="text-sm font-bold mb-1" style={{ color: GOV.text }}>Your RIASEC Profile</h2>
+            <p className="text-xs mb-4" style={{ color: GOV.textHint }}>A visual representation of your interests across the six RIASEC dimensions.</p>
+            <ResponsiveContainer width="100%" height={300}>
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="75%">
+                <PolarGrid stroke={GOV.borderLight} />
+                <PolarAngleAxis dataKey="type" tick={({ x, y, payload }) => {
+                  const meta = RIASEC_META[payload.value];
+                  return (
+                    <text x={x} y={y} textAnchor="middle" dominantBaseline="central" fontSize={13} fontWeight={700} fill={meta?.color || GOV.text}>
+                      {payload.value}
+                    </text>
+                  );
+                }} />
+                <PolarRadiusAxis tick={{ fontSize: 9, fill: GOV.textHint }} />
+                <Radar name="Your Score" dataKey="score" stroke={GOV.blue} fill={GOV.blue} fillOpacity={0.25} strokeWidth={2.5} dot={{ r: 4, fill: GOV.blue }} />
+                <Tooltip formatter={(v) => [v, 'Score']} labelFormatter={(l) => RIASEC_META[l]?.label || l} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Score Bars */}
+          <div className="bg-white rounded-md p-6">
+            <h2 className="text-sm font-bold mb-1" style={{ color: GOV.text }}>Your RIASEC Scores</h2>
+            <p className="text-xs mb-4" style={{ color: GOV.textHint }}>Detailed breakdown of your interest scores per dimension.</p>
+            <div className="space-y-4">
               {Object.entries(scores).map(([key, score]) => (
-                <div key={key} className="space-y-1">
-                  <div className="text-xs text-slate-500">{RIASEC_LABELS[key]}</div>
-                  <div className="w-full bg-gray-100 rounded-full h-7 flex items-center overflow-hidden">
-                    <div
-                      className="bg-indigo-600 h-7 text-white text-xs font-semibold px-3 flex items-center"
-                      style={{ width: `${Math.min((score / maxScore) * 100, 100)}%` }}
-                    >
-                      {score}
+                <ScoreBar key={key} letter={key} score={score} maxScore={maxScore} />
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t" style={{ borderColor: GOV.borderLight }}>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={barData} barSize={28}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 9 }} />
+                  <Tooltip formatter={(v, n, p) => [v, p.payload.label]} />
+                  <Bar dataKey="score" radius={[4, 4, 0, 0]}>
+                    {barData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Holland Code Interpretation ── */}
+        <div className="bg-white rounded-md p-6">
+          <div className="flex items-center gap-3 mb-1">
+            <h2 className="text-sm font-bold" style={{ color: GOV.text }}>Your Top Holland Codes</h2>
+            <div className="flex gap-1.5">
+              {hollandLetters.map(c => (
+                <span key={c} className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white shadow-sm" style={{ backgroundColor: RIASEC_META[c].color }}>
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+          <p className="text-xs mb-5" style={{ color: GOV.textHint }}>
+            Understanding your primary interest areas and their implications. Your Holland Code <strong style={{ color: GOV.blue }}>{hollandCode}</strong> represents:{' '}
+            <strong>{hollandLetters.map(c => RIASEC_META[c].label).join('-')}</strong>.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {hollandLetters.slice(0, 3).map((c, i) => (
+              <HollandCodeCard key={c} letter={c} rank={i + 1} />
+            ))}
+          </div>
+        </div>
+
+        {/* ── Suggested Subjects ── */}
+        {suggestedSubjects.length > 0 && (
+          <div className="bg-white rounded-md p-6">
+            <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
+              <BookOpen className="w-4 h-4" style={{ color: '#059669' }} /> Suggested School Subjects
+            </h2>
+            <p className="text-xs mb-4" style={{ color: GOV.textHint }}>Subjects that align with your interests and can support your career pathway.</p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedSubjects.map((s, i) => (
+                <span key={i} className="text-xs font-medium px-3 py-1.5 rounded-full" style={{ backgroundColor: '#ecfdf5', color: '#059669' }}>{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Career Recommendations ── */}
+        {occupations.length > 0 && (
+          <div className="bg-white rounded-md p-6">
+            <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
+              <Briefcase className="w-4 h-4" style={{ color: GOV.blue }} /> {focusLabel}
+            </h2>
+            <p className="text-xs mb-4" style={{ color: GOV.textHint }}>Explore career paths aligned with your unique RIASEC profile.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {occupations.map((occ) => {
+                const riasecLetter = occ.primaryRiasec || hollandLetters[0];
+                const meta = RIASEC_META[riasecLetter] || RIASEC_META.R;
+                return (
+                  <div key={occ.id} className="flex items-start gap-3 p-4 rounded-lg border transition-all duration-200 hover:shadow-md hover:scale-[1.01] cursor-pointer" style={{ borderColor: GOV.border }}>
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white text-sm font-bold" style={{ backgroundColor: meta.color }}>
+                      {riasecLetter || <FileText className="w-4 h-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm" style={{ color: GOV.text }}>{occ.name}</p>
+                      {occ.description && (
+                        <p className="text-xs mt-0.5 line-clamp-2" style={{ color: GOV.textMuted }}>{occ.description}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {occ.demandLevel && <DemandBadge level={occ.demandLevel} />}
+                        {occ.localDemand && occ.localDemand !== occ.demandLevel && <DemandBadge level={occ.localDemand} />}
+                        {!occ.demandLevel && occ.localDemand && <DemandBadge level={occ.localDemand} />}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
+        )}
 
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <h3 className="font-semibold text-slate-800 mb-2">Your Holland Code</h3>
-            <p className="text-xs text-slate-500 mb-4">Your top three interest areas.</p>
-            <p className="text-2xl font-bold text-indigo-700">
-              {hollandCode.split('').map((c) => RIASEC_LABELS[c] || c).join(' – ')}
+        {/* ── Courses & Qualifications ── */}
+        {courses.length > 0 && (
+          <div className="bg-white rounded-md p-6">
+            <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
+              <GraduationCap className="w-4 h-4" style={{ color: GOV.blue }} /> Recommended Courses & Qualifications
+            </h2>
+            <p className="text-xs mb-4" style={{ color: GOV.textHint }}>
+              Study programmes aligned to your profile. Click a course to see entry requirements and where to study.
             </p>
-            <p className="text-sm text-slate-600 mt-2">Code: {hollandCode}</p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-          <h3 className="font-semibold text-slate-800 mb-2">Career Recommendations</h3>
-          <p className="text-xs text-slate-500 mb-4">Careers aligned with your profile.</p>
-          {recommendations.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {recommendations.map((occ) => (
-                <div key={occ.id} className="flex items-start gap-3">
-                  <div className="bg-indigo-50 text-indigo-700 w-9 h-9 rounded-lg flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-slate-800 text-sm">{occ.name}</p>
-                    {occ.description && (
-                      <p className="text-slate-600 text-sm leading-relaxed mt-1">{occ.description}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {courses.map((course) => <CourseCard key={course.id} course={course} />)}
             </div>
-          ) : (
-            <p className="text-slate-500 text-sm">No specific recommendations in the database for this code. Discuss options with a career counselor.</p>
-          )}
-        </div>
-      </div>
-    </div>
+          </div>
+        )}
+
+        {/* ── Empty state ── */}
+        {occupations.length === 0 && courses.length === 0 && (
+          <div className="bg-white rounded-md p-10 text-center">
+            <Award className="w-12 h-12 mx-auto mb-3" style={{ color: GOV.textHint }} />
+            <p className="text-sm font-medium" style={{ color: GOV.text }}>No specific recommendations found for your code yet.</p>
+            <p className="text-xs mt-1" style={{ color: GOV.textMuted }}>Speak with a career counsellor for personalised guidance.</p>
+          </div>
+        )}
+
+        {/* ── Footer ── */}
+        <p className="text-xs text-center py-4" style={{ color: GOV.textHint }}>
+          Kingdom of Eswatini · National Career Guidance Platform · Ministry of Labour and Social Security · {completedDate}
+        </p>
+    </AssessmentShell>
   );
 };
 

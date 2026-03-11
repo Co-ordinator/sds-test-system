@@ -1,0 +1,229 @@
+questionOrder,section,sectionName,questionCode,riasecCategory,questionText,questionType
+1,I,Activities,R1,R,Fix electrical apparatus,yes_no 
+2,I,Activities,R2,R,Repair motor cars,yes_no 
+3,I,Activities,R3,R,Fix mechanical apparatus,yes_no 
+4,I,Activities,R4,R,Build objects with wood ,yes_no 
+5,I,Activities,R5,R,Drive a truck or tractor,yes_no 
+6,I,Activities,R6,R,Use metalwork or machine tools.,yes_no 
+7,I,Activities,R7,R,Work on a bicycle or motorcycle,yes_no 
+8,I,Activities,R8,R,Take a technical course,yes_no 
+9,I,Activities,R9,R,Take a course in mechanical drawing,yes_no 
+10,I,Activities,R10,R,Take a woodworking course,yes_no 
+11,I,Activities,R11,R,Take a motor mechanics course,yes_no 
+12,I,Activities,I12,I,Read scientific books or magazines,yes_no 
+13,I,Activities,I13,I,Work in a laboratory,yes_no 
+14,I,Activities,I14,I,Work on a research project,yes_no 
+15,I,Activities,I15,I,Study a scientific theory,yes_no 
+16,I,Activities,I16,I,Work with a chemistry set,yes_no 
+17,I,Activities,I17,I,Read about a special subject on my own,yes_no 
+18,I,Activities,I18,I,Apply mathematics to a practical problem,yes_no 
+19,I,Activities,I19,I,Take physics course,yes_no 
+20,I,Activities,I20,I,Take chemistry course,yes_no 
+21,I,Activities,I21,I,Take a mathematics course,yes_no 
+22,I,Activities,I22,I,Take a biology course,yes_no 
+23,I,Activities,A23,A,"Sketch, draw, or paint",yes_no 
+24,I,Activities,A24,A,Take part in a comedy or play,yes_no 
+25,I,Activities,A25,A,"Design furniture, clothing, posters, or buildings",yes_no 
+26,I,Activities,A26,A,"Play in a band, musical group or orchestra",yes_no 
+27,I,Activities,A27,A,Practise to play a musical instrument,yes_no 
+28,I,Activities,A28,A,"Go to recitals, concerts or musicals",yes_no 
+29,I,Activities,A29,A,Create portraits ot take photographs,yes_no 
+30,I,Activities,A30,A,Read plays,yes_no 
+31,I,Activities,A31,A,Read or write poetry,yes_no 
+32,I,Activities,A32,A,Take an art course,yes_no 
+33,I,Activities,A33,A,Arrange or compose music of any kind,yes_no 
+34,I,Activities,S34,S,Write letters to friends ,yes_no 
+35,I,Activities,S35,S,Read articles or books on socialogy,yes_no 
+36,I,Activities,S36,S,Belong tosocial clubs,yes_no 
+37,I,Activities,S37,S,Help others with their personal problems,yes_no 
+38,I,Activities,S38,S,Take care of children,yes_no 
+39,I,Activities,S39,S,Go to parties/social meetings.,yes_no 
+40,I,Activities,S40,S,Dance,yes_no 
+41,I,Activities,S41,S,Read books on psychology,yes_no 
+42,I,Activities,S42,S,Help handicapped people,yes_no 
+43,I,Activities,S43,S,Go to sports events,yes_no 
+44,I,Activities,S44,S,Teach in a school,yes_no 
+45,I,Activities,E45,E,Convince other people,yes_no 
+46,I,Activities,E46,E,Sell something,yes_no 
+47,I,Activities,E47,E,Discuss politics,yes_no 
+48,I,Activities,E48,E,Manage your own service or business,yes_no 
+49,I,Activities,E49,E,Go to meetings,yes_no 
+50,I,Activities,E50,E,Give talks,yes_no 
+51,I,Activities,E51,E,Act as a leader of a group,yes_no 
+52,I,Activities,E52,E,Supervise the work of others,yes_no 
+53,I,Activities,E53,E,Meet important people,yes_no 
+54,I,Activities,E54,E,Lead a group in accomplishing some goal,yes_no 
+55,I,Activities,E55,E,Participate in a political campain,yes_no 
+56,I,Activities,C56,C,Keep your own desk and room neat,yes_no 
+57,I,Activities,C57,C,Type papers or letters,yes_no 
+58,I,Activities,C58,C,"Add, subtract mulyiply and divie numbers",yes_no 
+59,I,Activities,C59,C,Operate business machines of any kind,yes_no 
+60,I,Activities,C60,C,keep detailed records of expenses ,yes_no 
+61,I,Activities,C61,C,Take a typewriting course,yes_no 
+62,I,Activities,C62,C,Take a business course,yes_no 
+63,I,Activities,C63,C,Take a bookkeeping course,yes_no 
+64,I,Activities,C64,C,Take a commercial maths course,yes_no 
+65,I,Activities,C65,C,"File letters, reports, records, etc",yes_no 
+66,I,Activities,C66,C,Write business letters,yes_no 
+67,II,Competencies,R67,R,"I have used woodworking tool such as power saw, a lathe or a sander",yes_no 
+68,II,Competencies,R68,R,I know how to use a voltmeter,yes_no 
+69,II,Competencies,R69,R,I can change car oil or tyres,yes_no 
+70,II,Competencies,R70,R,I have operated tools such as a drill press or a grinder or a sweing machine,yes_no 
+71,II,Competencies,R71,R,"I can refinish, varnish or stain furniture or woodwork",yes_no 
+72,II,Competencies,R72,R,I can read blueprints (building plans),yes_no 
+73,II,Competencies,R73,R,I can make simple electrical repairs,yes_no 
+74,II,Competencies,R74,R,I can repair furniture,yes_no 
+75,II,Competencies,R75,R,I can do mechanical drawings,yes_no 
+76,II,Competencies,R76,R,I can do simple repairs to a TV set (or radio),yes_no 
+77,II,Competencies,R77,R,I can can do simple plumbing repairs,yes_no 
+78,II,Competencies,I78,I,I can use algebra to solve mathematical problems,yes_no 
+79,II,Competencies,I79,I,I have participated in scientific contest,yes_no 
+80,II,Competencies,I80,I,"I understand the ""half-life"" of a radioactive element",yes_no 
+81,II,Competencies,I81,I,I understand logarithmic tables,yes_no 
+82,II,Competencies,I82,I,I can use a slide rule/calculator to multiply or divide.,yes_no 
+83,II,Competencies,I83,I,I can use a microscope,yes_no 
+84,II,Competencies,I84,I,I can program a computer to study a scintific problem,yes_no 
+85,II,Competencies,I85,I,I can describe the function of white blood cells,yes_no 
+86,II,Competencies,I86,I,I can intepret simple chemical formulas,yes_no 
+87,II,Competencies,I87,I,I understand why man-made satellites do not fall to the earth,yes_no 
+88,II,Competencies,I88,I,I can name three foods that are high in vitamins,yes_no 
+89,II,Competencies,A89,A,I can play a musical instrument,yes_no 
+90,II,Competencies,A90,A,I can participate in two or four-part choral singing,yes_no 
+91,II,Competencies,A91,A,I can paeform as a musical soloist,yes_no 
+92,II,Competencies,A92,A,I can act in a play,yes_no 
+93,II,Competencies,A93,A,I can do interpretive reading,yes_no 
+94,II,Competencies,A94,A,I can interpretive or ballet dancing,yes_no 
+95,II,Competencies,A95,A,I can sketch people on such a way that they are recognizable,yes_no 
+96,II,Competencies,A96,A,I can do a painting or do a piece of sculpture,yes_no 
+97,II,Competencies,A97,A,I can do poetry,yes_no 
+98,II,Competencies,A98,A,"I can do design clothing , posters or furniture",yes_no 
+99,II,Competencies,A99,A,I can write stories or poetry well,yes_no 
+100,II,Competencies,S100,S,I find it easy to talk to all kinds of people,yes_no 
+101,II,Competencies,S101,S,I am good at explaining things to others,yes_no 
+102,II,Competencies,S102,S,I am competent at entertaining people older than myself,yes_no 
+103,II,Competencies,S103,S,I can be a good host/hostess,yes_no 
+104,II,Competencies,S104,S,I can teach others easily,yes_no 
+105,II,Competencies,S105,S,I can plan entertainment for a party,yes_no 
+106,II,Competencies,S106,S,I have worked as a hospital helper or nurse,yes_no 
+107,II,Competencies,S107,S,I am good at helping people who are upset or troubled,yes_no 
+108,II,Competencies,S108,S,I can plan social events for the school or the church,yes_no 
+109,II,Competencies,S109,S,I am a good judge of personality,yes_no 
+110,II,Competencies,S110,S,People seek me out to tell to tell me their troubles,yes_no 
+111,II,Competencies,E111,E,I have won an award for work as a salesperson or leader,yes_no 
+112,II,Competencies,E112,E,I know how to be a succesful leader,yes_no 
+113,II,Competencies,E113,E,I am a good debater,yes_no 
+114,II,Competencies,E114,E,I could manage a small business or service,yes_no 
+115,II,Competencies,E115,E,I have orgainized a club or group,yes_no 
+116,II,Competencies,E116,E,I have been elected to an office while in high scholl or after leaving,yes_no 
+117,II,Competencies,E117,E,I have acted as a spokesman for a group in presenting suggestions or complaints to a person in authority,yes_no 
+118,II,Competencies,E118,E,I can supervise the work of others,yes_no 
+119,II,Competencies,E119,E,I am ambitious,yes_no 
+120,II,Competencies,E120,E,I am good at getting people to do things my way,yes_no 
+121,II,Competencies,E121,E,I am a good salesperson,yes_no 
+122,II,Competencies,C122,C,I can type 40 words a minute,yes_no 
+123,II,Competencies,C123,C,I can operate a duplicating or adding machine,yes_no 
+124,II,Competencies,C124,C,I can take shorthand,yes_no 
+125,II,Competencies,C125,C,I can file correspondence and other papers,yes_no 
+126,II,Competencies,C126,C,I have held an office job,yes_no 
+127,II,Competencies,C127,C,I can use a bookkeeping/accounting machine,yes_no 
+128,II,Competencies,C128,C,I can do a lot of paper work in a short time,yes_no 
+129,II,Competencies,C129,C,I can use a pocket calculator,yes_no 
+130,II,Competencies,C130,C,I can use simple data processing equipment such as a keypunch,yes_no 
+131,II,Competencies,C131,C,I can post credits and debits,yes_no 
+132,II,Competencies,C132,C,I can keep accurate records of payments or sales,yes_no 
+133,III,Occupations,R133,R,Aeroplane Mechanic - Maintains aeroplanes,yes_no 
+134,III,Occupations,R134,R,Fish and wildlife specialist- studies natural animal resources,yes_no 
+135,III,Occupations,R135,R,Motor mechanic - maintains and repairs motor vehicles,yes_no 
+136,III,Occupations,R136,R,Carpenter/Joiner - does woodwork,yes_no 
+137,III,Occupations,R137,R,Power shovel operator - runs shovel and large building and roasd equipment,yes_no 
+138,III,Occupations,R138,R,"Filling statio worker - pumps fuel , changes / deposits oil in vehicles at filling statyions",yes_no 
+139,III,Occupations,R139,R,Farmer - works on a farm where crops are grown or livestock is bred and raised,yes_no 
+140,III,Occupations,R140,R,Surveyor - measures distances for buildings and roads,yes_no 
+141,III,Occupations,R141,R,Construction inspector - inspects new buildings to see that they meet certain requirements,yes_no 
+142,III,Occupations,R142,R,Radio operator - sends and receives readio messages,yes_no 
+143,III,Occupations,R143,R,Long distance bus driver - transports people over long distances,yes_no 
+144,III,Occupations,R144,R,Engine driver - runs trains,yes_no 
+145,III,Occupations,R145,R,Tool designer - designs tools to do new jobs,yes_no 
+146,III,Occupations,R146,R,Electrician - maintains and repairs electric wires and machinery,yes_no 
+147,III,Occupations,I147,I,Meteorologist - studies the weather ,yes_no 
+148,III,Occupations,I148,I,Biologist - studies plants and animals,yes_no 
+149,III,Occupations,I149,I,Astronomer - studies the stars,yes_no 
+150,III,Occupations,I150,I,Medical laboratory technician - works in medical laboratory and provides information  to the medical doctor.,yes_no 
+151,III,Occupations,I151,I,"Anthropologist - studies the beliefs , the past and present behaviour and the physical characteristics of people",yes_no 
+152,III,Occupations,I152,I,Zoologist - studies animals,yes_no 
+153,III,Occupations,I153,I,Chemist - studies composition and characteristics of materials and the processes they undergo,yes_no 
+154,III,Occupations,I154,I,Research scientist - conducts scientific experiments,yes_no 
+155,III,Occupations,I155,I,"Writer of scientific articles - writes articles on science fo magazines, books or encyclopedias",yes_no 
+156,III,Occupations,I156,I,Editor of scientific journal - heads a magazine that publishes articles on science,yes_no 
+157,III,Occupations,I157,I,"Geologist - studies the earth, rocks mountains, volcanoes",yes_no 
+158,III,Occupations,I158,I,Botanist - studies plants,yes_no 
+159,III,Occupations,I159,I,Microbiologist - studies the growth and characteristics of microscopic organisms,yes_no 
+160,III,Occupations,I160,I,"Physicist - studies the physical laws of nature (gravity, magnetism, motion)",yes_no 
+161,III,Occupations,A161,A,Poet - writes poetry,yes_no 
+162,III,Occupations,A162,A,Symphony conductor - conducts musicians who play orchestra,yes_no 
+163,III,Occupations,A163,A,Musician - plays musical instruments or sings,yes_no 
+164,III,Occupations,A164,A,"Writer - writes books, plays, poetry and newspaper articles.",yes_no 
+165,III,Occupations,A165,A,Actor/ Actress - acts in a play,yes_no 
+166,III,Occupations,A166,A,"Freelance writer - writes stories for magazines , newspapers on a part-time basis.",yes_no 
+167,III,Occupations,A167,A,Musical arranger - writes music for words someone has written,yes_no 
+168,III,Occupations,A168,A,Journalist - writes for a newpaper/magazine,yes_no 
+169,III,Occupations,A169,A,"Commercial artist - promotes the sale of products by means of pictures , paintings and pieces of sculpture.",yes_no 
+170,III,Occupations,A170,A,Concert singer - sings on the stage,yes_no 
+171,III,Occupations,A171,A,Composer or lyricist - writes music or words to music,yes_no 
+172,III,Occupations,A172,A,"Sculptor/sculptress - carves / moulds statues from marble, metal , clay or wood.",yes_no 
+173,III,Occupations,A173,A,Platwright - writes plays,yes_no 
+174,III,Occupations,A174,A,Cartoonist - drwas comic strips or humorous drawings on sports and news events,yes_no 
+175,III,Occupations,S175,S,Sociologist - examines the ways in which individuals in groups and groups yhemselves interact.,yes_no 
+176,III,Occupations,S176,S,High school teacher - teaces one or two subjects to pupils in standards 6 to 10.,yes_no 
+177,III,Occupations,S177,S,Playground director - organizes games for young people at a playground,yes_no 
+178,III,Occupations,S178,S,Speech therapist - helps people correct and solve their speech problems,yes_no 
+179,III,Occupations,S179,S,Marriage counsellor - helps husbands and wivws who are not happy together,yes_no 
+180,III,Occupations,S180,S,School principal - head fo a school,yes_no 
+181,III,Occupations,S181,S,Psychiatric nurse - someone who cares for psychiatric patients in a hospital,yes_no 
+182,III,Occupations,S182,S,Clinical psychologist - helps people who are unhappy with their lives,yes_no 
+183,III,Occupations,S183,S,"Social science teacher - teaches for example, history and geography",yes_no 
+184,III,Occupations,S184,S,Director of a welfare agency - head of an organization that gives social support to families or indivduals in distress,yes_no 
+185,III,Occupations,S185,S,Youth organizer - organizes activities and takes responsibility for young people,yes_no 
+186,III,Occupations,S186,S,Counselling psychologist - helps individuals to deal with the problems that occur in everyday life,yes_no 
+187,III,Occupations,S187,S,Socual worker - helps people to cope satisfactorily in their family and communit life,yes_no 
+188,III,Occupations,S188,S,Vocational counsellor - someone who helps others decide wht kind of work thay would like to do,yes_no 
+189,III,Occupations,E189,E,Speculator - someone who takes risks with buying and selling to make money,yes_no 
+190,III,Occupations,E190,E,Buyer - purchases merchandise from manufacturers and wholesalers,yes_no 
+191,III,Occupations,E191,E,Advertising executive - does advertising for a business,yes_no 
+192,III,Occupations,E192,E,Manufacturers representative - a salesperson who sells a company's products,yes_no 
+193,III,Occupations,E193,E,Television producer - produces TV shows,yes_no 
+194,III,Occupations,E194,E,Hotel manager - manages a hotel,yes_no 
+195,III,Occupations,E195,E,Business executive - owner or manager of a business,yes_no 
+196,III,Occupations,E196,E,"Restaurant manager - runs a restaurant , hires the waiters and waitresses, cashiers and cooks",yes_no 
+197,III,Occupations,E197,E,Advocate - conducts civil and criminal cases in various courts of law,yes_no 
+198,III,Occupations,E198,E,Salesperson - person who sells goods and services ,yes_no 
+199,III,Occupations,E199,E,Real estate salesperson - sells houses and property,yes_no 
+200,III,Occupations,E200,E,Personnel manager - gives advice and sees to it that personnel policies are carried out,yes_no 
+201,III,Occupations,E201,E,Sports promoter - arranges and publicizes sports events,yes_no 
+202,III,Occupations,E202,E,Sales manager - ensures that goods and services are sold,yes_no 
+203,III,Occupations,C203,C,Bookkeeper - Keeps track of how money is earned and spent in a business,yes_no 
+204,III,Occupations,C204,C,"Business teacher - teaches business subjects at school, e.g. bookkeeping, commerce",yes_no 
+205,III,Occupations,C205,C,Data typist - uses a special typewiriter to process information for immediate or future use.,yes_no 
+206,III,Occupations,C206,C,Chartered accountant - inspects the correctness and completeness of the financial states and books of organizations,yes_no 
+207,III,Occupations,C207,C,Credit controller - checks if clients have credit value,yes_no 
+208,III,Occupations,C208,C,Court stenographer - reocorrds everything on tape said during courtrooms,yes_no 
+209,III,Occupations,C209,C,Bank teller - receives and pays out money at a bank,yes_no 
+210,III,Occupations,C210,C,Tax expert - advises people on tax matters,yes_no 
+211,III,Occupations,C211,C,Inventory controller - takes stock of goods in a store or business at a certain time,yes_no 
+212,III,Occupations,C212,C,"Typist - types letters , reports , etc. on a typewriter",yes_no 
+213,III,Occupations,C213,C,Financial analyst - works out if a person or business is spending money wisely,yes_no 
+214,III,Occupations,C214,C,Cost estimator - determines how much it will cost to do certain jobs.,yes_no 
+215,III,Occupations,C215,C,Payroll clerk - calculates how much money people should be paid for their jobs,yes_no 
+216,III,Occupations,C216,C,Bank inspector - checks on bank personnel to see if they carry out their work,yes_no 
+217,IV,Self Rating,SR1,R,"I rate mechanical ability (fixing things, using tools and machines) as ",rating_scale 
+218,IV,Self Rating,SR2,I,"I rate  my scientific abilit (biology, chemistry and problem solving ) as ",rating_scale 
+219,IV,Self Rating,SR3,A,"I rate my artistic ability(music , art and drama) as ",rating_scale 
+220,IV,Self Rating,SR4,S,I rate my  teaching ability (helping others learn) as ,rating_scale 
+221,IV,Self Rating,SR5,E,I rate my sale ability (selling or managing) as ,rating_scale 
+222,IV,Self Rating,SR6,C,"I rate my clerical (numbers, spelling and fillin papers) as ",rating_scale 
+223,IV,Self Rating,SR7,R,I rate my manual skill as ,rating_scale 
+224,IV,Self Rating,SR8,I,I rate my mathematical ability as ,rating_scale 
+225,IV,Self Rating,SR9,A,I rate my musical ability as ,rating_scale 
+226,IV,Self Rating,SR10,S,I rate my friendliness as ,rating_scale 
+227,IV,Self Rating,SR11,E,I rate my manegerial skills as,rating_scale 
+228,IV,Self Rating,SR12,C,I rate my office skills as,rating_scale 

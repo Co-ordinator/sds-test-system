@@ -37,16 +37,20 @@ const restrictTo = (...roles) => {
   };
 };
 
-// Log authentication actions
-const logAuthAction = async (req, actionType) => {
+// Log authentication actions (AuditLog schema: actionType, description, details)
+// optionalUserId: use when the acting user is not in req.user (e.g. REGISTER)
+const logAuthAction = async (req, actionType, optionalUserId = null) => {
   await AuditLog.create({
-    userId: req.user?.id,
-    action: actionType,
-    resourceType: 'auth',
+    userId: optionalUserId ?? req.user?.id ?? null,
+    actionType,
+    description: `Auth action: ${actionType}`,
+    details: {
+      resourceType: 'auth',
+      requestMethod: req.method,
+      requestPath: req.path
+    },
     ipAddress: req.ip,
-    userAgent: req.headers['user-agent'],
-    requestMethod: req.method,
-    requestPath: req.path
+    userAgent: req.headers['user-agent']
   });
 };
 

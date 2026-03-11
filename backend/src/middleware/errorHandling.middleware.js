@@ -1,30 +1,32 @@
 const logger = require('../utils/logger');
 
 const errorHandler = (err, req, res, next) => {
+  const statusCode = err.status || err.statusCode || 500;
+
   if (process.env.NODE_ENV === 'production') {
-    logger.error({
-      message: err.message,
-      stack: err.stack,
-      url: req.originalUrl,
-      method: req.method,
-      ip: req.ip,
-      user: req.user?.id || 'anonymous'
-    });
-    
-    return res.status(500).json({
+    if (statusCode >= 500) {
+      logger.error({
+        message: err.message,
+        stack: err.stack,
+        url: req.originalUrl,
+        method: req.method,
+        ip: req.ip,
+        user: req.user?.id || 'anonymous'
+      });
+    }
+    const message = statusCode >= 500 ? 'An internal server error occurred.' : err.message;
+    return res.status(statusCode).json({
       status: 'error',
-      message: 'An internal server error occurred.'
-    });
-  } else {
-    logger.error(err.stack);
-    
-    return res.status(500).json({
-      status: 'error',
-      message: err.message,
-      stack: err.stack,
-      error: err
+      message
     });
   }
+
+  logger.error(err.stack);
+  return res.status(statusCode).json({
+    status: 'error',
+    message: err.message,
+    ...(statusCode >= 500 && { stack: err.stack })
+  });
 };
 
 module.exports = errorHandler;

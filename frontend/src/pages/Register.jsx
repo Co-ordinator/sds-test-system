@@ -1,10 +1,36 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
+import { GraduationCap, BookOpen, Briefcase, ArrowLeft, ArrowRight } from 'lucide-react';
 import api from '../services/api';
-import { GOV, TYPO, LOGO, MINISTRY_NAME, KINGDOM, LOGO_ALT } from '../theme/government';
+import OnboardingLayout from '../components/onboarding/OnboardingLayout';
+import { GOV, TYPO } from '../theme/government';
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+
+const USER_TYPES = [
+  {
+    id: 'school_student',
+    label: 'High School Student',
+    description: 'Discover careers and choose the right subjects for your future.',
+    Icon: GraduationCap,
+    color: '#1e3a5f'
+  },
+  {
+    id: 'university_student',
+    label: 'University Student',
+    description: 'Explore specialisations and graduate career pathways.',
+    Icon: BookOpen,
+    color: '#2563eb'
+  },
+  {
+    id: 'professional',
+    label: 'Professional / Career Switcher',
+    description: 'Find new opportunities and plan your career transition.',
+    Icon: Briefcase,
+    color: '#7c3aed'
+  }
+];
 
 function parseEmailOrPhone(value) {
   const v = (value || '').trim();
@@ -27,9 +53,13 @@ function validateEmailOrPhone(value) {
 
 export default function Register() {
   const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [userType, setUserType] = useState('');
   const [serverError, setServerError] = useState('');
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm();
+
+  const selectedType = USER_TYPES.find(t => t.id === userType);
 
   const onSubmit = async (data) => {
     setServerError('');
@@ -39,6 +69,11 @@ export default function Register() {
       phoneNumber: phoneNumber || undefined,
       password: data.password,
       consent: true,
+      userType: userType || undefined,
+      degreeProgram: data.degreeProgram || undefined,
+      yearOfStudy: data.yearOfStudy || undefined,
+      yearsExperience: data.yearsExperience || undefined,
+      currentOccupation: data.currentOccupation || undefined,
     };
     try {
       await api.post('/api/v1/auth/register', payload);
@@ -51,144 +86,192 @@ export default function Register() {
     }
   };
 
+  const inputClass = (hasError) =>
+    `form-control ${hasError ? '' : ''}`;
+
   return (
-    <div className="min-h-screen flex flex-col relative bg-white">
-      <div
-        className="flex-shrink-0 px-6 py-1.5 border-b text-center"
-        style={{ borderColor: GOV.border, backgroundColor: GOV.blueLightAlt }}
-      >
-        <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-          {MINISTRY_NAME} · {KINGDOM}
-        </p>
-      </div>
+    <OnboardingLayout>
+      <div className="w-full max-w-[440px] mx-auto">
 
-      <button
-        type="button"
-        className="absolute top-4 right-6 w-9 h-9 rounded-full flex items-center justify-center z-10"
-        style={{ backgroundColor: GOV.blueLight }}
-        aria-label="Help"
-      >
-        <span className="text-base font-semibold" style={{ color: GOV.blue }}>?</span>
-      </button>
+        <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
-        <div className="w-full max-w-[380px] flex flex-col items-center">
-          <Link to="/" className={`${LOGO.marginBottom} flex-shrink-0`} aria-label="Home">
-            <img src="/siyinqaba.png" alt={LOGO_ALT} className="h-20 w-auto object-contain" />
-          </Link>
-
-          <div
-            className="w-full bg-white rounded-lg border overflow-hidden"
-            style={{ borderColor: GOV.border }}
-          >
-            <div className="px-6 pt-6 pb-1">
-              <h1 className={`${TYPO.pageTitle} text-center`} style={{ color: GOV.text }}>
-                Create account
-              </h1>
-              <p className={`${TYPO.bodySmall} text-center mt-1`} style={{ color: GOV.textMuted }}>
-                Enter your details to get started
+          {/* ── STEP 1: User Type Selection ── */}
+          {step === 1 && (
+            <div className="p-6">
+              <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>Get career guidance</h1>
+              <p className="text-xs text-center mb-5" style={{ color: GOV.textMuted }}>
+                Select the option that best describes you.
+              </p>
+              <div className="space-y-3">
+                {USER_TYPES.map(({ id, label, description, Icon, color }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setUserType(id)}
+                    className="w-full flex items-center gap-4 p-4 rounded-md border-2 text-left transition-all"
+                    style={{
+                      borderColor: userType === id ? color : GOV.border,
+                      backgroundColor: userType === id ? `${color}08` : 'white'
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}15` }}>
+                      <Icon className="w-5 h-5" style={{ color }} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm" style={{ color: GOV.text }}>{label}</p>
+                      <p className="text-xs mt-0.5" style={{ color: GOV.textMuted }}>{description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={!userType}
+                onClick={() => setStep(2)}
+                className="w-full mt-5 py-2.5 rounded-md font-semibold text-sm text-white flex items-center justify-center gap-2 disabled:opacity-40"
+                style={{ backgroundColor: GOV.blue }}
+              >
+                Continue <ArrowRight className="w-4 h-4" />
+              </button>
+              <p className="text-xs text-center mt-4" style={{ color: GOV.textMuted }}>
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium hover:underline" style={{ color: GOV.blue }}>Sign in</Link>
               </p>
             </div>
+          )}
 
-            <form className="px-6 pt-4 pb-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
+          {/* ── STEP 2: Account Details ── */}
+          {step === 2 && (
+            <form className="p-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
+              <div className="flex items-center gap-3 mb-2">
+                <button type="button" onClick={() => setStep(1)} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}>
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div>
+                  <h1 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Create your account</h1>
+                  <p className="text-xs mt-0.5" style={{ color: GOV.textMuted }}>
+                    Enter your details to continue.
+                  </p>
+                </div>
+              </div>
+
+              {/* Email / Phone */}
               <div>
-                <label htmlFor="register-email-or-phone" className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>
-                  Email or phone
-                </label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email or phone *</label>
                 <input
-                  id="register-email-or-phone"
-                  {...register('emailOrPhone', {
-                    required: 'Email or phone is required',
-                    validate: validateEmailOrPhone,
-                  })}
+                  {...register('emailOrPhone', { required: 'Required', validate: validateEmailOrPhone })}
                   type="text"
                   autoComplete="username"
                   placeholder="you@example.com or +268 7612 3456"
-                  className={`w-full px-3 py-2 rounded-md border ${TYPO.body} focus:outline-none focus:ring-2 focus:ring-offset-0`}
-                  style={{ borderColor: errors.emailOrPhone ? GOV.error : GOV.border, color: GOV.text }}
+                  className={inputClass(!!errors.emailOrPhone)}
+                  style={{ borderBottomColor: errors.emailOrPhone ? GOV.error : GOV.border, color: GOV.text }}
                 />
-                {errors.emailOrPhone && (
-                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.emailOrPhone.message}</p>
-                )}
-                <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                  Eswatini phone: +268 followed by 8 digits
-                </p>
+                {errors.emailOrPhone && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.emailOrPhone.message}</p>}
               </div>
 
+              {/* Password */}
               <div>
-                <label htmlFor="register-password" className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>
-                  Password
-                </label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Password *</label>
                 <input
-                  id="register-password"
                   type="password"
                   {...register('password', {
-                    required: 'Password is required',
+                    required: 'Required',
                     minLength: { value: 8, message: 'At least 8 characters' },
-                    pattern: {
-                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/,
-                      message: 'Use letters and numbers',
-                    },
+                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/, message: 'Use letters and numbers' }
                   })}
                   autoComplete="new-password"
-                  className={`w-full px-3 py-2 rounded-md border ${TYPO.body} focus:outline-none focus:ring-2 focus:ring-offset-0`}
-                  style={{ borderColor: errors.password ? GOV.error : GOV.border, color: GOV.text }}
+                  className={inputClass(!!errors.password)}
+                  style={{ borderBottomColor: errors.password ? GOV.error : GOV.border, color: GOV.text }}
                 />
-                {errors.password && (
-                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.password.message}</p>
-                )}
+                {errors.password && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.password.message}</p>}
               </div>
 
-              <div className="flex items-start">
-                <div className="flex items-center h-5">
-                  <input
-                    id="register-consent"
-                    type="checkbox"
-                    {...register('consent', { required: 'You must accept the terms to register' })}
-                    className="h-4 w-4 rounded"
-                    style={{ accentColor: GOV.blue, borderColor: GOV.border }}
-                  />
+              {/* University-specific fields */}
+              {userType === 'university_student' && (
+                <div className="space-y-3 pt-1">
+                  <div className="h-px" style={{ backgroundColor: GOV.borderLight }} />
+                  <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>University details (optional)</p>
+                  <div>
+                    <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Degree programme</label>
+                    <input
+                      {...register('degreeProgram')}
+                      type="text"
+                      placeholder="e.g. Bachelor of Commerce"
+                      className={inputClass(false)}
+                      style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Year of study</label>
+                    <select {...register('yearOfStudy')} className={inputClass(false)} style={{ borderBottomColor: GOV.border, color: GOV.text }}>
+                      <option value="">— Select —</option>
+                      {[1,2,3,4,5,6].map(y => <option key={y} value={y}>Year {y}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="ml-2.5">
-                  <label htmlFor="register-consent" className={TYPO.bodySmall} style={{ color: GOV.text }}>
-                    I consent to the processing of my data under the Eswatini Data Protection Act 2022
-                  </label>
-                  {errors.consent && (
-                    <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.consent.message}</p>
-                  )}
+              )}
+
+              {/* Professional-specific fields */}
+              {userType === 'professional' && (
+                <div className="space-y-3 pt-1">
+                  <div>
+                    <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current occupation</label>
+                    <input
+                      {...register('currentOccupation')}
+                      type="text"
+                      placeholder="e.g. Secondary School Teacher"
+                      className={inputClass(false)}
+                      style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Years of experience</label>
+                    <select {...register('yearsExperience')} className={inputClass(false)} style={{ borderBottomColor: GOV.border, color: GOV.text }}>
+                      <option value="">— Select —</option>
+                      {['0-1','2-3','4-6','7-10','10+'].map(v => <option key={v} value={v}>{v} years</option>)}
+                    </select>
+                  </div>
                 </div>
+              )}
+
+              {/* Consent */}
+              <div className="flex items-start gap-2.5 pt-1">
+                <input
+                  id="reg-consent"
+                  type="checkbox"
+                  {...register('consent', { required: 'You must accept the terms' })}
+                  className="h-4 w-4 mt-0.5 rounded shrink-0"
+                  style={{ accentColor: GOV.blue }}
+                />
+                <label htmlFor="reg-consent" className="text-xs" style={{ color: GOV.text }}>
+                  I consent to the processing of my data under the Eswatini Data Protection Act 2022
+                </label>
               </div>
+              {errors.consent && <p className="text-xs" style={{ color: GOV.error }}>{errors.consent.message}</p>}
 
               {serverError && (
-                <div
-                  className={`rounded-md px-3 py-2 ${TYPO.hint}`}
-                  style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}
-                >
+                <div className="rounded-md px-3 py-2 text-xs" style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}>
                   {serverError}
                 </div>
               )}
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-opacity hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed`}
-                style={{ backgroundColor: GOV.blue }}
-              >
-                {isSubmitting ? 'Creating account…' : 'Create account'}
-              </button>
-            </form>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
+              style={{ backgroundColor: GOV.blue }}
+            >
+              {isSubmitting ? 'Creating account…' : 'Create account'}
+            </button>
 
-            <div className="px-6 pb-6 pt-0 text-center border-t" style={{ borderColor: GOV.borderLight }}>
-              <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-                Already have an account?{' '}
-                <Link to="/login" className="font-medium hover:underline" style={{ color: GOV.blue }}>
-                  Sign in
-                </Link>
-              </p>
-            </div>
-          </div>
+            <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
+              Already have an account?{' '}
+              <Link to="/login" className="font-medium hover:underline" style={{ color: GOV.blue }}>Sign in</Link>
+            </p>
+          </form>
+        )}
         </div>
-      </main>
-    </div>
+      </div>
+    </OnboardingLayout>
   );
 }

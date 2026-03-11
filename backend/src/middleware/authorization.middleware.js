@@ -4,18 +4,20 @@ const authorize = (allowedRoles = []) => {
   return async (req, res, next) => {
     // Check if user role is in allowed roles
     if (!allowedRoles.includes(req.user.role)) {
-      // Log unauthorized access attempt
+      // Log unauthorized access attempt (AuditLog schema: actionType, description, details)
       await AuditLog.create({
         userId: req.user.id,
-        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
-        resourceType: req.baseUrl + req.path,
-        resourceId: req.params.id,
+        actionType: 'ACCESS_DENIED',
+        description: 'Unauthorized access attempt',
+        details: {
+          resourceType: req.baseUrl + req.path,
+          resourceId: req.params.id,
+          requestMethod: req.method,
+          isSuspicious: true
+        },
         ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-        requestMethod: req.method,
-        isSuspicious: true,
-        securityLevel: 'high'
-      });
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
 
       return res.status(403).json({
         status: 'error',
@@ -41,15 +43,17 @@ const selfOnly = (resourceType) => {
     if (resourceId !== req.user.id) {
       await AuditLog.create({
         userId: req.user.id,
-        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
-        resourceType,
-        resourceId,
+        actionType: 'ACCESS_DENIED',
+        description: 'Unauthorized access to resource',
+        details: {
+          resourceType,
+          resourceId,
+          requestMethod: req.method,
+          isSuspicious: true
+        },
         ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-        requestMethod: req.method,
-        isSuspicious: true,
-        securityLevel: 'high'
-      });
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
 
       return res.status(403).json({
         status: 'error',

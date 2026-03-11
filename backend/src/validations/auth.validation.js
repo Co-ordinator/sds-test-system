@@ -73,7 +73,7 @@ const register = Joi.object({
 
 const login = Joi.object({
   identifier: Joi.string().required().messages({
-    'any.required': 'Email or Student ID is required'
+    'any.required': 'Email or Code is required'
   }),
   password: Joi.string().required().messages({
     'any.required': 'Password is required'
@@ -92,6 +92,12 @@ const resetPassword = Joi.object({
 });
 
 const updateProfile = Joi.object({
+  firstName: Joi.string().max(255).allow('', null),
+  lastName: Joi.string().max(255).allow('', null),
+  gender: Joi.string().valid('male', 'female', 'other', 'prefer_not_to_say').allow('', null),
+  nationalId: Joi.string().pattern(/^\d{13}$/).allow('', null).messages({
+    'string.pattern.base': 'National ID must be exactly 13 digits'
+  }),
   phoneNumber: Joi.string().pattern(/^\+268\d{8}$/).allow('', null),
   region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').allow('', null),
   district: Joi.string().allow('', null),

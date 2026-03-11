@@ -5,6 +5,7 @@ const { logAuthAction } = require('../middleware/authentication.middleware');
 const { sendEmail } = require('../config/email.config');
 const { Op } = require('sequelize');
 const logger = require('../utils/logger');
+const { generateStudentCode } = require('../utils/generateStudentCode');
 
 // Generate JWT token
 const signToken = (id, role) => {
@@ -38,7 +39,11 @@ const setRefreshTokenCookie = (res, token) => {
 // Register new user (email OR phone, password, consent; verify email only when email provided)
 const register = async (req, res, next) => {
   try {
-    const { email, password, phoneNumber, consent } = req.body;
+    const {
+      email, password, phoneNumber, consent,
+      userType, degreeProgram, yearOfStudy, yearsExperience,
+      currentOccupation
+    } = req.body;
     const hasEmail = email && String(email).trim().length > 0;
     const hasPhone = phoneNumber && String(phoneNumber).trim().length > 0;
 
@@ -65,13 +70,22 @@ const register = async (req, res, next) => {
     const emailToken = crypto.randomBytes(32).toString('hex');
     const emailTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
+    // Generate universal login number for all users
+    const studentCode = await generateStudentCode();
+
     const user = await User.create({
       email: hasEmail ? email.trim() : null,
       password,
       firstName: 'Pending',
       lastName: 'User',
       role: 'user',
+      userType: userType || null,
+      degreeProgram: degreeProgram || null,
+      yearOfStudy: yearOfStudy ? parseInt(yearOfStudy, 10) : null,
+      yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : null,
+      currentOccupation: currentOccupation || null,
       phoneNumber: hasPhone ? phoneNumber.trim() : null,
+      studentCode,
       isConsentGiven: true,
       consentDate: new Date(),
       emailVerificationToken: hasEmail ? emailToken : null,
@@ -106,7 +120,7 @@ const register = async (req, res, next) => {
         });
         await AuditLog.create({
           userId: user.id,
-          actionType: 'WELCOME_EMAIL_SENT',
+          actionType: 'SYSTEM',
           description: 'Welcome email sent',
           details: {
             resourceType: 'email',
@@ -129,7 +143,7 @@ const register = async (req, res, next) => {
         });
         await AuditLog.create({
           userId: user.id,
-          actionType: 'EMAIL_FAILURE',
+          actionType: 'SYSTEM',
           description: 'Failed to send welcome email',
           details: {
             resourceType: 'email',
@@ -144,8 +158,8 @@ const register = async (req, res, next) => {
       }
     }
 
-    // Log registration
-    await logAuthAction(req, 'REGISTER');
+    // Log registration (pass user.id since req.user is not set yet)
+    await logAuthAction(req, 'REGISTER', user.id);
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);
@@ -218,32 +232,47 @@ const verifyEmail = async (req, res, next) => {
       }
     });
 
-    // Log verification
-    await AuditLog.create({
-      userId: user.id,
-      actionType: 'EMAIL_VERIFIED',
-      description: 'Email verified',
-      details: {
-        resourceType: 'user',
-        resourceId: user.id,
-        requestMethod: 'GET',
-        requestPath: `/api/v1/auth/verify-email/${req.params.token}`
-      },
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
+    let token = null;
 
-    const token = signToken(user.id, user.role);
-    const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = refreshToken;
-    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await user.save();
-    setRefreshTokenCookie(res, refreshToken);
+    try {
+      // Log verification
+      await AuditLog.create({
+        userId: user.id,
+        actionType: 'SYSTEM',
+        description: 'Email verified',
+        details: {
+          resourceType: 'user',
+          resourceId: user.id,
+          requestMethod: 'GET',
+          requestPath: `/api/v1/auth/verify-email/${req.params.token}`
+        },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+
+      token = signToken(user.id, user.role);
+      const refreshToken = signRefreshToken(user.id, user.role);
+      user.refreshToken = refreshToken;
+      user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await user.save();
+      setRefreshTokenCookie(res, refreshToken);
+    } catch (postVerifyError) {
+      logger.warn({
+        actionType: 'VERIFY_EMAIL',
+        message: 'Email verified, but post-verification setup failed',
+        req,
+        details: {
+          userId: user.id,
+          error: postVerifyError.message,
+          stack: postVerifyError.stack
+        }
+      });
+    }
 
     res.status(200).json({
       status: 'success',
-      message: 'Email successfully verified!',
-      token,
+      message: token ? 'Email successfully verified!' : 'Email successfully verified. Please log in.',
+      ...(token ? { token } : {}),
       data: {
         user: user.toJSON()
       }
@@ -262,48 +291,54 @@ const verifyEmail = async (req, res, next) => {
   }
 };
 
-// User login
+// User login (accepts email, username, or student_number)
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const identifier = (req.body.identifier ?? req.body.email ?? req.body.username ?? '').toString().trim();
+    const password = req.body.password;
     
-    // 1) Check if email and password exist
-    if (!email || !password) {
+    // 1) Check if identifier and password exist
+    if (!identifier || !password) {
       logger.warn({
         actionType: 'LOGIN_FAILED',
-        message: 'Missing email or password',
+        message: 'Missing identifier or password',
         req,
-        details: {
-          email: email,
-          password: password
-        }
+        details: { identifier: identifier ? 'present' : 'missing' }
       });
       return res.status(400).json({
         status: 'error',
-        message: 'Please provide email and password'
+        message: 'Please provide your email or username and password'
       });
     }
     
-    // 2) Check if user exists && password is correct
-    const user = await User.findOne({ where: { email } });
+    // 2) Find user by studentCode (universal login number), email, username, or student_number
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [
+          { studentCode: identifier },
+          { email: identifier },
+          { username: identifier },
+          { studentNumber: identifier }
+        ]
+      }
+    });
     
     if (!user || !(await user.comparePassword(password))) {
       logger.warn({
         actionType: 'LOGIN_FAILED',
         message: 'Failed login attempt',
         req,
-        details: {
-          email: email
-        }
+        details: { identifier: identifier.slice(0, 3) + '***' }
       });
       return res.status(401).json({
         status: 'error',
-        message: 'Incorrect email or password'
+        message: 'Incorrect email/username or password'
       });
     }
     
-    // 3) Check if email is verified
-    if (!user.isEmailVerified) {
+    // 3) Check if email is verified — skip for counselor-created students (no email)
+    const requiresVerification = user.email && !user.isEmailVerified && !user.createdByCounselor;
+    if (requiresVerification) {
       logger.warn({
         actionType: 'LOGIN_FAILED',
         message: 'Login attempt with unverified email',
@@ -334,8 +369,8 @@ const login = async (req, res, next) => {
       }
     });
 
-    // 5) Log login
-    await logAuthAction(req, 'LOGIN');
+    // 5) Log login (pass user.id since req.user is not set yet)
+    await logAuthAction(req, 'LOGIN', user.id);
     
     // 6) Send token to client
     const token = signToken(user.id, user.role);
@@ -393,7 +428,7 @@ const getMe = async (req, res, next) => {
     
     logger.info({
       actionType: 'GET_ME',
-      message: `User profile retrieved: ${user.email}`,
+      message: `User profile retrieved: ${user.email || user.phoneNumber || user.id}`,
       req,
       details: {
         userId: user.id
@@ -403,7 +438,7 @@ const getMe = async (req, res, next) => {
     res.status(200).json({
       status: 'success',
       data: {
-        user
+        user: user.toJSON ? user.toJSON() : user
       }
     });
   } catch (error) {
@@ -429,7 +464,7 @@ const updateProfile = async (req, res, next) => {
     }
 
     const allowed = [
-      'phoneNumber', 'region', 'district', 'address', 'educationLevel',
+      'firstName', 'lastName', 'gender', 'nationalId', 'phoneNumber', 'region', 'district', 'address', 'educationLevel',
       'currentInstitution', 'gradeLevel', 'employmentStatus', 'currentOccupation',
       'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds'
     ];
@@ -472,22 +507,28 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
-// Forgot password (accepts email or identifier: email / nationalId)
+// Forgot password (accepts login number, email, username, or student number)
 const forgotPassword = async (req, res, next) => {
   try {
     const identifier = (req.body.identifier || req.body.email || '').trim();
     if (!identifier) {
       return res.status(400).json({
         status: 'error',
-        message: 'Email or National ID is required'
+        message: 'Login number, email, username, or student number is required'
       });
     }
 
-    const isEmail = identifier.includes('@');
-    const where = isEmail
-      ? { email: identifier }
-      : { nationalId: identifier };
-    const user = await User.findOne({ where });
+    // Find user by any login identifier (same as login flow)
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [
+          { studentCode: identifier },
+          { email: identifier },
+          { username: identifier },
+          { studentNumber: identifier }
+        ]
+      }
+    });
 
     if (!user) {
       logger.warn({
@@ -498,7 +539,7 @@ const forgotPassword = async (req, res, next) => {
       });
       return res.status(404).json({
         status: 'error',
-        message: 'No user found with that email or National ID'
+        message: 'No user found with that login number, email, username, or student number'
       });
     }
 
@@ -544,7 +585,7 @@ const forgotPassword = async (req, res, next) => {
 
       await AuditLog.create({
         userId: user.id,
-        actionType: 'PASSWORD_RESET_EMAIL_SENT',
+        actionType: 'SYSTEM',
         description: 'Password reset email sent',
         details: {
           resourceType: 'email',
@@ -567,7 +608,7 @@ const forgotPassword = async (req, res, next) => {
       });
       await AuditLog.create({
         userId: user.id,
-        actionType: 'EMAIL_FAILURE',
+        actionType: 'SYSTEM',
         description: 'Failed to send password reset email',
         details: {
           resourceType: 'email',
@@ -628,8 +669,8 @@ const resetPassword = async (req, res, next) => {
       });
     }
     
-    // 2) Update password
-    user.password = req.body.password;
+    // 2) Update password (validation provides newPassword/confirmPassword)
+    user.password = req.body.newPassword ?? req.body.password;
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
     await user.save();
@@ -643,8 +684,8 @@ const resetPassword = async (req, res, next) => {
       }
     });
 
-    // 3) Log password reset
-    await logAuthAction(req, 'PASSWORD_RESET');
+    // 3) Log password reset (AuditLog enum uses PASSWORD_CHANGE; pass user.id - no req.user on this route)
+    await logAuthAction(req, 'PASSWORD_CHANGE', user.id);
     
     // 4) Log the user in, send JWT
     const token = signToken(user.id, user.role);
@@ -672,7 +713,7 @@ const resetPassword = async (req, res, next) => {
 // Refresh access token
 const refreshToken = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
     
     if (!refreshToken) {
       return res.status(401).json({
@@ -724,7 +765,7 @@ const refreshToken = async (req, res, next) => {
 // Logout user
 const logout = async (req, res, next) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
     
     if (refreshToken) {
       // Find user by refresh token and clear it
@@ -846,7 +887,7 @@ const deleteUserAccount = async (req, res, next) => {
     // Log deletion before it happens
     await AuditLog.create({
       userId: user.id,
-      actionType: 'ACCOUNT_DELETED_BY_USER',
+      actionType: 'SYSTEM',
       description: 'User deleted own account',
       details: {
         resourceType: 'user',
@@ -878,9 +919,9 @@ const deleteUserAccount = async (req, res, next) => {
       sameSite: 'strict'
     });
 
-    res.status(204).json({
+    res.status(200).json({
       status: 'success',
-      data: null
+      message: 'Account deleted successfully'
     });
   } catch (error) {
     logger.error({
@@ -968,7 +1009,7 @@ const resendVerificationEmail = async (req, res, next) => {
 
       await AuditLog.create({
         userId: user.id,
-        actionType: 'VERIFICATION_EMAIL_RESENT',
+        actionType: 'SYSTEM',
         description: 'Verification email resent',
         details: {
           resourceType: 'email',
@@ -996,7 +1037,7 @@ const resendVerificationEmail = async (req, res, next) => {
       });
       await AuditLog.create({
         userId: user.id,
-        actionType: 'EMAIL_FAILURE',
+        actionType: 'SYSTEM',
         description: 'Failed to resend verification email',
         details: {
           resourceType: 'email',

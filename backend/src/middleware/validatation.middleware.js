@@ -10,15 +10,19 @@ const validate = (schema) => async (req, res, next) => {
     });
 
     if (error) {
-      // Log validation error
+      // Log validation error (AuditLog schema: actionType, description, details)
       await AuditLog.create({
-        action: 'VALIDATION_ERROR',
-        resourceType: req.baseUrl + req.path,
-        requestMethod: req.method,
-        errorMessage: error.message,
+        userId: null,
+        actionType: 'SYSTEM',
+        description: 'Validation failed',
+        details: {
+          path: req.baseUrl + req.path,
+          requestMethod: req.method,
+          errorMessage: error.message
+        },
         ipAddress: req.ip,
         userAgent: req.headers['user-agent']
-      });
+      }).catch(() => {}); // avoid failing request if audit fails
 
       // Format error response
       const errors = error.details.map(detail => ({

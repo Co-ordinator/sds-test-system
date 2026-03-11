@@ -1,10 +1,15 @@
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { GOV, TYPO, LOGO, MINISTRY_NAME, KINGDOM, LOGO_ALT } from '../theme/government';
+import ResendVerification from '../components/auth/ResendVerification';
 
 export default function Unauthorized() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [showResend, setShowResend] = useState(false);
+  const requiresVerification = location.state?.requiresVerification === true;
 
   const handleBack = () => {
     if (user?.role === 'admin') {
@@ -33,24 +38,40 @@ export default function Unauthorized() {
             <img src="/siyinqaba.png" alt={LOGO_ALT} className={LOGO.className} />
           </Link>
 
+          {showResend && <ResendVerification onClose={() => setShowResend(false)} defaultEmail={user?.email || ''} />}
+
           <div
             className="w-full bg-white rounded-lg border py-6 px-6 text-center"
             style={{ borderColor: GOV.border }}
           >
-            <h1 className={`${TYPO.pageTitle} mb-2`} style={{ color: GOV.error }}>
-              Access denied
+            <h1 className={`${TYPO.pageTitle} mb-2`} style={{ color: requiresVerification ? GOV.blue : GOV.error }}>
+              {requiresVerification ? 'Email verification required' : 'Access denied'}
             </h1>
             <p className={`${TYPO.bodySmall} mb-4`} style={{ color: GOV.textMuted }}>
-              You do not have permission to view this page.
+              {requiresVerification
+                ? 'Please verify your email address to access this page. Check your inbox for a verification link.'
+                : 'You do not have permission to view this page.'}
             </p>
-            <button
-              type="button"
-              onClick={handleBack}
-              className={`py-2.5 px-4 rounded-md font-medium ${TYPO.bodySmall} text-white transition-opacity hover:opacity-95`}
-              style={{ backgroundColor: GOV.blue }}
-            >
-              Back to dashboard
-            </button>
+            <div className="flex flex-col gap-2">
+              {requiresVerification && (
+                <button
+                  type="button"
+                  onClick={() => setShowResend(true)}
+                  className={`py-2.5 px-4 rounded-md font-medium ${TYPO.bodySmall} text-white transition-opacity hover:opacity-95`}
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  Resend verification email
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleBack}
+                className={`py-2.5 px-4 rounded-md font-medium ${TYPO.bodySmall} transition-opacity hover:opacity-95 ${requiresVerification ? '' : 'text-white'}`}
+                style={requiresVerification ? { border: `1px solid ${GOV.border}`, color: GOV.textMuted } : { backgroundColor: GOV.blue, color: 'white' }}
+              >
+                {requiresVerification ? 'Go back' : 'Back to dashboard'}
+              </button>
+            </div>
           </div>
         </div>
       </main>

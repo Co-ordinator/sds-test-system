@@ -1,17 +1,5 @@
 const { DataTypes } = require('sequelize');
 
-const ACTION_TYPES = [
-  'LOGIN',
-  'REGISTER',
-  'LOGOUT',
-  'TEST_START',
-  'TEST_COMPLETE',
-  'PROFILE_UPDATE',
-  'PASSWORD_CHANGE',
-  'ACCESS_DENIED',
-  'SYSTEM'
-];
-
 module.exports = (sequelize) => {
   const AuditLog = sequelize.define('AuditLog', {
     id: {
@@ -24,7 +12,7 @@ module.exports = (sequelize) => {
       allowNull: true
     },
     actionType: {
-      type: DataTypes.ENUM(...ACTION_TYPES),
+      type: DataTypes.STRING(100),
       allowNull: false
     },
     description: {

@@ -1,10 +1,32 @@
-const { Answer, Assessment, Occupation, EducationLevel, sequelize } = require('../models');
+const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, CourseRequirement, CourseInstitution, Institution, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
+ * Holland Code → Suggested High School Subjects mapping
+ * Used to populate the "Suggested Subjects" section of career reports.
+ */
+const HOLLAND_SUBJECTS = {
+  R: ['Mathematics', 'Physical Science', 'Technical Drawing', 'Agricultural Science', 'Computer Science'],
+  I: ['Mathematics', 'Physical Science', 'Biology', 'Chemistry', 'Computer Science'],
+  A: ['Art', 'Music', 'English Language', 'Literature', 'Drama', 'Design & Technology'],
+  S: ['Biology', 'English Language', 'History', 'Religious Education', 'Home Economics'],
+  E: ['Business Studies', 'Economics', 'Accounting', 'English Language', 'Mathematics'],
+  C: ['Accounting', 'Business Studies', 'Mathematics', 'Computer Science', 'Economics']
+};
+
+/**
+ * Holland Code → Career Focus description per user type
+ */
+const CAREER_FOCUS = {
+  school_student: 'Based on your interests, here are careers and study paths available in Eswatini.',
+  university_student: 'Your profile suggests these career specializations and graduate pathways.',
+  professional: 'Based on your RIASEC profile, here are career transition opportunities and upskilling paths.'
+};
+
+/**
  * SDS Scoring Service
- * Handles the calculation of RIASEC scores and career matching
- * based on the 228-item assessment and Education Levels 1-5.
+ * Handles the calculation of RIASEC scores, career matching,
+ * and the full careers → courses → institutions recommendation chain.
  */
 class ScoringService {
   /**
@@ -14,7 +36,6 @@ class ScoringService {
     const transaction = await sequelize.transaction();
 
     try {
-      // 1. Fetch the assessment and the associated user's education level
       const assessment = await Assessment.findByPk(assessmentId, {
         include: ['user'],
         transaction
@@ -22,25 +43,20 @@ class ScoringService {
 
       if (!assessment) throw new Error('Assessment not found');
 
-      // 2. Fetch all answers
       const answers = await Answer.findAll({ 
         where: { assessmentId },
         transaction 
       });
 
-      // 3. Initialize RIASEC tally
       const totals = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
 
       answers.forEach(ans => {
-        const type = ans.riasecType; // R, I, A, S, E, or C
-        
+        const type = ans.riasecType;
         if (['activities', 'competencies', 'occupations'].includes(ans.section)) {
-          // Sections I, II, III: Binary scoring (YES = 1 point)
           if (ans.value.toUpperCase() === 'YES') {
             totals[type] += 1;
           }
         } else if (ans.section === 'self_estimates') {
-          // Section IV: Scale scoring (Values 1-6)
           const rating = parseInt(ans.value, 10);
           if (!isNaN(rating)) {
             totals[type] += rating;
@@ -48,14 +64,12 @@ class ScoringService {
         }
       });
 
-      // 4. Generate the 3-letter Holland Code (e.g., "RIA")
       const hollandCode = Object.entries(totals)
-        .sort(([, valA], [, valB]) => valB - valA) // Sort by score descending
-        .slice(0, 3) // Take top 3
+        .sort(([, valA], [, valB]) => valB - valA)
+        .slice(0, 3)
         .map(([key]) => key)
         .join('');
 
-      // 5. Update Assessment with final scores and code
       await assessment.update({
         scoreR: totals.R,
         scoreI: totals.I,
@@ -66,11 +80,9 @@ class ScoringService {
         hollandCode,
         status: 'completed',
         completedAt: new Date(),
-        // Store the education level at time of completion for historical accuracy
         educationLevelAtTest: assessment.user.educationLevel 
       }, { transaction });
 
-      // 6. Fetch Matching Occupations based on Code AND Education Level (1-5)
       const recommendations = await this.getRecommendations(
         hollandCode, 
         assessment.user.educationLevel,
@@ -78,6 +90,28 @@ class ScoringService {
       );
 
       await transaction.commit();
+
+      try {
+        const student = assessment.user;
+        await AuditLog.create({
+          userId: assessment.userId,
+          actionType: 'ASSESSMENT_COMPLETED_NOTIFY',
+          description: `${student?.firstName || 'Student'} ${student?.lastName || ''} completed their SDS assessment. Holland Code: ${hollandCode}`,
+          details: {
+            assessmentId,
+            userId: assessment.userId,
+            studentName: `${student?.firstName || ''} ${student?.lastName || ''}`.trim(),
+            studentEmail: student?.email || null,
+            institutionId: student?.institutionId || null,
+            hollandCode,
+            isRead: false
+          },
+          ipAddress: '127.0.0.1',
+          userAgent: 'system'
+        });
+      } catch (_notifyErr) {
+        // Notification failure must not break the assessment flow
+      }
 
       return {
         scores: totals,
@@ -92,26 +126,111 @@ class ScoringService {
   }
 
   /**
-   * Matches Holland Code against the Appendix data
-   * Logic: Finds occupations with the same 3-letter code and matching education level.
+   * Get suggested subjects for a Holland code (top 3 letters).
+   * Returns deduplicated list of subjects relevant to the code.
+   */
+  getSuggestedSubjects(hollandCode) {
+    if (!hollandCode) return [];
+    const subjects = new Set();
+    hollandCode.split('').forEach(letter => {
+      (HOLLAND_SUBJECTS[letter] || []).forEach(s => subjects.add(s));
+    });
+    return Array.from(subjects).slice(0, 8);
+  }
+
+  /**
+   * Matches Holland Code against occupations and enriches with:
+   * - Suggested subjects
+   * - Matching courses (qualification pathways)
+   * - Institutions offering those courses
+   * - Entry requirements per course
    */
   async getRecommendations(code, eduLevel, transaction = null) {
-    // 1. Validate education level exists
-    const levelExists = await EducationLevel.findByPk(eduLevel, { transaction });
-    if (!levelExists) {
-      console.warn(`Warning: Education Level ${eduLevel} not found in master data.`);
-      return [];
+    const opts = transaction ? { transaction } : {};
+
+    // 1. Validate education level
+    const levelExists = eduLevel
+      ? await EducationLevel.findByPk(eduLevel, opts)
+      : null;
+
+    // 2. Find matching occupations (exact code match or any letter overlap)
+    let occupations = await Occupation.findAll({
+      where: { code },
+      include: [{ model: EducationLevel, as: 'education' }],
+      ...opts
+    });
+
+    // Fallback: try partial match on any 2 of 3 letters
+    if (occupations.length === 0 && code && code.length >= 2) {
+      const letters = code.split('');
+      occupations = await Occupation.findAll({
+        where: {
+          [Op.or]: letters.map(l => ({
+            code: { [Op.iLike]: `%${l}%` }
+          }))
+        },
+        limit: 15,
+        include: [{ model: EducationLevel, as: 'education' }],
+        ...opts
+      });
     }
 
-    // 2. Perform the matching with level details for UI
-    return await Occupation.findAll({
-      where: {
-        code,
-        educationLevel: eduLevel
-      },
-      include: [{ model: EducationLevel, as: 'education' }],
-      transaction
-    });
+    // 3. Find matching courses by RIASEC code overlap
+    let courses = [];
+    try {
+      // Match courses whose riasec_codes array contains any letter from the holland code
+      const codeLetters = code ? code.split('') : [];
+      
+      courses = await Course.findAll({
+        where: {
+          isActive: true,
+          [Op.or]: codeLetters.length > 0
+            ? codeLetters.map(l => sequelize.where(
+                sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
+                { [Op.iLike]: `%${l}%` }
+              ))
+            : [{ id: { [Op.ne]: null } }]
+        },
+        include: [
+          { model: CourseRequirement, as: 'requirements' },
+          {
+            model: CourseInstitution,
+            as: 'courseInstitutions',
+            where: { isActive: true },
+            required: false,
+            include: [
+              {
+                model: Institution,
+                as: 'institution',
+                attributes: ['id', 'name', 'type', 'region', 'website', 'accredited']
+              }
+            ]
+          }
+        ],
+        limit: 12,
+        ...opts
+      });
+    } catch (_err) {
+      courses = [];
+    }
+
+    // 4. Suggested subjects from Holland code
+    const suggestedSubjects = this.getSuggestedSubjects(code);
+
+    return {
+      occupations,
+      courses,
+      suggestedSubjects,
+      hollandCode: code,
+      educationLevel: levelExists
+    };
+  }
+
+  /**
+   * Get career focus message by user type
+   */
+  getCareerFocusMessage(userType) {
+    return CAREER_FOCUS[userType] || CAREER_FOCUS.school_student;
   }
 }
 

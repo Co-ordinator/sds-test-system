@@ -24,7 +24,12 @@ const baseQuestionSchema = Joi.object({
   })
 });
 
-const createQuestionSchema = baseQuestionSchema;
+const createQuestionSchema = Joi.object({
+  text: Joi.string().trim().min(1).required(),
+  section: Joi.string().valid(...sectionEnum).required(),
+  riasecType: Joi.string().valid(...riasecEnum).required(),
+  order: Joi.number().integer().positive().optional()
+});
 
 const updateQuestionSchema = Joi.object({
   text: Joi.string().trim().min(1),

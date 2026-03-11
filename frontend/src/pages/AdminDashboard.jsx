@@ -1,335 +1,536 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Users, FileCheck, Activity, ShieldCheck, Building2, Plus, Search } from 'lucide-react';
-import { BarChart, Bar, ResponsiveContainer } from 'recharts';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Download, MapPin, Filter, X
+} from 'lucide-react';
+import FilterDialog from '../components/ui/FilterDialog';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { GOV } from '../theme/government';
+import AppShell from '../components/layout/AppShell';
+import { adminService } from '../services/adminService';
+import DataTable from '../components/data/DataTable';
+import EswatiniLeafletMap from '../components/maps/EswatiniLeafletMap';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+} from 'recharts';
+import { PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../features/analytics/analyticsConstants';
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('users');
-  const [institutions, setInstitutions] = useState([]);
-  const [users, setUsers] = useState([]);
+  const { user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [instSearch, setInstSearch] = useState('');
-  const [newInst, setNewInst] = useState({ name: '', type: 'school', region: 'hhohho' });
-  const [isSaving, setIsSaving] = useState(false);
+  const [regionalData, setRegionalData] = useState(null);
+  const [hollandDist, setHollandDist] = useState([]);
+  const [trend, setTrend] = useState([]);
+  const [assessments, setAssessments] = useState([]);
+  const [institutions, setInstitutions] = useState([]);
+  const [exporting, setExporting] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [filters, setFilters] = useState({
+    region: '',
+    institutionId: '',
+    startDate: '',
+    endDate: '',
+  });
+
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Administrator';
+
+  const buildParams = () => {
+    const p = new URLSearchParams();
+    if (filters.region) p.set('region', filters.region);
+    if (filters.institutionId) p.set('institutionId', filters.institutionId);
+    if (filters.startDate) p.set('startDate', filters.startDate);
+    if (filters.endDate) p.set('endDate', filters.endDate);
+    return p.toString();
+  };
 
   useEffect(() => {
-    const loadInstitutions = async () => {
+    const fetchDashboard = async () => {
+      setLoading(true);
       try {
-        const res = await api.get('/api/v1/institutions');
-        setInstitutions(res.data?.data?.institutions || []);
-      } catch {
-        setInstitutions([]);
-      }
-    };
-    loadInstitutions();
-  }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'users') return;
-    const loadUsers = async () => {
-      try {
-        const res = await api.get('/api/v1/admin/users');
-        setUsers(res.data?.data?.users || []);
-      } catch {
-        setUsers([]);
-      }
-    };
-    loadUsers();
-  }, [activeTab]);
-
-  useEffect(() => {
-    const loadAnalytics = async () => {
-      try {
-        const res = await api.get('/api/v1/admin/analytics');
-        setAnalytics(res.data?.data || null);
+        const qs = buildParams();
+        const [aRes, rRes, hRes, tRes, assessmentsRes, institutionsRes] = await Promise.all([
+          api.get(`/api/v1/admin/analytics${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/admin/analytics/regional${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/admin/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/admin/analytics/trend${qs ? `?${qs}` : ''}`),
+          adminService.getAssessments(1000),
+          adminService.getInstitutions(),
+        ]);
+        setAnalytics(aRes.data?.data || null);
+        setRegionalData(rRes.data?.data || null);
+        setHollandDist(hRes.data?.data?.distribution || []);
+        setTrend(tRes.data?.data?.trend || []);
+        setAssessments(assessmentsRes || []);
+        setInstitutions(institutionsRes || []);
       } catch {
         setAnalytics(null);
+        setRegionalData(null);
+        setHollandDist([]);
+        setTrend([]);
+      } finally {
+        setLoading(false);
       }
     };
-    loadAnalytics();
-  }, []);
+    fetchDashboard();
+  }, [filters.region, filters.institutionId, filters.startDate, filters.endDate]);
 
-  useEffect(() => {
-    if (activeTab !== 'settings') return;
-    const loadAuditLogs = async () => {
-      try {
-        const res = await api.get('/api/v1/admin/audit-logs');
-        setAuditLogs(res.data?.data?.logs || []);
-      } catch {
-        setAuditLogs([]);
-      }
-    };
-    loadAuditLogs();
-  }, [activeTab]);
-
-  const filteredInstitutions = useMemo(() => {
-    if (!instSearch) return institutions;
-    return institutions.filter((i) => i.name.toLowerCase().includes(instSearch.toLowerCase()));
-  }, [institutions, instSearch]);
-
-  const handleCreateInstitution = async (e) => {
-    e.preventDefault();
-    if (!newInst.name) return;
-    setIsSaving(true);
+  const handleExport = async (type) => {
+    setExporting(type);
     try {
-      const res = await api.post('/api/v1/institutions', newInst);
-      setInstitutions((prev) => [...prev, res.data.data.institution]);
-      setNewInst({ name: '', type: 'school', region: 'hhohho' });
-    } catch (err) {
-      // could add notification
+      const res = await api.get(`/api/v1/admin/export/${type}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `${type}_export.csv`;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); window.URL.revokeObjectURL(url);
+    } catch { /* silent */ }
+    finally { setExporting(null); }
+  };
+
+  const handleAnalyticsExport = async (format) => {
+    setExporting(`analytics-${format}`);
+    try {
+      const qs = buildParams();
+      const res = await api.get(`/api/v1/admin/analytics/export?format=${format}${qs ? `&${qs}` : ''}`, { responseType: 'blob' });
+      const mime = format === 'pdf' ? 'application/pdf' : 'text/csv';
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: mime }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `national_dashboard.${format === 'pdf' ? 'pdf' : 'csv'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      // silent
     } finally {
-      setIsSaving(false);
+      setExporting(null);
     }
   };
 
+  const completionRate = analytics?.completionRate ?? 0;
+  const totalUsers = analytics?.totals?.users ?? 0;
+  const totalCompleted = analytics?.totals?.completedAssessments ?? 0;
+  const totalAssessments = analytics?.totals?.assessments ?? 0;
+  const schoolCount = institutions.filter(i => i.type === 'school').length;
+  const universityCount = institutions.filter(i => i.type === 'university').length;
+  const engagementPct = totalUsers > 0 ? Math.round((totalCompleted / totalUsers) * 100) : 0;
+
+  const trendData = useMemo(
+    () => trend.map(t => ({
+      month: t.month ? new Date(t.month).toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' }) : '',
+      started: Number(t.total || 0),
+      completed: Number(t.completed || 0),
+    })),
+    [trend]
+  );
+
+  const regionalChartData = useMemo(
+    () => (regionalData?.regions || []).map(r => ({
+      key: r.region,
+      region: REGION_LABELS[r.region] || r.region,
+      users: Number(r.totalUsers || 0),
+      completed: Number(r.completedAssessments || 0),
+    })),
+    [regionalData]
+  );
+
+  const pieData = useMemo(
+    () => hollandDist.slice(0, 8).map(d => ({ name: d.hollandCode, value: Number(d.count) })),
+    [hollandDist]
+  );
+
+  const schoolUsageRows = useMemo(() => {
+    const map = new Map();
+    const parseDate = (v) => (v ? new Date(v) : null);
+    const start = parseDate(filters.startDate);
+    const end = parseDate(filters.endDate);
+
+    assessments.forEach((a) => {
+      const inst = a.user?.institution;
+      const completedAt = parseDate(a.completedAt || a.createdAt);
+      if (start && completedAt && completedAt < start) return;
+      if (end && completedAt && completedAt > end) return;
+      if (filters.region && inst?.region !== filters.region) return;
+      if (filters.institutionId && String(inst?.id) !== String(filters.institutionId)) return;
+
+      const key = inst?.id || a.user?.institutionId || 'unknown';
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          institutionName: inst?.name || 'Unknown Institution',
+          region: inst?.region || 'unknown',
+          tested: 0,
+          completed: 0,
+          topCode: null,
+          codes: {},
+        });
+      }
+
+      const row = map.get(key);
+      row.tested += 1;
+      if (a.status === 'completed') row.completed += 1;
+      if (a.hollandCode) {
+        row.codes[a.hollandCode] = (row.codes[a.hollandCode] || 0) + 1;
+      }
+    });
+
+    return Array.from(map.values())
+      .map((r) => {
+        const topCode = Object.entries(r.codes).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+        return {
+          ...r,
+          topCode,
+          completionRate: r.tested > 0 ? Math.round((r.completed / r.tested) * 100) : 0,
+          regionLabel: REGION_LABELS[r.region] || r.region,
+        };
+      })
+      .sort((a, b) => b.tested - a.tested);
+  }, [assessments, filters.endDate, filters.institutionId, filters.region, filters.startDate]);
+
+  const selectedRegionDetail = useMemo(
+    () => (filters.region ? (regionalData?.regions || []).find(r => r.region === filters.region) : null),
+    [filters.region, regionalData]
+  );
+
+  const schoolUsageColumns = [
+    {
+      key: 'institutionName',
+      header: 'Institution',
+      sortable: true,
+      render: (row) => <span className="text-sm font-semibold" style={{ color: GOV.text }}>{row.institutionName}</span>,
+    },
+    {
+      key: 'regionLabel',
+      header: 'Region',
+      sortable: true,
+      render: (row) => (
+        <span className="inline-flex items-center gap-1.5 text-xs" style={{ color: GOV.textMuted }}>
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: REGION_COLORS[row.region] || GOV.textHint }} />
+          {row.regionLabel}
+        </span>
+      ),
+    },
+    { key: 'tested', header: 'Students Tested', sortable: true, align: 'right' },
+    { key: 'completed', header: 'Completed', sortable: true, align: 'right' },
+    {
+      key: 'completionRate',
+      header: 'Completion Rate',
+      sortable: true,
+      align: 'right',
+      render: (row) => <span className="font-semibold" style={{ color: GOV.blue }}>{row.completionRate}%</span>,
+    },
+    {
+      key: 'topCode',
+      header: 'Top Holland Code',
+      sortable: true,
+      align: 'center',
+      render: (row) => <span className="font-mono font-semibold" style={{ color: GOV.text }}>{row.topCode}</span>,
+    },
+  ];
+
+  const resetFilters = () => setFilters({ region: '', institutionId: '', startDate: '', endDate: '' });
+
   return (
-    <div className="p-8 bg-gray-50 min-h-screen space-y-8">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-800">Administrator Dashboard</h1>
-        <p className="text-slate-500">Comprehensive overview and management of the SDS Test System.</p>
-      </header>
+    <AppShell>
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Header */}
+        <div className="flex items-start justify-between flex-wrap gap-5 pb-1">
+          <div className="pt-1">
+            <h1 className="text-2xl font-bold" style={{ color: GOV.text }}>Dashboard</h1>
+            <p className="text-sm mt-1" style={{ color: GOV.textMuted }}>Welcome back, {displayName}. Here's your system overview.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button type="button" onClick={() => handleExport('users')} disabled={exporting === 'users'}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              style={{ borderColor: GOV.border, color: GOV.blue }}>
+              <Download className="w-3.5 h-3.5" /> {exporting === 'users' ? 'Exporting...' : 'Export Users'}
+            </button>
+            <button type="button" onClick={() => handleExport('assessments')} disabled={exporting === 'assessments'}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              style={{ borderColor: GOV.border, color: GOV.blue }}>
+              <Download className="w-3.5 h-3.5" /> {exporting === 'assessments' ? 'Exporting...' : 'Export Results'}
+            </button>
+            <button type="button" onClick={() => handleAnalyticsExport('csv')} disabled={exporting === 'analytics-csv'}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              style={{ borderColor: GOV.border, color: GOV.blue }}>
+              <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-csv' ? 'Exporting...' : 'National CSV'}
+            </button>
+            <button type="button" onClick={() => handleAnalyticsExport('pdf')} disabled={exporting === 'analytics-pdf'}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+              style={{ backgroundColor: GOV.blue }}>
+              <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-pdf' ? 'Exporting...' : 'National PDF'}
+            </button>
+          </div>
+        </div>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <MetricCard title="Total Users" value={analytics?.totals?.users ?? users.length ?? '–'} Icon={Users} />
-        <MetricCard title="Tests Completed" value={analytics?.totals?.completedAssessments ?? '–'} Icon={FileCheck} />
-        <MetricCard title="Completion Rate" value={analytics?.completionRate != null ? `${analytics.completionRate}%` : '–'} Icon={Activity} />
-        <MetricCard title="Institutions" value={institutions.length.toString()} Icon={Building2} />
-      </div>
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          <KpiCard
+            title="Total Users"
+            value={totalUsers.toLocaleString()}
+            hint="Registered users on SDS"
+          />
+          <KpiCard
+            title="Tests Completed"
+            value={totalCompleted.toLocaleString()}
+            hint="Completed assessments"
+          />
+          <KpiCard
+            title="Completion Rate"
+            value={`${completionRate}%`}
+            status={completionRate >= 70 ? 'good' : completionRate >= 40 ? 'warn' : 'bad'}
+            hint={`${totalCompleted} of ${totalAssessments} finished`}
+          />
+          <KpiCard
+            title="User Engagement"
+            value={`${engagementPct}%`}
+            status={engagementPct >= 50 ? 'good' : engagementPct >= 25 ? 'warn' : 'bad'}
+            hint={`${totalCompleted} completions / ${totalUsers} users`}
+          />
+          <KpiCard
+            title="Institutions"
+            value={`${schoolCount + universityCount}`}
+            hint={`${schoolCount} schools · ${universityCount} universities`}
+          />
+        </div>
 
-      {/* Tabs / Quick Actions */}
-      <div className="flex border-b border-gray-200 gap-8 text-sm font-medium text-slate-500">
-        {['users', 'institutions', 'reports', 'settings'].map((tab) => (
+        {/* ── Compact Applied-Filters bar ── */}
+        <div className="flex flex-wrap items-center gap-2 px-1 py-1">
+          <Filter className="w-3.5 h-3.5 flex-shrink-0" style={{ color: GOV.blue }} />
+          <span className="text-xs font-semibold mr-1 flex-shrink-0" style={{ color: GOV.textMuted }}>Applied Filters:</span>
+
+          {!filters.region && !filters.institutionId && !filters.startDate && !filters.endDate && (
+            <span className="text-xs italic" style={{ color: GOV.textHint }}>None — showing all data</span>
+          )}
+
+          {filters.region && (
+            <button type="button" onClick={() => setFilters(p => ({ ...p, region: '' }))}
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+              style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
+              {REGION_LABELS[filters.region] || filters.region}
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          {filters.institutionId && (
+            <button type="button" onClick={() => setFilters(p => ({ ...p, institutionId: '' }))}
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+              style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
+              {institutions.find(i => String(i.id) === String(filters.institutionId))?.name || 'Institution'}
+              <X className="w-3 h-3" />
+            </button>
+          )}
+          {filters.startDate && (
+            <button type="button" onClick={() => setFilters(p => ({ ...p, startDate: '' }))}
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+              style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
+              From {filters.startDate} <X className="w-3 h-3" />
+            </button>
+          )}
+          {filters.endDate && (
+            <button type="button" onClick={() => setFilters(p => ({ ...p, endDate: '' }))}
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+              style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}>
+              To {filters.endDate} <X className="w-3 h-3" />
+            </button>
+          )}
+
+          <div className="flex-1" />
+
           <button
-            key={tab}
-            className={`pb-4 ${activeTab === tab ? 'border-b-2 border-blue-600 text-blue-600' : 'hover:text-slate-700'}`}
-            onClick={() => setActiveTab(tab)}
+            type="button"
+            onClick={() => setFilterDialogOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold border transition-colors hover:bg-blue-50"
+            style={{ borderColor: GOV.blue, color: GOV.blue, backgroundColor: 'white' }}
           >
-            {tab === 'users' && 'User Management'}
-            {tab === 'institutions' && 'Institutions'}
-            {tab === 'reports' && 'Reports & Analytics'}
-            {tab === 'settings' && 'System Settings'}
+            <span className="text-base leading-none">+</span> Add Filter
           </button>
-        ))}
-      </div>
 
-      {activeTab === 'users' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b">
-            <h3 className="font-bold text-slate-800">User Management</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-slate-500 uppercase">
-                <tr>
-                  <th className="p-4">Name</th>
-                  <th className="p-4">Email</th>
-                  <th className="p-4">Role</th>
-                  <th className="p-4">Region</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="p-4 font-medium text-slate-800">{u.firstName} {u.lastName}</td>
-                    <td className="p-4 text-slate-600">{u.email || '–'}</td>
-                    <td className="p-4"><span className="capitalize">{u.role}</span></td>
-                    <td className="p-4 text-slate-600 capitalize">{u.region || '–'}</td>
-                  </tr>
-                ))}
-                {users.length === 0 && (
-                  <tr><td colSpan={4} className="p-4 text-slate-400">No users found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          {(filters.region || filters.institutionId || filters.startDate || filters.endDate) && (
+            <button type="button" onClick={resetFilters}
+              className="px-2.5 py-1 rounded-md text-xs font-semibold hover:bg-red-50"
+              style={{ color: '#dc2626' }}>
+              Clear all
+            </button>
+          )}
         </div>
-      )}
 
-      {activeTab === 'institutions' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-6 border-b flex items-center gap-3">
-              <Building2 className="w-5 h-5 text-blue-600" />
-              <h3 className="font-bold">Institutions</h3>
-              <div className="ml-auto flex items-center gap-2 text-sm text-slate-500">
-                <Search className="w-4 h-4" />
-                <input
-                  className="border border-gray-200 rounded-md px-3 py-1 text-sm"
-                  placeholder="Search institutions"
-                  value={instSearch}
-                  onChange={(e) => setInstSearch(e.target.value)}
-                />
-              </div>
+        {/* Filter Dialog */}
+        <FilterDialog
+          isOpen={filterDialogOpen}
+          onClose={() => setFilterDialogOpen(false)}
+          filters={filters}
+          onFilterChange={setFilters}
+          onReset={resetFilters}
+          title="Dashboard Filters"
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: GOV.text }}>Region</label>
+              <select value={filters.region} onChange={e => setFilters(p => ({ ...p, region: e.target.value }))} className="form-control w-full" style={{ borderBottomColor: GOV.border, color: GOV.text }}>
+                <option value="">All Regions</option>
+                {Object.entries(REGION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-slate-500 uppercase">
-                  <tr>
-                    <th className="p-4">Name</th>
-                    <th className="p-4">Type</th>
-                    <th className="p-4">Region</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredInstitutions.map((inst) => (
-                    <tr key={inst.id} className="hover:bg-gray-50">
-                      <td className="p-4 font-medium text-slate-800">{inst.name}</td>
-                      <td className="p-4 text-slate-500 capitalize">{inst.type}</td>
-                      <td className="p-4 text-slate-500 capitalize">{inst.region || '—'}</td>
-                    </tr>
-                  ))}
-                  {filteredInstitutions.length === 0 && (
-                    <tr>
-                      <td className="p-4 text-slate-400" colSpan={3}>No institutions found</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: GOV.text }}>Institution</label>
+              <select value={filters.institutionId} onChange={e => setFilters(p => ({ ...p, institutionId: e.target.value }))} className="form-control w-full" style={{ borderBottomColor: GOV.border, color: GOV.text }}>
+                <option value="">All Institutions</option>
+                {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: GOV.text }}>Start Date</label>
+              <input type="date" value={filters.startDate} onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))} className="form-control w-full" style={{ borderBottomColor: GOV.border, color: GOV.text }} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold mb-2" style={{ color: GOV.text }}>End Date</label>
+              <input type="date" value={filters.endDate} onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))} className="form-control w-full" style={{ borderBottomColor: GOV.border, color: GOV.text }} />
             </div>
           </div>
+        </FilterDialog>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <Plus className="w-4 h-4 text-blue-600" />
-              <h4 className="font-semibold text-slate-800">Add Institution</h4>
-            </div>
-            <form className="space-y-4" onSubmit={handleCreateInstitution}>
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">Name</label>
-                <input
-                  className="w-full border border-gray-200 rounded-md px-3 py-2"
-                  value={newInst.name}
-                  onChange={(e) => setNewInst({ ...newInst, name: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-slate-600 mb-1">Type</label>
-                  <select
-                    className="w-full border border-gray-200 rounded-md px-3 py-2"
-                    value={newInst.type}
-                    onChange={(e) => setNewInst({ ...newInst, type: e.target.value })}
-                  >
-                    <option value="school">School</option>
-                    <option value="college">College</option>
-                    <option value="tvet">TVET</option>
-                    <option value="university">University</option>
-                    <option value="vocational">Vocational</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-600 mb-1">Region</label>
-                  <select
-                    className="w-full border border-gray-200 rounded-md px-3 py-2"
-                    value={newInst.region}
-                    onChange={(e) => setNewInst({ ...newInst, region: e.target.value })}
-                  >
-                    <option value="hhohho">Hhohho</option>
-                    <option value="manzini">Manzini</option>
-                    <option value="lubombo">Lubombo</option>
-                    <option value="shiselweni">Shiselweni</option>
-                    <option value="multiple">Multiple</option>
-                  </select>
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Add Institution'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'reports' && analytics && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <ChartCard title="RIASEC Averages">
-            {analytics.riasecAverages && (
-              <ResponsiveContainer width="100%" height={250}>
-                <BarChart
-                  data={[
-                    { name: 'R', value: Number(analytics.riasecAverages.avgR || 0) },
-                    { name: 'I', value: Number(analytics.riasecAverages.avgI || 0) },
-                    { name: 'A', value: Number(analytics.riasecAverages.avgA || 0) },
-                    { name: 'S', value: Number(analytics.riasecAverages.avgS || 0) },
-                    { name: 'E', value: Number(analytics.riasecAverages.avgE || 0) },
-                    { name: 'C', value: Number(analytics.riasecAverages.avgC || 0) }
-                  ]}
-                >
-                  <Bar dataKey="value" fill="#5D5FEF" radius={[4, 4, 0, 0]} />
+        {/* Charts + map */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 bg-white rounded-lg border p-4" style={{ borderColor: GOV.border }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>Assessments per Region</h3>
+            <p className="text-xs mb-4" style={{ color: GOV.textMuted }}>Compare started and completed assessments by region.</p>
+            {loading ? <LoadingChart /> : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={regionalChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+                  <XAxis dataKey="region" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="users" name="Started" fill="#2563eb" radius={[4, 4, 0, 0]}>
+                    {regionalChartData.map((entry) => (
+                      <Cell key={`users-${entry.key}`} cursor="pointer" onClick={() => setFilters(prev => ({ ...prev, region: entry.key }))} />
+                    ))}
+                  </Bar>
+                  <Bar dataKey="completed" name="Completed" fill="#059669" radius={[4, 4, 0, 0]}>
+                    {regionalChartData.map((entry) => (
+                      <Cell key={`completed-${entry.key}`} cursor="pointer" onClick={() => setFilters(prev => ({ ...prev, region: entry.key }))} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </ChartCard>
-          <ChartCard title="Summary">
-            <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Completion rate:</span> {analytics.completionRate}%</p>
-              <p><span className="font-medium">Total assessments:</span> {analytics.totals?.assessments ?? '–'}</p>
-              <p><span className="font-medium">Completed:</span> {analytics.totals?.completedAssessments ?? '–'}</p>
-            </div>
-          </ChartCard>
-        </div>
-      )}
+          </div>
 
-      {activeTab === 'settings' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b">
-            <h3 className="font-bold text-slate-800">Audit logs (latest 100)</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-slate-500 uppercase">
-                <tr>
-                  <th className="p-4">Time</th>
-                  <th className="p-4">Action</th>
-                  <th className="p-4">Description</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {auditLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="p-4 text-slate-600">{log.createdAt ? new Date(log.createdAt).toLocaleString() : '–'}</td>
-                    <td className="p-4 font-medium">{log.actionType || '–'}</td>
-                    <td className="p-4 text-slate-600">{log.description || '–'}</td>
-                  </tr>
-                ))}
-                {auditLogs.length === 0 && (
-                  <tr><td colSpan={3} className="p-4 text-slate-400">No audit logs.</td></tr>
-                )}
-              </tbody>
-            </table>
+          <div className="bg-white rounded-lg border p-4" style={{ borderColor: GOV.border }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>Holland Distribution</h3>
+            <p className="text-xs mb-4" style={{ color: GOV.textMuted }}>National personality profile split.</p>
+            {loading ? <LoadingChart /> : (
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={48} outerRadius={90} label>
+                    {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 bg-white rounded-lg border p-4" style={{ borderColor: GOV.border }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>Monthly SDS Adoption Trend</h3>
+            <p className="text-xs mb-4" style={{ color: GOV.textMuted }}>Track growth of test usage over time.</p>
+            {loading ? <LoadingChart /> : (
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
+                  <Tooltip />
+                  <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                  <Area type="monotone" dataKey="started" stroke="#2563eb" fill="#2563eb" fillOpacity={0.16} name="Started" />
+                  <Area type="monotone" dataKey="completed" stroke="#059669" fill="#059669" fillOpacity={0.16} name="Completed" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="bg-white rounded-lg border p-4" style={{ borderColor: GOV.border }}>
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="w-4 h-4" style={{ color: GOV.blue }} />
+              <h3 className="text-sm font-bold" style={{ color: GOV.text }}>National Map</h3>
+            </div>
+            <p className="text-xs mb-3" style={{ color: GOV.textMuted }}>Click regions to filter. Hover for details.</p>
+            {loading ? <LoadingChart /> : (
+              <EswatiniLeafletMap
+                regionRows={regionalData?.regions || []}
+                selectedRegion={filters.region}
+                onSelectRegion={(region) => setFilters(prev => ({ ...prev, region: prev.region === region ? '' : region }))}
+              />
+            )}
+            {selectedRegionDetail && (
+              <div className="mt-3 p-3 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
+                <p className="text-xs font-semibold" style={{ color: GOV.text }}>{REGION_LABELS[selectedRegionDetail.region]} Region</p>
+                <p className="text-xs mt-1" style={{ color: GOV.textMuted }}>
+                  {selectedRegionDetail.totalUsers} users, {selectedRegionDetail.completedAssessments} completed, top code {selectedRegionDetail.topCode || '-'}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Detailed data table */}
+        <div className="bg-white rounded-lg border overflow-hidden" style={{ borderColor: GOV.border }}>
+          <DataTable
+            columns={schoolUsageColumns}
+            rows={schoolUsageRows}
+            rowKey="id"
+            loading={loading}
+            pageSize={15}
+            emptyTitle="No school usage data"
+            emptyMessage="Adjust region/school/date filters to broaden results."
+            toolbar={(
+              <>
+                <h3 className="text-sm font-bold" style={{ color: GOV.text }}>Detailed Institutional Usage Table</h3>
+                <span className="text-xs ml-auto" style={{ color: GOV.textMuted }}>
+                  {schoolUsageRows.length} institutions matched
+                </span>
+              </>
+            )}
+          />
+        </div>
+
+      </div>
+    </AppShell>
+  );
+};
+
+const KpiCard = ({ title, value, status, hint }) => {
+  const accentColor = status === 'good' ? '#059669' : status === 'warn' ? '#d97706' : status === 'bad' ? '#dc2626' : GOV.blue;
+  return (
+    <div className="bg-white rounded-xl border p-5 flex flex-col gap-1" style={{ borderColor: GOV.border }}>
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: GOV.textMuted }}>{title}</p>
+      <p className="text-4xl font-bold leading-none mt-1" style={{ color: status ? accentColor : GOV.text }}>{value}</p>
+      {hint && <p className="text-xs mt-2 italic" style={{ color: GOV.textHint }}>{hint}</p>}
     </div>
   );
 };
 
-const MetricCard = ({ title, value, Icon }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm text-slate-500">{title}</p>
-        <p className="text-2xl font-bold text-slate-800 mt-1">{value}</p>
-      </div>
-      <div className="bg-blue-50 p-3 rounded-lg">
-        <Icon className="w-6 h-6 text-blue-600" />
-      </div>
-    </div>
-  </div>
-);
-
-const ChartCard = ({ title, children }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-    <h3 className="font-bold text-slate-800 mb-4">{title}</h3>
-    {children}
+const LoadingChart = () => (
+  <div className="h-[250px] flex items-center justify-center">
+    <div className="inline-block w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: GOV.borderLight, borderTopColor: GOV.blue }} />
   </div>
 );
 

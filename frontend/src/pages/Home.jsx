@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { HelpCircle, UserPlus, ClipboardList, BarChart3 } from 'lucide-react';
+import { UserPlus, ClipboardList, BarChart3, Sparkles } from 'lucide-react';
 import { GOV, TYPO, LOGO, MINISTRY_NAME, KINGDOM, LOGO_ALT } from '../theme/government';
 
 export default function Home() {
@@ -17,95 +17,87 @@ export default function Home() {
 
       <button
         type="button"
-        className="absolute top-3 right-6 w-8 h-8 rounded-full flex items-center justify-center z-10"
-        style={{ backgroundColor: GOV.blueLight }}
+        className="absolute top-3 right-6 w-8 h-8 rounded-md flex items-center justify-center z-10 border"
+        style={{ backgroundColor: '#ffffff', borderColor: GOV.border }}
         aria-label="Help"
       >
         <span className="text-sm font-semibold" style={{ color: GOV.blue }}>?</span>
       </button>
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 pt-8 pb-8">
-        <div className={LOGO.marginBottom}>
-          <img src="/siyinqaba.png" alt={LOGO_ALT} className={LOGO.className} />
+        <div className="mb-6">
+          <img src="/siyinqaba.png" alt={LOGO_ALT} className="h-16 w-auto mx-auto" />
         </div>
 
-        <h1
-          className={`${TYPO.pageTitle} text-center mb-2 max-w-2xl`}
-          style={{ color: GOV.text }}
-        >
-          Self-Directed Search (SDS)
-        </h1>
-
-        <p
-          className={`${TYPO.bodySmall} text-center max-w-2xl mx-auto mb-6 leading-relaxed`}
-          style={{ color: GOV.textMuted }}
-        >
-          The Self-Directed Search (SDS) is an assessment tool to help you identify career interests and explore occupations aligned with your personality.
-        </p>
-
-        <div className="flex flex-col items-center gap-3 w-full max-w-xs mx-auto">
-          <Link
-            to="/login"
-            className="w-full inline-flex items-center justify-center px-5 py-2.5 rounded-md font-medium text-white transition-opacity hover:opacity-95 text-sm"
-            style={{ backgroundColor: GOV.blue }}
+        <div className="w-full max-w-3xl bg-white rounded-md p-8 text-center">
+          <h1
+            className="text-2xl font-bold text-center mb-2"
+            style={{ color: GOV.text }}
           >
-            Login
-          </Link>
-          <Link
-            to="/register"
-            className="w-full inline-flex items-center justify-center px-5 py-2.5 rounded-md font-medium border transition-opacity hover:opacity-95 text-sm"
-            style={{ borderColor: GOV.border, color: GOV.text }}
+            Self-Directed Search (SDS)
+          </h1>
+
+          <p
+            className="text-sm font-medium text-center mb-6"
+            style={{ color: GOV.textMuted }}
           >
-            Register
-          </Link>
+            National Career Assessment System
+          </p>
+
+          <p
+            className={`${TYPO.body} text-center max-w-2xl mx-auto mb-8 leading-relaxed`}
+            style={{ color: GOV.text }}
+          >
+            The Self-Directed Search is a career assessment tool designed to help students and professionals identify their interests, abilities, and suitable career paths. Complete the assessment to receive personalized career recommendations aligned with the national education and labour market framework.
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-md mx-auto">
+            <Link
+              to="/login"
+              className="w-full inline-flex items-center justify-center px-6 py-3 rounded-md font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 text-sm"
+              style={{ backgroundColor: GOV.blue }}
+            >
+              Sign In
+            </Link>
+            <Link
+              to="/register"
+              className="w-full inline-flex items-center justify-center px-6 py-3 rounded-md font-semibold border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 text-sm bg-white"
+              style={{ borderColor: GOV.border, color: GOV.text }}
+            >
+              Register
+            </Link>
+          </div>
         </div>
       </main>
 
-      {/* Feature cards */}
+      {/* Process information */}
       <section className="px-6 pb-16 md:pb-20">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg p-5 text-center flex flex-col items-center border border-gray-100">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center mb-3"
-              style={{ backgroundColor: GOV.blueLight }}
-            >
-              <UserPlus className="w-5 h-5" style={{ color: GOV.blue }} strokeWidth={1.8} />
-            </div>
-            <h2 className={`${TYPO.cardTitle} mb-1`} style={{ color: GOV.text }}>
-              1. Register &amp; Login
-            </h2>
+        <h2 className="text-center text-lg font-bold mb-6" style={{ color: GOV.text }}>Assessment Process</h2>
+        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="bg-white rounded-md p-5 text-center flex flex-col items-center border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-default" style={{ borderColor: GOV.border }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>
+              1. Registration
+            </h3>
             <p className={`${TYPO.hint} leading-relaxed`} style={{ color: GOV.textMuted }}>
-              Create your secure account to get started on your career journey.
+              Create an account with your personal details to access the assessment system.
             </p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 text-center flex flex-col items-center border border-gray-100">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center mb-3"
-              style={{ backgroundColor: GOV.blueLight }}
-            >
-              <ClipboardList className="w-5 h-5" style={{ color: GOV.blue }} strokeWidth={1.8} />
-            </div>
-            <h2 className={`${TYPO.cardTitle} mb-1`} style={{ color: GOV.text }}>
-              2. Take the Assessment
-            </h2>
+          <div className="bg-white rounded-md p-5 text-center flex flex-col items-center border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-default" style={{ borderColor: GOV.border }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>
+              2. Complete Assessment
+            </h3>
             <p className={`${TYPO.hint} leading-relaxed`} style={{ color: GOV.textMuted }}>
-              Complete the interactive SDS test at your own pace, answering questions about your activities, competencies, and occupations.
+              Answer questions about your activities, competencies, and occupational interests.
             </p>
           </div>
 
-          <div className="bg-white rounded-lg p-5 text-center flex flex-col items-center border border-gray-100">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center mb-3"
-              style={{ backgroundColor: GOV.blueLight }}
-            >
-              <BarChart3 className="w-5 h-5" style={{ color: GOV.blue }} strokeWidth={1.8} />
-            </div>
-            <h2 className={`${TYPO.cardTitle} mb-1`} style={{ color: GOV.text }}>
-              3. View Your Results
-            </h2>
+          <div className="bg-white rounded-md p-5 text-center flex flex-col items-center border transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-default" style={{ borderColor: GOV.border }}>
+            <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>
+              3. Receive Results
+            </h3>
             <p className={`${TYPO.hint} leading-relaxed`} style={{ color: GOV.textMuted }}>
-              Receive a personalized report with your Holland Code, detailed interpretations, and career recommendations.
+              View your Holland Code profile and personalized career and education recommendations.
             </p>
           </div>
         </div>

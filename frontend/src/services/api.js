@@ -1,9 +1,11 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL;
+// Use origin only (e.g. http://localhost:5000). Paths in the app include /api/v1.
+const rawUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const baseURL = rawUrl.replace(/\/api\/v1\/?$/, '') || rawUrl;
 
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -12,6 +14,14 @@ const api = axios.create({
 
 let isRefreshing = false;
 let failedQueue = [];
+
+const isAuthEndpoint = (url = '') => {
+  const normalizedUrl = url.toLowerCase();
+  return normalizedUrl.includes('/api/v1/auth/login')
+    || normalizedUrl.includes('/api/v1/auth/register')
+    || normalizedUrl.includes('/api/v1/auth/refresh-token')
+    || normalizedUrl.includes('/api/v1/auth/logout');
+};
 
 const processQueue = (error, token = null) => {
   failedQueue.forEach(prom => {
@@ -42,8 +52,16 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = originalRequest?.url || '';
+    const hasAccessToken = !!localStorage.getItem('token');
     
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401
+      && originalRequest
+      && !originalRequest._retry
+      && !isAuthEndpoint(requestUrl)
+      && hasAccessToken
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
