@@ -41,6 +41,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'answers',
     underscored: true,
+    timestamps: true,
     indexes: [
       { fields: ['assessment_id', 'question_id'], unique: true },
       { fields: ['question_id'] },

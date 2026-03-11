@@ -35,7 +35,7 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'questions',
     underscored: true,
-    timestamps: false // Static question bank doesn't usually need timestamps
+    timestamps: true
   });
 
   Question.associate = (models) => {

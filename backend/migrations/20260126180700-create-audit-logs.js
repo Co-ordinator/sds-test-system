@@ -17,17 +17,7 @@ module.exports = {
         onDelete: "SET NULL"
       },
       action_type: {
-        type: Sequelize.ENUM(
-          "LOGIN",
-          "REGISTER",
-          "LOGOUT",
-          "TEST_START",
-          "TEST_COMPLETE",
-          "PROFILE_UPDATE",
-          "PASSWORD_CHANGE",
-          "ACCESS_DENIED",
-          "SYSTEM"
-        ),
+        type: Sequelize.STRING(100),
         allowNull: false
       },
       description: {

@@ -171,6 +171,36 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: true
       },
+      user_type: {
+        type: Sequelize.ENUM("school_student", "university_student", "professional", "counselor", "admin"),
+        allowNull: true
+      },
+      student_number: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: true
+      },
+      class_name: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      student_code: {
+        type: Sequelize.STRING,
+        allowNull: true,
+        unique: true
+      },
+      degree_program: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      year_of_study: {
+        type: Sequelize.INTEGER,
+        allowNull: true
+      },
+      years_experience: {
+        type: Sequelize.INTEGER,
+        allowNull: true
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -186,8 +216,11 @@ module.exports = {
     await queryInterface.addIndex("users", ["username"], { unique: true });
     await queryInterface.addIndex("users", ["email"], { unique: true });
     await queryInterface.addIndex("users", ["national_id"], { unique: true });
+    await queryInterface.addIndex("users", ["student_number"], { unique: true });
+    await queryInterface.addIndex("users", ["student_code"], { unique: true });
     await queryInterface.addIndex("users", ["institution_id"]);
     await queryInterface.addIndex("users", ["role"]);
+    await queryInterface.addIndex("users", ["user_type"]);
     await queryInterface.addIndex("users", ["education_level"]);
     await queryInterface.addIndex("users", ["is_active"]);
     await queryInterface.addIndex("users", ["is_email_verified"]);

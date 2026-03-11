@@ -17,7 +17,8 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     tableName: 'education_levels',
-    underscored: true
+    underscored: true,
+    timestamps: true
   });
 
   EducationLevel.associate = (models) => {

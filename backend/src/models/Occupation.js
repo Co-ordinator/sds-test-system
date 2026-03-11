@@ -36,7 +36,8 @@ module.exports = (sequelize, DataTypes) => {
     skills: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true }
   }, {
     tableName: 'occupations',
-    underscored: true
+    underscored: true,
+    timestamps: true
   });
 
   Occupation.associate = (models) => {

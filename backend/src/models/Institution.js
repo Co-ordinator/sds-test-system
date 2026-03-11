@@ -73,7 +73,8 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     tableName: 'institutions',
-    underscored: true
+    underscored: true,
+    timestamps: true
   });
 
   Institution.associate = (models) => {

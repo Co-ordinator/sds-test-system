@@ -29,6 +29,12 @@ module.exports = {
         allowNull: false,
         comment: "Used to maintain the sequence of the test"
       },
+      question_code: {
+        type: Sequelize.STRING(10),
+        allowNull: true,
+        unique: true,
+        comment: "SDS question code e.g. R1, I12, SR1"
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -40,6 +46,8 @@ module.exports = {
         defaultValue: Sequelize.literal("CURRENT_TIMESTAMP")
       }
     });
+
+    await queryInterface.addIndex("questions", ["question_code"], { unique: true });
   },
 
   async down(queryInterface) {

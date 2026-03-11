@@ -28,7 +28,8 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     tableName: 'course_requirements',
-    underscored: true
+    underscored: true,
+    timestamps: true
   });
 
   CourseRequirement.associate = (models) => {

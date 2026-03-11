@@ -29,6 +29,7 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING
     }
   }, {
+    tableName: 'audit_logs',
     timestamps: true,
     underscored: true,
     indexes: [
