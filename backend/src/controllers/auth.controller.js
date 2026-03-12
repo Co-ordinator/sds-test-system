@@ -42,7 +42,7 @@ const register = async (req, res, next) => {
     const {
       email, password, phoneNumber, consent,
       userType, degreeProgram, yearOfStudy, yearsExperience,
-      currentOccupation
+      currentOccupation, workplaceInstitutionId, workplaceName
     } = req.body;
     const hasEmail = email && String(email).trim().length > 0;
     const hasPhone = phoneNumber && String(phoneNumber).trim().length > 0;
@@ -78,12 +78,14 @@ const register = async (req, res, next) => {
       password,
       firstName: 'Pending',
       lastName: 'User',
-      role: 'user',
+      role: 'Test Taker',
       userType: userType || null,
       degreeProgram: degreeProgram || null,
       yearOfStudy: yearOfStudy ? parseInt(yearOfStudy, 10) : null,
       yearsExperience: yearsExperience ? parseInt(yearsExperience, 10) : null,
       currentOccupation: currentOccupation || null,
+      workplaceInstitutionId: workplaceInstitutionId || null,
+      workplaceName: workplaceName || null,
       phoneNumber: hasPhone ? phoneNumber.trim() : null,
       studentCode,
       isConsentGiven: true,
@@ -336,8 +338,8 @@ const login = async (req, res, next) => {
       });
     }
     
-    // 3) Check if email is verified — skip for counselor-created students (no email)
-    const requiresVerification = user.email && !user.isEmailVerified && !user.createdByCounselor;
+    // 3) Check if email is verified — skip for test-administrator-created users (no email)
+    const requiresVerification = user.email && !user.isEmailVerified && !user.createdByTestAdministrator;
     if (requiresVerification) {
       logger.warn({
         actionType: 'LOGIN_FAILED',
@@ -382,12 +384,20 @@ const login = async (req, res, next) => {
     await user.save();
     
     setRefreshTokenCookie(res, refreshToken);
+
+    // 7) Load permissions for the response
+    const { Permission } = require('../models');
+    const userWithPerms = await User.findByPk(user.id, {
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken', 'refreshTokenExpires'] },
+      include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
+    });
     
     res.status(200).json({
       status: 'success',
       token,
+      mustChangePassword: user.mustChangePassword || false,
       data: {
-        user: user.toJSON()
+        user: userWithPerms ? userWithPerms.toJSON() : user.toJSON()
       }
     });
   } catch (error) {
@@ -407,8 +417,10 @@ const login = async (req, res, next) => {
 // Get current user profile
 const getMe = async (req, res, next) => {
   try {
+    const { Permission } = require('../models');
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken'] }
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken'] },
+      include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
     });
     
     if (!user) {
@@ -466,7 +478,9 @@ const updateProfile = async (req, res, next) => {
     const allowed = [
       'firstName', 'lastName', 'gender', 'nationalId', 'phoneNumber', 'region', 'district', 'address', 'educationLevel',
       'currentInstitution', 'gradeLevel', 'employmentStatus', 'currentOccupation',
-      'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds'
+      'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds',
+      'workplaceInstitutionId', 'workplaceName',
+      'degreeProgram', 'yearOfStudy', 'yearsExperience'
     ];
     const updates = {};
     for (const key of allowed) {
@@ -1069,6 +1083,74 @@ const resendVerificationEmail = async (req, res, next) => {
   }
 };
 
+// Change password (for authenticated users, including first-time password change)
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Current password and new password are required'
+      });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found'
+      });
+    }
+
+    // Verify current password
+    const isPasswordValid = await user.comparePassword(currentPassword);
+    if (!isPasswordValid) {
+      logger.warn({
+        actionType: 'PASSWORD_CHANGE_FAILED',
+        message: 'Invalid current password',
+        req,
+        details: { userId: user.id }
+      });
+      return res.status(401).json({
+        status: 'error',
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Update password and clear mustChangePassword flag
+    user.password = newPassword;
+    user.mustChangePassword = false;
+    await user.save();
+
+    logger.info({
+      actionType: 'PASSWORD_CHANGE',
+      message: `Password changed for user: ${user.email || user.studentCode}`,
+      req,
+      details: { userId: user.id }
+    });
+
+    await logAuthAction(req, 'PASSWORD_CHANGE', user.id);
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Password changed successfully'
+    });
+  } catch (error) {
+    logger.error({
+      actionType: 'PASSWORD_CHANGE_FAILED',
+      message: 'Failed to change password',
+      req,
+      details: {
+        error: error.message,
+        stack: error.stack
+      }
+    });
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -1082,4 +1164,5 @@ module.exports = {
   logout,
   exportUserData,
   deleteUserAccount,
+  changePassword,
 };

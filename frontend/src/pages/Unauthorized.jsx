@@ -12,10 +12,10 @@ export default function Unauthorized() {
   const requiresVerification = location.state?.requiresVerification === true;
 
   const handleBack = () => {
-    if (user?.role === 'admin') {
+    if (user?.role === 'System Administrator') {
       navigate('/admin');
-    } else if (user?.role === 'counselor') {
-      navigate('/counselor');
+    } else if (user?.role === 'Test Administrator') {
+      navigate('/admin/dashboard');
     } else {
       navigate('/');
     }

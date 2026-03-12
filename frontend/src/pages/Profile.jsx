@@ -3,11 +3,12 @@ import { useForm } from 'react-hook-form';
 import Joi from 'joi';
 import { joiResolver } from '@hookform/resolvers/joi';
 import { useNavigate } from 'react-router-dom';
-import { Save, Download, Trash2, User, GraduationCap, Briefcase, Settings, Shield, Clock, Mail, Key, Eye, EyeOff } from 'lucide-react';
+import { Save, Download, Trash2, User, GraduationCap, Briefcase, Settings, Shield, Clock, Mail, Key, Eye, EyeOff, Upload, FileText, X, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
+import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 
 const inputStyle = {
   border: '0',
@@ -19,9 +20,9 @@ const inputFocusClass = 'w-full px-0 py-2 rounded-none bg-transparent focus:outl
 const errorInputStyle = { border: '0', borderBottom: `1px solid ${GOV.error}` };
 
 const ROLE_COLORS = {
-  admin: { bg: '#ede9fe', text: '#6d28d9', label: 'Administrator' },
-  counselor: { bg: '#dbeafe', text: '#1d4ed8', label: 'Counselor' },
-  user: { bg: '#f0fdf4', text: '#15803d', label: 'Student' },
+  'System Administrator': { bg: '#ede9fe', text: '#6d28d9', label: 'System Administrator' },
+  'Test Administrator': { bg: '#dbeafe', text: '#1d4ed8', label: 'Test Administrator' },
+  'Test Taker': { bg: '#f0fdf4', text: '#15803d', label: 'Test Taker' },
 };
 
 export default function Profile() {
@@ -29,6 +30,18 @@ export default function Profile() {
   const { user: authUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [saveStatus, setSaveStatus] = useState(null);
+  const [workplace, setWorkplace] = useState({ name: '', institutionId: null });
+
+  // Qualifications state
+  const [qualifications, setQualifications] = useState([]);
+  const [qualLoading, setQualLoading] = useState(false);
+  const [qualUploading, setQualUploading] = useState(false);
+  const [qualError, setQualError] = useState('');
+  const [qualSuccess, setQualSuccess] = useState('');
+  const [qualForm, setQualForm] = useState({
+    title: '', documentType: 'certificate', issuedBy: '', issueDate: '', file: null
+  });
+  const [dragOver, setDragOver] = useState(false);
 
   // Extended schema for profile fields
   const schema = Joi.object({
@@ -62,19 +75,113 @@ export default function Profile() {
         if (user) {
           setUserData(user);
           reset(user);
+          setWorkplace({
+            name: user.workplaceName || '',
+            institutionId: user.workplaceInstitutionId || null,
+          });
         }
       } catch (err) {
         setUserData({});
       }
     };
-
     fetchUserData();
   }, [reset]);
 
-  const onSubmit = async (data) => {
+  useEffect(() => {
+    const fetchQualifications = async () => {
+      setQualLoading(true);
+      try {
+        const res = await api.get('/api/v1/qualifications');
+        setQualifications(res.data?.data?.qualifications || []);
+      } catch { /* silent */ }
+      finally { setQualLoading(false); }
+    };
+    fetchQualifications();
+  }, []);
+
+  const handleQualFileSelect = (file) => {
+    if (!file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setQualError('Only PDF, JPEG, PNG or WebP files are allowed.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setQualError('File must be under 5 MB.');
+      return;
+    }
+    setQualError('');
+    setQualForm(p => ({ ...p, file }));
+  };
+
+  const handleQualUpload = async (e) => {
+    e.preventDefault();
+    if (!qualForm.title.trim()) { setQualError('Title is required.'); return; }
+    if (!qualForm.file) { setQualError('Please select a file.'); return; }
+    setQualError(''); setQualSuccess(''); setQualUploading(true);
     try {
-      await api.patch('/api/v1/auth/me', data);
-      setUserData((prev) => ({ ...prev, ...data }));
+      const fd = new FormData();
+      fd.append('file', qualForm.file);
+      fd.append('title', qualForm.title.trim());
+      fd.append('documentType', qualForm.documentType);
+      if (qualForm.issuedBy) fd.append('issuedBy', qualForm.issuedBy.trim());
+      if (qualForm.issueDate) fd.append('issueDate', qualForm.issueDate);
+      const res = await api.post('/api/v1/qualifications', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setQualifications(p => [res.data.data.qualification, ...p]);
+      setQualForm({ title: '', documentType: 'certificate', issuedBy: '', issueDate: '', file: null });
+      setQualSuccess('Document uploaded successfully.');
+      setTimeout(() => setQualSuccess(''), 4000);
+    } catch (err) {
+      setQualError(err.response?.data?.message || 'Upload failed. Please try again.');
+    } finally { setQualUploading(false); }
+  };
+
+  const handleQualDelete = async (id) => {
+    if (!window.confirm('Delete this qualification document?')) return;
+    try {
+      await api.delete(`/api/v1/qualifications/${id}`);
+      setQualifications(p => p.filter(q => q.id !== id));
+    } catch (err) {
+      setQualError(err.response?.data?.message || 'Delete failed.');
+    }
+  };
+
+  const getQualIcon = (mime) => {
+    if (mime === 'application/pdf') return '📄';
+    return '🖼️';
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const DOC_TYPE_LABELS = {
+    certificate: 'Certificate',
+    degree: 'Degree',
+    diploma: 'Diploma',
+    transcript: 'Transcript',
+    professional_licence: 'Professional Licence',
+    other: 'Other'
+  };
+
+  const onSubmit = async (data) => {
+    const isProfessional = (userData?.userType === 'Professional') ||
+      (authUser?.userType === 'Professional') ||
+      (userData?.userType === 'professional');
+    const payload = {
+      ...data,
+      ...(isProfessional ? {
+        workplaceName: workplace.name || null,
+        workplaceInstitutionId: workplace.institutionId || null,
+      } : {}),
+    };
+    try {
+      await api.patch('/api/v1/auth/me', payload);
+      setUserData((prev) => ({ ...prev, ...payload }));
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus(null), 3000);
     } catch (err) {
@@ -169,9 +276,9 @@ export default function Profile() {
   const FieldError = ({ error }) =>
     error ? <p className="mt-1" style={{ color: GOV.error, fontSize: '0.75rem' }}>{error.message}</p> : null;
 
-  const role = authUser?.role || userData?.role || 'user';
-  const rc = ROLE_COLORS[role] || ROLE_COLORS.user;
-  const backTo = role === 'admin' ? '/admin/dashboard' : role === 'counselor' ? '/counselor' : '/dashboard';
+  const role = authUser?.role || userData?.role || 'Test Taker';
+  const rc = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
+  const backTo = role === 'System Administrator' || role === 'Test Administrator' ? '/admin/dashboard' : '/dashboard';
 
   if (!userData) {
     return (
@@ -326,6 +433,21 @@ export default function Profile() {
                 />
                 <FieldError error={errors.currentOccupation} />
               </div>
+
+              {((userData?.userType === 'Professional') || (authUser?.userType === 'Professional') || (userData?.userType === 'professional')) && (
+                <div className="md:col-span-2">
+                  <FieldLabel>Workplace / Employer</FieldLabel>
+                  <WorkplaceSearchInput
+                    value={workplace.name}
+                    institutionId={workplace.institutionId}
+                    onChange={(name, id) => setWorkplace({ name, institutionId: id })}
+                    placeholder="Search for your employer or organisation..."
+                  />
+                  <p className="mt-1" style={{ color: GOV.textHint, fontSize: '0.75rem' }}>
+                    Type to search registered organisations, or enter your workplace name.
+                  </p>
+                </div>
+              )}
             </div>
           </SectionCard>
 
@@ -468,6 +590,187 @@ export default function Profile() {
             </button>
           </form>
         </SectionCard>
+
+        {/* Academic Qualifications / Certificates Section */}
+        <div className="rounded-md border overflow-hidden" style={{ borderColor: GOV.border, backgroundColor: 'white' }}>
+          <div className="flex items-center gap-2 px-5 py-4" style={{ borderBottom: `1px solid ${GOV.borderLight}` }}>
+            <GraduationCap size={16} style={{ color: GOV.blue }} />
+            <h2 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Academic Qualifications &amp; Certificates</h2>
+          </div>
+
+          {/* Upload form */}
+          <form onSubmit={handleQualUpload} className="p-5 space-y-4" style={{ borderBottom: `1px solid ${GOV.borderLight}` }}>
+            <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
+              Upload certificates, degrees, diplomas or transcripts (PDF, JPEG, PNG or WebP · max 5 MB each).
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Document title *</label>
+                <input
+                  type="text"
+                  value={qualForm.title}
+                  onChange={e => setQualForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. IGCSE Certificate 2022"
+                  className={inputFocusClass}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Document type</label>
+                <select
+                  value={qualForm.documentType}
+                  onChange={e => setQualForm(p => ({ ...p, documentType: e.target.value }))}
+                  className={inputFocusClass}
+                  style={inputStyle}
+                >
+                  <option value="certificate">Certificate</option>
+                  <option value="degree">Degree</option>
+                  <option value="diploma">Diploma</option>
+                  <option value="transcript">Transcript</option>
+                  <option value="professional_licence">Professional Licence</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Issued by</label>
+                <input
+                  type="text"
+                  value={qualForm.issuedBy}
+                  onChange={e => setQualForm(p => ({ ...p, issuedBy: e.target.value }))}
+                  placeholder="e.g. University of Eswatini"
+                  className={inputFocusClass}
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Issue date</label>
+                <input
+                  type="date"
+                  value={qualForm.issueDate}
+                  onChange={e => setQualForm(p => ({ ...p, issueDate: e.target.value }))}
+                  className={inputFocusClass}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            {/* Drop zone */}
+            <div
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); handleQualFileSelect(e.dataTransfer.files[0]); }}
+              onClick={() => document.getElementById('qual-file-input').click()}
+              className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed cursor-pointer transition-colors py-6 px-4"
+              style={{
+                borderColor: dragOver ? GOV.blue : GOV.border,
+                backgroundColor: dragOver ? GOV.blueLight : '#fafafa'
+              }}
+            >
+              <input
+                id="qual-file-input"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={e => handleQualFileSelect(e.target.files[0])}
+              />
+              <Upload className="w-6 h-6" style={{ color: GOV.textHint }} />
+              {qualForm.file ? (
+                <div className="text-center">
+                  <p className={`font-medium ${TYPO.bodySmall}`} style={{ color: GOV.text }}>{qualForm.file.name}</p>
+                  <p className={TYPO.hint} style={{ color: GOV.textMuted }}>{formatFileSize(qualForm.file.size)}</p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className={TYPO.bodySmall} style={{ color: GOV.text }}>Drag & drop or <span style={{ color: GOV.blue }}>click to browse</span></p>
+                  <p className={TYPO.hint} style={{ color: GOV.textMuted }}>PDF, JPEG, PNG, WebP · max 5 MB</p>
+                </div>
+              )}
+            </div>
+
+            {qualError && (
+              <div className="flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: '#fef2f2', border: `1px solid #fecaca` }}>
+                <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: GOV.error }} />
+                <p className={TYPO.hint} style={{ color: GOV.error }}>{qualError}</p>
+              </div>
+            )}
+            {qualSuccess && (
+              <div className="flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
+                <p className={TYPO.hint} style={{ color: '#059669' }}>{qualSuccess}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={qualUploading}
+              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{ backgroundColor: GOV.blue }}
+            >
+              <Upload size={14} /> {qualUploading ? 'Uploading...' : 'Upload Document'}
+            </button>
+          </form>
+
+          {/* Uploaded list */}
+          <div className="p-5">
+            {qualLoading ? (
+              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>Loading documents...</p>
+            ) : qualifications.length === 0 ? (
+              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>No qualification documents uploaded yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {qualifications.map(q => (
+                  <li key={q.id} className="flex items-start gap-3 rounded-md border p-3" style={{ borderColor: GOV.borderLight }}>
+                    <span className="text-xl flex-shrink-0">{getQualIcon(q.mimeType)}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-semibold truncate ${TYPO.bodySmall}`} style={{ color: GOV.text }}>{q.title}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase"
+                          style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
+                        >
+                          {DOC_TYPE_LABELS[q.documentType] || q.documentType}
+                        </span>
+                        {q.issuedBy && <span className={TYPO.hint} style={{ color: GOV.textMuted }}>{q.issuedBy}</span>}
+                        {q.issueDate && <span className={TYPO.hint} style={{ color: GOV.textMuted }}>{new Date(q.issueDate).toLocaleDateString()}</span>}
+                        <span className={TYPO.hint} style={{ color: GOV.textHint }}>{formatFileSize(q.fileSize)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <a
+                        href={`${process.env.REACT_APP_API_URL || ''}/api/v1/qualifications/${q.id}/file`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          try {
+                            const res = await api.get(`/api/v1/qualifications/${q.id}/file`, { responseType: 'blob' });
+                            const url = window.URL.createObjectURL(new Blob([res.data], { type: q.mimeType }));
+                            window.open(url, '_blank');
+                          } catch { setQualError('Could not open file.'); }
+                        }}
+                        className="flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
+                        style={{ color: GOV.blue }}
+                        title="View document"
+                      >
+                        <ExternalLink size={13} /> View
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleQualDelete(q.id)}
+                        className="flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
+                        style={{ color: GOV.error }}
+                        title="Delete document"
+                      >
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
 
         {/* Data subject rights */}
         <div className="rounded-md border p-5" style={{ borderColor: GOV.border, backgroundColor: 'white' }}>

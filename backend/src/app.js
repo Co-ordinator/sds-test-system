@@ -56,6 +56,7 @@ const assessmentRoutes = require('./routes/assessment.routes');
 const resultRoutes = require('./routes/result.routes');
 const institutionRoutes = require('./routes/institution.routes');
 const counselorRoutes = require('./routes/counselor.routes');
+const qualificationRoutes = require('./routes/qualification.routes');
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
@@ -63,6 +64,7 @@ app.use('/api/v1/assessments', assessmentRoutes);
 app.use('/api/v1/results', resultRoutes);
 app.use('/api/v1/institutions', institutionRoutes);
 app.use('/api/v1/counselor', counselorRoutes);
+app.use('/api/v1/qualifications', qualificationRoutes);
 
 // Error handling
 app.use(errorHandler);

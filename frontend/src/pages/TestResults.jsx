@@ -211,8 +211,7 @@ const TestResults = () => {
   const [data, setData] = useState(null);
 
   const getDashboardPath = () => {
-    if (user?.role === 'admin') return '/admin/dashboard';
-    if (user?.role === 'counselor') return '/counselor';
+    if (user?.role === 'System Administrator' || user?.role === 'Test Administrator') return '/admin/dashboard';
     return '/dashboard';
   };
 

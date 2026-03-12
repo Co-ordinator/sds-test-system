@@ -307,7 +307,7 @@ class AssessmentController {
       }
 
       const isOwner = assessment.userId === req.user.id;
-      const isStaff = ['admin', 'counselor'].includes(req.user.role);
+      const isStaff = ['System Administrator', 'Test Administrator'].includes(req.user.role);
       if (!isOwner && !isStaff) {
         return res.status(403).json({ status: 'error', message: 'Not authorized to view these results' });
       }
@@ -358,8 +358,8 @@ class AssessmentController {
       }
 
       const isOwner = assessment.userId === req.user.id;
-      const isAdmin = req.user.role === 'admin';
-      const isCounselor = req.user.role === 'counselor';
+      const isAdmin = req.user.role === 'System Administrator';
+      const isCounselor = req.user.role === 'Test Administrator';
       if (!isOwner && !isAdmin && !isCounselor) {
         return res.status(403).json({ status: 'error', message: 'Not authorized' });
       }

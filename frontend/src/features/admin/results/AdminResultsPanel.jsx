@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Search, Eye, Download } from 'lucide-react';
+import { Search, Eye, Download, Award, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { StatusBadge, useToast, ErrorBanner } from '../../../components/ui/StatusIndicators';
 import { adminService } from '../../../services/adminService';
+import { PermissionGate } from '../../../context/PermissionContext';
 
 const AdminResultsPanel = () => {
   const navigate = useNavigate();
@@ -12,6 +13,8 @@ const AdminResultsPanel = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [generatingCert, setGeneratingCert] = useState(null);
+  const [generatedCerts, setGeneratedCerts] = useState({});
   const { toast, showToast, Toast: ToastComp } = useToast();
 
   const load = useCallback(async () => {
@@ -24,6 +27,28 @@ const AdminResultsPanel = () => {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleGenerateCert = async (a) => {
+    setGeneratingCert(a.id);
+    try {
+      const result = await adminService.generateCertificate(a.id);
+      setGeneratedCerts(prev => ({ ...prev, [a.id]: result?.data }));
+      showToast(`Certificate ${result?.data?.certNumber || ''} generated — student notified`);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to generate certificate', 'error');
+    } finally {
+      setGeneratingCert(null);
+    }
+  };
+
+  const handleDownloadCert = async (a) => {
+    const certData = generatedCerts[a.id];
+    try {
+      await adminService.downloadCertificate(a.id, certData?.certNumber);
+    } catch {
+      showToast('Certificate download failed', 'error');
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!search) return assessments;
@@ -74,13 +99,33 @@ const AdminResultsPanel = () => {
       header: 'Actions',
       stopPropagation: true,
       render: (a) => a.status === 'completed' ? (
-        <div className="flex gap-2">
+        <div className="flex gap-1 items-center">
           <button type="button" onClick={() => navigate('/results', { state: { assessmentId: a.id } })} className="p-1 rounded hover:bg-gray-100" title="View Results">
             <Eye className="w-3.5 h-3.5" style={{ color: GOV.blue }} />
           </button>
-          <button type="button" onClick={() => adminService.downloadResultPdf(a.id).catch(() => showToast('PDF download failed', 'error'))} className="p-1 rounded hover:bg-gray-100" title="Download PDF">
-            <Download className="w-3.5 h-3.5 text-green-600" />
-          </button>
+          <PermissionGate permission="results.download_pdf">
+            <button type="button" onClick={() => adminService.downloadResultPdf(a.id).catch(() => showToast('PDF download failed', 'error'))} className="p-1 rounded hover:bg-gray-100" title="Download Career Report PDF">
+              <Download className="w-3.5 h-3.5 text-green-600" />
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="certificates.generate">
+            {generatedCerts[a.id] ? (
+              <button type="button" onClick={() => handleDownloadCert(a)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border"
+                style={{ borderColor: '#d97706', color: '#d97706', backgroundColor: '#fffbeb' }}
+                title={`Download Certificate ${generatedCerts[a.id]?.certNumber || ''}`}>
+                <CheckCircle className="w-3 h-3" /> Certificate
+              </button>
+            ) : (
+              <button type="button" onClick={() => handleGenerateCert(a)}
+                disabled={generatingCert === a.id}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border disabled:opacity-50"
+                style={{ borderColor: GOV.border, color: GOV.blue }}
+                title="Generate SDS Certificate">
+                {generatingCert === a.id ? '…' : <><Award className="w-3 h-3" /> Certify</>}
+              </button>
+            )}
+          </PermissionGate>
         </div>
       ) : null,
     },

@@ -6,11 +6,17 @@ Implementation of the Ministry of Labour's Self-Directed Search (SDS) Test Syste
 
 **228 Questions** from the actual Ministry of Labour Career Interest Books  
 **4 Test Sections**: Activities, Competencies, Occupations, Self-Estimates  
-**Full RIASEC Model** implementation  
-**35+ Occupations** with Holland codes  
-**5 Eswatini Institutions** (UNESWA, ECOT, GVTI, SANU, LUCT)  
-**Complete Database Models** with audit logging  
-**Multi-language Support** (English & siSwati placeholders)
+**Full RIASEC Model** implementation with career-to-course-to-institution chain  
+**35+ Occupations** with Holland codes and local demand data  
+**25+ Courses** (bachelor, diploma, TVET, certificate programs)  
+**20+ Eswatini Institutions** (universities, colleges, TVET, schools)  
+**25+ Subjects** with RIASEC mapping  
+**Enterprise RBAC** - 49 permissions across 13 modules  
+**Complete Database Models** with comprehensive audit logging  
+**Multi-language Support** (English & siSwati)  
+**Advanced Analytics** - Regional, segmentation, skills pipeline, interactive maps  
+**PDF Generation** - Results reports, certificates, login cards  
+**Student Management** - CSV import, bulk user creation, login card printing
 
 ---
 
@@ -50,11 +56,28 @@ DB_USER=postgres
 DB_PASSWORD=your_password_here
 
 # JWT
-JWT_SECRET=your_super_secret_jwt_key_change_this_in_production
+JWT_SECRET=your_super_secret_jwt_key_change_this_in_production_minimum_32_chars
 JWT_EXPIRE=24h
+JWT_REFRESH_EXPIRE=7d
+
+# Email (for production - optional in development)
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+EMAIL_FROM=noreply@sds.gov.sz
 
 # Frontend URL
 FRONTEND_URL=http://localhost:3000
+
+# API Base URL
+API_BASE_URL=http://localhost:5000/api/v1
+```
+
+Create `frontend/.env`:
+
+```env
+REACT_APP_API_URL=http://localhost:5000/api/v1
 ```
 
 ### 3. Install & Setup Backend
@@ -65,11 +88,33 @@ cd backend
 # Install dependencies
 npm install
 
-# Setup database and seed data
-npm run setup
+# Run migrations
+npx sequelize-cli db:migrate
+
+# Seed database with test data
+npx sequelize-cli db:seed:all
 ```
 
-### 4. Start Development
+**Note:** Migrations create all tables and the seeder populates:
+- 5 education levels
+- 20+ institutions (universities, colleges, TVET, schools)
+- 228 SDS questions
+- 35+ occupations with Holland codes
+- 25+ courses with entry requirements
+- 25+ subjects with RIASEC mapping
+- 49 permissions across 13 modules
+- 5 test user accounts (see below)
+
+### 4. Install & Setup Frontend
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+```
+
+### 5. Start Development
 
 ```bash
 # Terminal 1 - Backend
@@ -83,30 +128,68 @@ npm start
 
 **You're ready! 🎉**
 
-- Backend: http://localhost:5000
-- Frontend: http://localhost:3000
-- API Health: http://localhost:5000/health
+- **Backend API**: http://localhost:5000/api/v1
+- **Frontend**: http://localhost:3000
+- **API Health**: http://localhost:5000/health
 
 ---
 
 ## Test Accounts
 
-### Admin Account
+### System Administrator
+- **Username**: `sysadmin`
 - **Email**: `admin@labor.gov.sz`
 - **Password**: `Admin@123`
-- **Role**: Full system access
+- **Role**: `System Administrator`
+- **User Type**: `System Administrator`
+- **Permissions**: All 49 permissions
+- **Access**: Full system access including user management, permissions, analytics, audit logs
+- **Institution**: Ministry of Labour and Social Security
 
-### Counselor Account
-- **Email**: `counselor@labor.gov.sz`
-- **Password**: `Counselor@123`
-- **Role**: Manage students, review results
+### Test Administrator (Counselor)
+- **Username**: `testadmin.mbabane`
+- **Email**: `testadmin@labor.gov.sz`
+- **Password**: `TestAdmin@123`
+- **Role**: `Test Administrator`
+- **User Type**: `Test Administrator`
+- **Permissions**: 16 default permissions (test_takers.manage, assessments.view, results.view, etc.)
+- **Access**: Import students, generate login cards, view student results, institution analytics
+- **Institution**: Mbabane Government High School
 
-### Student Account
-- **Email**: `student@test.sz`
+### Test Taker (High School Student)
+- **Username**: `20250101`
+- **Email**: None (counselor-created account)
+- **Password**: `Pass@2025`
+- **Role**: `Test Taker`
+- **User Type**: `High School Student`
+- **Student Number**: `20250101`
+- **Grade**: Form 5
+- **Class**: 5A
+- **Access**: Take assessments, view own results, download certificate
+- **Institution**: Mbabane Government High School
+
+### Test Taker (University Student)
+- **Username**: `zanele.motsa`
+- **Email**: `zanele.motsa@student.uneswa.sz`
 - **Password**: `Student@123`
-- **Role**: Take tests, view results
+- **Role**: `Test Taker`
+- **User Type**: `University Student`
+- **Degree Program**: Bachelor of Science
+- **Year of Study**: 2
+- **Access**: Take assessments, view own results with course recommendations
+- **Institution**: University of Eswatini (UNESWA)
 
-⚠️ **IMPORTANT**: These accounts must be removed in production!
+### Test Taker (Professional)
+- **Username**: `mandla.dlamini`
+- **Email**: `mandla.dlamini@gmail.com`
+- **Password**: `Professional@123`
+- **Role**: `Test Taker`
+- **User Type**: `Professional`
+- **Current Occupation**: Software Developer
+- **Years Experience**: 5
+- **Access**: Take assessments, view career transition recommendations
+
+⚠️ **IMPORTANT**: These accounts are for development/testing only and must be removed before production deployment!
 
 ---
 
@@ -216,133 +299,286 @@ recommendations = matchingOccupations
 
 ## Database Schema Overview
 
-### Core Tables
+### Core Tables (16 tables total)
 
-**users** (14 fields)
-- Authentication & profile
-- Role-based access (admin/counselor/user)
-- Accessibility preferences
+**users** (40+ fields)
+- Authentication & profile (username, email, password, nationalId)
+- Role-based access (System Administrator/Test Administrator/Test Taker)
+- User types (High School Student/University Student/Professional/Test Administrator/System Administrator)
+- Extended journey fields (studentNumber, className, degreeProgram, yearOfStudy, yearsExperience)
+- Password change enforcement (mustChangePassword)
+- Accessibility preferences (WCAG compliance)
+- Security tokens (email verification, password reset, refresh tokens)
 
-**tests** (9 fields)
-- Test definitions
-- Multi-language support
+**permissions** (49 permissions across 13 modules)
+- users, institutions, questions, occupations, subjects, assessments, results, analytics, audit, notifications, certificates, permissions, test_takers
+- Granular permission codes (e.g., users.view, users.create, analytics.export)
 
-**test_sections** (11 fields)
-- Activities, Competencies, Occupations, Self-Estimates
+**user_permissions**
+- Many-to-many junction table
+- Links users to specific permissions
 
-**questions** (14 fields)
-- 228 questions with RIASEC categories
-- Yes/No and Rating scale types
+**education_levels** (5 levels)
+- Levels 1-5 from SDS Appendix
+- Referenced by users and occupations
 
-**test_attempts** (18 fields)
+**institutions** (20+ institutions)
+- Universities, colleges, TVET, schools
+- Multi-language support (name, nameSwati)
+- Programs, facilities, bursaries
+- Regional distribution across Eswatini
+
+**questions** (228 questions)
+- 4 sections: activities, competencies, occupations, self_estimates
+- RIASEC type mapping (R, I, A, S, E, C)
+- Question codes for reference
+
+**assessments**
 - User test sessions
-- Progress tracking
-- Resume capability
-
-**test_responses** (11 fields)
-- Individual answers
-- Time tracking
-- Modification history
-
-**test_results** (23 fields)
-- RIASEC scores (0-100 each)
+- Progress tracking (0-100%)
+- RIASEC scores (scoreR, scoreI, scoreA, scoreS, scoreE, scoreC)
 - Holland Code (3-letter)
-- Interpretation
+- Status (in_progress, completed, expired)
 
-**occupations** (18 fields)
-- 35+ career options
+**answers**
+- Individual question responses
+- Values: YES/NO or 1-6 (self-estimates)
+- Linked to assessments and questions
+- Cascade delete with assessments
+
+**occupations** (35+ careers)
 - Holland codes mapping
-- Eswatini-specific data
+- Local demand levels (low, medium, high, critical)
+- Education requirements
+- Eswatini availability
+- Skills arrays
 
-**institutions** (28 fields)
-- 5 Eswatini institutions
-- Programs & bursaries
+**courses** (25+ programs)
+- Qualification types (certificate, diploma, bachelor, honours, masters, doctorate, TVET)
+- Duration, description, field of study
+- RIASEC codes for matching
+- Suggested subjects
 
-**audit_logs** (32 fields)
+**course_requirements**
+- Entry requirements per course
+- Subject + minimum grade
+- Mandatory vs optional
+
+**course_institutions**
+- Many-to-many linking courses to institutions
+- Custom requirements per institution
+- Application URLs
+
+**subjects** (25+ subjects)
+- High school and tertiary subjects
+- RIASEC code mapping
+- Display order for UI
+
+**school_students**
+- Extended profile for school students
+- Grade, class, student number
+- Login card printing tracking
+- Links to users and institutions
+
+**certificates**
+- Generated certificates for completed assessments
+- Certificate numbers
+- Generation tracking
+
+**audit_logs**
 - Complete activity tracking
 - Security monitoring
+- Action types (LOGIN, REGISTER, ACCESS_DENIED, etc.)
+- IP address and user agent logging
 
 ---
 
-## API Endpoints (To Build Next)
+## Technology Stack
 
-### Authentication
-```
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-POST   /api/v1/auth/refresh-token
-POST   /api/v1/auth/logout
-POST   /api/v1/auth/forgot-password
-POST   /api/v1/auth/reset-password
-GET    /api/v1/auth/me
-```
+### Backend
+- **Runtime**: Node.js v18+
+- **Framework**: Express.js v5
+- **Database**: PostgreSQL 14+
+- **ORM**: Sequelize v6
+- **Authentication**: JWT (jsonwebtoken)
+- **Password Hashing**: bcryptjs
+- **Validation**: Joi
+- **Logging**: Winston with daily rotate
+- **Email**: Nodemailer with Handlebars templates
+- **PDF Generation**: PDFKit
+- **CSV Parsing**: csv-parse
+- **Security**: Helmet, express-rate-limit, CORS
 
-### Tests
-```
-GET    /api/v1/tests
-GET    /api/v1/tests/:id
-GET    /api/v1/tests/:id/sections
-GET    /api/v1/tests/:id/sections/:sectionId/questions
-```
+### Frontend
+- **Framework**: React 19
+- **Routing**: React Router DOM v7
+- **Styling**: Tailwind CSS v3
+- **Forms**: React Hook Form with Joi validation
+- **HTTP Client**: Axios
+- **Charts**: Recharts v3
+- **Maps**: React Leaflet v5 + Leaflet v1.9
+- **Icons**: Lucide React
+- **Build Tool**: React Scripts (Create React App)
 
-### Test Taking
-```
-POST   /api/v1/attempts          # Start new attempt
-GET    /api/v1/attempts/:id      # Get attempt details
-PATCH  /api/v1/attempts/:id      # Update progress
-POST   /api/v1/attempts/:id/responses  # Submit answers
-POST   /api/v1/attempts/:id/complete   # Finish test
-```
+### Development Tools
+- **Package Manager**: npm
+- **Version Control**: Git
+- **Code Quality**: ESLint (implicit via React Scripts)
+- **Testing**: Jest (configured, tests pending)
 
-### Results
-```
-GET    /api/v1/results/:attemptId
-GET    /api/v1/results/:attemptId/report
-GET    /api/v1/results/:attemptId/recommendations
-```
+## Key Features Implemented
 
-### Admin
-```
-GET    /api/v1/admin/users
-GET    /api/v1/admin/analytics
-GET    /api/v1/admin/audit-logs
-```
+### Authentication & Authorization
+- ✅ User registration with email verification
+- ✅ Login with email/username/studentNumber
+- ✅ JWT access tokens + refresh tokens
+- ✅ Password reset via email
+- ✅ Change password (authenticated users)
+- ✅ Role-based access control (3 roles)
+- ✅ Enterprise RBAC with 49 granular permissions
+- ✅ National ID parsing (auto-extract DOB & gender)
+
+### Assessment System
+- ✅ 228 SDS questions across 4 sections
+- ✅ Progress saving and resume capability
+- ✅ RIASEC scoring algorithm
+- ✅ Holland Code generation (3-letter)
+- ✅ Career recommendations based on Holland Code
+- ✅ Course recommendations with entry requirements
+- ✅ Institution matching
+- ✅ Subject suggestions
+- ✅ PDF results report generation
+- ✅ Certificate generation and download
+
+### Admin Dashboard
+- ✅ User management (create, update, delete, permissions)
+- ✅ Question bank management (CRUD, import/export CSV)
+- ✅ Occupation management (CRUD, import/export CSV)
+- ✅ Subject management (CRUD, import/export CSV)
+- ✅ Institution management
+- ✅ System analytics with filters
+- ✅ Regional analytics
+- ✅ Segmentation analytics (gender, user type, education level)
+- ✅ Skills pipeline analytics
+- ✅ Audit log viewer
+- ✅ Notification system
+- ✅ Data export (users, assessments, analytics)
+
+### Test Administrator/Counselor Features
+- ✅ Student import via CSV
+- ✅ Bulk user creation with auto-generated passwords
+- ✅ Login card generation (PDF with credentials)
+- ✅ Student management (view, update, delete)
+- ✅ Student results viewing
+- ✅ Institution statistics
+- ✅ Student filtering by grade/class
+
+### Analytics & Reporting
+- ✅ Interactive Eswatini map with regional data
+- ✅ RIASEC distribution charts
+- ✅ Holland Code trends
+- ✅ Career field popularity
+- ✅ Assessment completion rates
+- ✅ Gender and user type segmentation
+- ✅ Skills pipeline momentum tracking
+- ✅ Emerging careers identification
+- ✅ Education pathway demand analysis
+
+### Data Protection & Compliance
+- ✅ GDPR-compliant data export (Right to Access)
+- ✅ Account deletion (Right to Erasure)
+- ✅ Consent tracking
+- ✅ Comprehensive audit logging
+- ✅ IP address and user agent tracking
+- ✅ Accessibility support (WCAG compliance fields)
+
+### UI/UX Features
+- ✅ Responsive design (mobile, tablet, desktop)
+- ✅ Multi-step registration flow
+- ✅ User type-specific onboarding
+- ✅ Progress indicators
+- ✅ Loading states and error handling
+- ✅ Toast notifications
+- ✅ Role-based navigation
+- ✅ Data tables with sorting and pagination
+- ✅ Interactive charts and visualizations
+- ✅ PDF preview and download
 
 ---
 
-## Next Development Steps
+## Development Status
 
-### Phase 1: Core Functionality (Week 1-2)
-1. ✅ Database models - DONE
-2. ✅ Authentication API (register, login, JWT)
-3. 🔨 Test API (get tests, sections, questions)
-4. 🔨 Test-taking API (start, save, complete)
-5. 🔨 Scoring algorithm implementation
+### ✅ Completed Features
 
-### Phase 2: User Interface (Week 3-4)
-1. 🔨 Login/Register pages
-2. 🔨 Dashboard
-3. 🔨 Test interface (question by question)
-4. 🔨 Results page with RIASEC visualization
-5. 🔨 Career recommendations page
+**Phase 1: Core Functionality**
+- ✅ Database models and migrations (16 tables)
+- ✅ Authentication API (register, login, JWT, password reset)
+- ✅ Assessment API (start, save progress, complete)
+- ✅ Scoring algorithm (RIASEC + Holland Code)
+- ✅ Recommendations engine (careers → courses → institutions)
 
-### Phase 3: Admin & Analytics (Week 5-6)
-1. 🔨 Admin dashboard
-2. 🔨 User management
-3. 🔨 Analytics reports
-4. 🔨 Audit logs viewer
+**Phase 2: User Interface**
+- ✅ Login/Register pages with multi-step flow
+- ✅ Role-specific dashboards (Admin, Counselor, Test Taker)
+- ✅ Assessment interface (228 questions, 4 sections)
+- ✅ Results page with RIASEC visualization
+- ✅ Career and course recommendations display
+- ✅ Certificate viewing and download
 
-### Phase 4: Advanced Features (Week 7-8)
-1. 🔨 Counselor portal
-2. 🔨 Group management
-3. 🔨 PDF report generation
-4. 🔨 siSwati translations
+**Phase 3: Admin & Analytics**
+- ✅ Admin dashboard (6 panels)
+- ✅ User management with permissions
+- ✅ Question/Occupation/Subject management
+- ✅ Advanced analytics (regional, segmentation, pipeline)
+- ✅ Interactive map visualization
+- ✅ Audit logs viewer
 
-### Phase 5: Testing & Deployment (Week 9-12)
-1. 🔨 Unit tests
-2. 🔨 Integration tests
-3. 🔨 User acceptance testing
-4. 🔨 Production deployment
+**Phase 4: Advanced Features**
+- ✅ Counselor portal (5 tabs)
+- ✅ Student import and management
+- ✅ Login card generation
+- ✅ PDF report generation (results, certificates, login cards)
+- ✅ Enterprise RBAC system
+- ✅ Notification system
+
+### 🔨 Pending Features
+
+**Phase 5: Localization**
+- 🔨 siSwati translations (UI strings)
+- 🔨 siSwati question translations
+- 🔨 Language switcher component
+- 🔨 RTL support (if needed)
+
+**Phase 6: Testing**
+- 🔨 Backend unit tests (Jest)
+- 🔨 Frontend component tests (React Testing Library)
+- 🔨 Integration tests (Supertest)
+- 🔨 E2E tests (optional: Playwright/Cypress)
+- 🔨 Load testing
+- 🔨 User acceptance testing
+
+**Phase 7: Production Readiness**
+- 🔨 Environment-specific configurations
+- 🔨 Production database setup
+- 🔨 Email service configuration (SMTP)
+- 🔨 SSL certificate setup
+- 🔨 Domain configuration
+- 🔨 Server deployment (PM2, Docker, or cloud platform)
+- 🔨 Database backups and restore procedures
+- 🔨 Monitoring and alerting (optional: Sentry, LogRocket)
+- 🔨 Remove test accounts
+- 🔨 Security audit
+
+### 📋 Optional Enhancements
+- 🔨 Mobile app (React Native)
+- 🔨 Offline assessment capability
+- 🔨 SMS notifications
+- 🔨 Bulk email campaigns
+- 🔨 Advanced reporting (custom date ranges, filters)
+- 🔨 Career pathway visualization
+- 🔨 Institution comparison tool
+- 🔨 Student progress tracking over time
+- 🔨 Counselor appointment scheduling
 
 ---
 
@@ -351,57 +587,78 @@ GET    /api/v1/admin/audit-logs
 ```
 sds-test-system/
 ├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   ├── database.js ✅
-│   │   │   └── setupDatabase.js ✅
-│   │   ├── models/
-│   │   │   ├── index.js ✅
-│   │   │   ├── User.js ✅
-│   │   │   ├── Test.js ✅
-│   │   │   ├── TestSection.js ✅
-│   │   │   ├── Question.js ✅
-│   │   │   ├── TestAttempt.js ✅
-│   │   │   ├── TestResponse.js ✅
-│   │   │   ├── TestResult.js ✅
-│   │   │   ├── Occupation.js ✅
-│   │   │   ├── OccupationRecommendation.js ✅
-│   │   │   ├── Career.js ✅
-│   │   │   ├── Institution.js ✅
-│   │   │   └── AuditLog.js ✅
-│   │   ├── seeders/
-│   │   │   ├── index.js ✅
-│   │   │   ├── completeSdsData.js ✅
-│   │   │   └── occupationsData.js ✅
-│   │   ├── controllers/ 🔨
-│   │   ├── routes/ 🔨
-│   │   ├── middleware/ 🔨
-│   │   ├── utils/ 🔨
-│   │   └── server.js ✅
+│   ├── config/
+│   │   ├── database.config.js ✅
+│   │   ├── email.config.js ✅
+│   │   └── .sequelizerc ✅
+│   ├── migrations/ (16 migrations) ✅
+│   ├── seeders/ (8 seeders) ✅
 │   ├── scripts/
-│   │   └── setup.js ✅
-│   ├── .env
+│   │   ├── create-db.js ✅
+│   │   ├── ensure-user-schema.js ✅
+│   │   └── backfill-student-codes.js ✅
+│   ├── src/
+│   │   ├── constants/
+│   │   │   └── roles.js ✅
+│   │   ├── controllers/ (9 controllers) ✅
+│   │   ├── middleware/ (5 middleware) ✅
+│   │   ├── models/ (17 models) ✅
+│   │   ├── routes/ (6 route files) ✅
+│   │   ├── services/
+│   │   │   ├── scoring.service.js ✅
+│   │   │   └── studentImport.service.js ✅
+│   │   ├── utils/
+│   │   │   └── logger.js ✅
+│   │   └── validations/ (4 validation schemas) ✅
+│   ├── .env (create from template)
 │   ├── .gitignore ✅
-│   └── package.json ✅
+│   ├── package.json ✅
+│   └── server.js ✅
 │
 ├── frontend/
+│   ├── public/
+│   │   ├── index.html ✅
+│   │   └── siyinqaba.png ✅
 │   ├── src/
-│   │   ├── components/ 🔨
-│   │   ├── pages/ 🔨
-│   │   ├── services/
-│   │   │   └── api.js ✅
+│   │   ├── components/
+│   │   │   ├── data/
+│   │   │   │   └── DataTable.jsx ✅
+│   │   │   └── ui/
+│   │   │       └── StatusIndicators.jsx ✅
+│   │   ├── context/
+│   │   │   └── AuthContext.js ✅
+│   │   ├── data/
+│   │   │   └── eswatiniGeoJson.js ✅
+│   │   ├── features/
+│   │   │   ├── admin/ (6 panels) ✅
+│   │   │   ├── analytics/ (5 sections) ✅
+│   │   │   └── counselor/ (5 panels) ✅
+│   │   ├── hooks/ (5 custom hooks) ✅
+│   │   ├── pages/ (15+ pages) ✅
+│   │   ├── services/ (5 service files) ✅
 │   │   ├── App.js ✅
+│   │   ├── index.css ✅
 │   │   └── index.js ✅
-│   ├── .env
-│   ├── tailwind.config.js ✅
-│   └── package.json ✅
+│   ├── .env (create from template)
+│   ├── babel.config.js ✅
+│   ├── package.json ✅
+│   ├── postcss.config.js ✅
+│   └── tailwind.config.js ✅
 │
+├── docs/
+│   ├── API_DOCUMENTATION.md ✅
+│   ├── DATABASE_SCHEMA_DOCUMENTATION.md ✅
+│   ├── SETUP_GUIDE.md ✅
+│   └── (source documents) ✅
+│
+├── .gitignore ✅
+├── CHANGELOG.md ✅
 └── README.md ✅
 ```
 
 **Legend:**
-- ✅ Complete
-- 🔨 To Build Next
+- ✅ Complete and functional
+- 🔨 Pending implementation
 
 ---
 
@@ -476,6 +733,47 @@ Tel: +268 4041971/2/3
 
 ---
 
-**Version**: 1.0  
-**Last Updated**: January 2026  
-**Status**: Development Ready 🚀
+**Version**: 2.0  
+**Last Updated**: March 2026  
+**Status**: Production Ready 🚀  
+**Ministry of Labour and Social Security - Kingdom of Eswatini
+
+---
+
+## Production Deployment Checklist
+
+### Pre-Deployment
+- [ ] Remove all test accounts from seeders
+- [ ] Update environment variables for production
+- [ ] Configure production database (PostgreSQL)
+- [ ] Set up email service (SMTP credentials)
+- [ ] Generate strong JWT secrets (minimum 32 characters)
+- [ ] Configure CORS for production domain
+- [ ] Set up SSL certificates (HTTPS)
+- [ ] Configure domain and DNS
+- [ ] Review and update rate limits
+- [ ] Enable production logging
+- [ ] Set up database backups
+- [ ] Configure file upload limits
+- [ ] Review security headers (Helmet configuration)
+
+### Deployment
+- [ ] Deploy backend (PM2, Docker, or cloud platform)
+- [ ] Deploy frontend (Netlify, Vercel, or static hosting)
+- [ ] Run database migrations on production
+- [ ] Seed production data (institutions, questions, occupations)
+- [ ] Test all critical user flows
+- [ ] Verify email sending works
+- [ ] Test PDF generation
+- [ ] Verify analytics and reporting
+- [ ] Check mobile responsiveness
+
+### Post-Deployment
+- [ ] Monitor error logs
+- [ ] Set up uptime monitoring
+- [ ] Configure automated backups
+- [ ] Document admin procedures
+- [ ] Train system administrators
+- [ ] Train test administrators/counselors
+- [ ] Prepare user documentation
+- [ ] Set up support channels

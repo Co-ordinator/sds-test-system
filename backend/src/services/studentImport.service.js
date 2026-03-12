@@ -110,8 +110,8 @@ const bulkCreateStudents = async (csvData, institutionId) => {
         firstName,
         lastName,
         nationalId,
-        role: 'user',
-        userType: 'school_student',
+        role: 'Test Taker',
+        userType: 'High School Student',
         employmentStatus: 'student',
         institutionId,
         gradeLevel: grade,
@@ -123,7 +123,8 @@ const bulkCreateStudents = async (csvData, institutionId) => {
         isConsentGiven: true,
         consentDate: new Date(),
         isEmailVerified: true,
-        createdByCounselor: true
+        createdByCounselor: true,
+        mustChangePassword: true
       }, { transaction });
 
       // Create structured SchoolStudent record

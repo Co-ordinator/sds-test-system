@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { GraduationCap, BookOpen, Briefcase, ArrowLeft, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
+import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 import { GOV, TYPO } from '../theme/government';
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
@@ -56,6 +57,7 @@ export default function Register() {
   const [step, setStep] = useState(1);
   const [userType, setUserType] = useState('');
   const [serverError, setServerError] = useState('');
+  const [workplace, setWorkplace] = useState({ name: '', institutionId: null });
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm();
 
@@ -74,6 +76,8 @@ export default function Register() {
       yearOfStudy: data.yearOfStudy || undefined,
       yearsExperience: data.yearsExperience || undefined,
       currentOccupation: data.currentOccupation || undefined,
+      workplaceName: userType === 'professional' ? (workplace.name || undefined) : undefined,
+      workplaceInstitutionId: userType === 'professional' ? (workplace.institutionId || undefined) : undefined,
     };
     try {
       await api.post('/api/v1/auth/register', payload);
@@ -214,6 +218,8 @@ export default function Register() {
               {/* Professional-specific fields */}
               {userType === 'professional' && (
                 <div className="space-y-3 pt-1">
+                  <div className="h-px" style={{ backgroundColor: GOV.borderLight }} />
+                  <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>Career details (optional)</p>
                   <div>
                     <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current occupation</label>
                     <input
@@ -222,6 +228,15 @@ export default function Register() {
                       placeholder="e.g. Secondary School Teacher"
                       className={inputClass(false)}
                       style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Workplace / Employer</label>
+                    <WorkplaceSearchInput
+                      value={workplace.name}
+                      institutionId={workplace.institutionId}
+                      onChange={(name, id) => setWorkplace({ name, institutionId: id })}
+                      placeholder="Search for your employer or organisation..."
                     />
                   </div>
                   <div>

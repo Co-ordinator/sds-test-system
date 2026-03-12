@@ -1,4 +1,5 @@
 const { AuditLog } = require('../models');
+const { ROLES } = require('../constants/roles');
 
 const authorize = (allowedRoles = []) => {
   return async (req, res, next) => {
@@ -34,8 +35,8 @@ const selfOnly = (resourceType) => {
   return async (req, res, next) => {
     const resourceId = req.params.userId || req.params.id;
     
-    // Allow admins and counselors to bypass
-    if (req.user.role === 'admin' || req.user.role === 'counselor') {
+    // Allow admins and test administrators to bypass
+    if (req.user.role === ROLES.SYSTEM_ADMIN || req.user.role === ROLES.TEST_ADMIN) {
       return next();
     }
 
@@ -67,7 +68,7 @@ const selfOnly = (resourceType) => {
 
 // Prevent self-deletion for admins
 const preventSelfDeletion = (req, res, next) => {
-  if (req.user.id === req.params.id && req.user.role === 'admin') {
+  if (req.user.id === req.params.id && req.user.role === ROLES.SYSTEM_ADMIN) {
     return res.status(403).json({
       status: 'error',
       message: 'Admins cannot delete their own accounts'

@@ -54,18 +54,50 @@ export const adminService = {
     api.get('/api/v1/admin/occupations/export?format=csv', { responseType: 'blob' })
       .then(r => downloadBlob(r.data, 'occupations.csv')),
 
+  // ── User Creation ─────────────────────────────────────────────────────
+  createUser: (payload) => api.post('/api/v1/admin/users', payload).then(r => r.data),
+
+  // ── Permissions ──────────────────────────────────────────────────────
+  getPermissions: () => api.get('/api/v1/admin/permissions').then(r => r.data?.data?.permissions || []),
+  getUserPermissions: (id) => api.get(`/api/v1/admin/permissions/user/${id}`).then(r => r.data?.data?.user),
+  updateUserPermissions: (id, permissionIds) => api.patch(`/api/v1/admin/users/${id}/permissions`, { permissionIds }).then(r => r.data),
+
   // ── Audit Logs ─────────────────────────────────────────────────────────
   getAuditLogs: () => api.get('/api/v1/admin/audit-logs').then(r => r.data?.data?.logs || []),
   getAuditLog: (id) => api.get(`/api/v1/admin/audit-logs/${id}`).then(r => r.data?.data?.log),
 
-  // ── Institutions (shared, also in institutionService) ─────────────────
+  // ── Institutions ───────────────────────────────────────────────────────
   getInstitutions: () => api.get('/api/v1/institutions').then(r => r.data?.data?.institutions || []),
   createInstitution: (payload) => api.post('/api/v1/institutions', payload).then(r => r.data?.data?.institution),
   updateInstitution: (id, payload) => api.patch(`/api/v1/institutions/${id}`, payload).then(r => r.data),
   deleteInstitution: (id) => api.delete(`/api/v1/institutions/${id}`).then(r => r.data),
+  importInstitutions: (csvText) =>
+    api.post('/api/v1/institutions/import', csvText, { headers: { 'Content-Type': 'text/csv' } }).then(r => r.data),
+  exportInstitutions: () =>
+    api.get('/api/v1/institutions/export', { responseType: 'blob' })
+      .then(r => downloadBlob(r.data, 'institutions.csv')),
+
+  // ── Subjects ───────────────────────────────────────────────────────────
+  getSubjects: () => api.get('/api/v1/admin/subjects').then(r => r.data?.data?.subjects || []),
+  createSubject: (payload) => api.post('/api/v1/admin/subjects', payload).then(r => r.data),
+  updateSubject: (id, payload) => api.patch(`/api/v1/admin/subjects/${id}`, payload).then(r => r.data),
+  deleteSubject: (id) => api.delete(`/api/v1/admin/subjects/${id}`).then(r => r.data),
+  importSubjects: (csvText) =>
+    api.post('/api/v1/admin/subjects/import', csvText, { headers: { 'Content-Type': 'text/csv' } }).then(r => r.data),
+  exportSubjects: () =>
+    api.get('/api/v1/admin/subjects/export', { responseType: 'blob' })
+      .then(r => downloadBlob(r.data, 'subjects.csv')),
 
   // ── PDF ────────────────────────────────────────────────────────────────
   downloadResultPdf: (assessmentId) =>
     api.get(`/api/v1/results/${assessmentId}/pdf`, { responseType: 'blob' })
       .then(r => downloadBlob(r.data, `SDS_Report_${assessmentId}.pdf`, 'application/pdf')),
+
+  // ── Certificates ───────────────────────────────────────────────────────
+  getCertificates: () => api.get('/api/v1/admin/certificates').then(r => r.data?.data?.certificates || []),
+  generateCertificate: (assessmentId) =>
+    api.post(`/api/v1/admin/certificates/${assessmentId}/generate`).then(r => r.data),
+  downloadCertificate: (assessmentId, certNumber) =>
+    api.get(`/api/v1/admin/certificates/${assessmentId}/download`, { responseType: 'blob' })
+      .then(r => downloadBlob(r.data, `SDS_Certificate_${(certNumber || assessmentId).replace(/\//g, '-')}.pdf`, 'application/pdf')),
 };

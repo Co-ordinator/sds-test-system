@@ -8,11 +8,12 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
   const { user, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
-  const role = user?.role || 'user';
-  const roleLabel = role === 'admin' ? 'Administrator' : role === 'counselor' ? 'Counselor' : 'Student';
-  const roleColor = role === 'admin'
+  const role = user?.role || 'Test Taker';
+  const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
+  const roleLabel = role === 'System Administrator' ? 'System Administrator' : role === 'Test Administrator' ? 'Test Administrator' : 'Test Taker';
+  const roleColor = role === 'System Administrator'
     ? { bg: '#ede9fe', text: '#6d28d9' }
-    : role === 'counselor'
+    : role === 'Test Administrator'
       ? { bg: '#dbeafe', text: '#1d4ed8' }
       : { bg: '#f0fdf4', text: '#15803d' };
 
@@ -23,7 +24,7 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
         style={{ backgroundColor: '#f8fafc', borderColor: GOV.borderLight }}
       >
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[10px]" style={{ color: GOV.textHint }}>
+          <p className={TYPO.ministryBanner} style={{ color: GOV.blue }}>
             Ministry of Labour &amp; Social Security · Kingdom of Eswatini
           </p>
         </div>
@@ -86,7 +87,7 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                       <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
                     </Link>
 
-                    {role === 'admin' && (
+                    {isAdminLike && (
                       <Link
                         to="/admin/dashboard"
                         className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
@@ -94,17 +95,6 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                         onClick={() => setUserMenuOpen(false)}
                       >
                         <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Admin Dashboard
-                      </Link>
-                    )}
-
-                    {role === 'counselor' && (
-                      <Link
-                        to="/counselor"
-                        className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
-                        style={{ color: GOV.text }}
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Home className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Counselor Dashboard
                       </Link>
                     )}
 

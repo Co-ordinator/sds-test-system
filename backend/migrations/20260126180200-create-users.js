@@ -100,9 +100,9 @@ module.exports = {
         onDelete: "SET NULL"
       },
       role: {
-        type: Sequelize.ENUM("admin", "counselor", "user"),
+        type: Sequelize.ENUM("System Administrator", "Test Administrator", "Test Taker"),
         allowNull: false,
-        defaultValue: "user"
+        defaultValue: "Test Taker"
       },
       is_active: {
         type: Sequelize.BOOLEAN,
@@ -114,7 +114,7 @@ module.exports = {
         allowNull: false,
         defaultValue: false
       },
-      created_by_counselor: {
+      created_by_test_administrator: {
         type: Sequelize.BOOLEAN,
         allowNull: false,
         defaultValue: false
@@ -162,7 +162,7 @@ module.exports = {
         type: Sequelize.DATE,
         allowNull: true
       },
-      counselor_code: {
+      test_administrator_code: {
         type: Sequelize.STRING,
         allowNull: true,
         unique: true
@@ -172,7 +172,7 @@ module.exports = {
         allowNull: true
       },
       user_type: {
-        type: Sequelize.ENUM("school_student", "university_student", "professional", "counselor", "admin"),
+        type: Sequelize.ENUM("High School Student", "University Student", "Professional", "Test Administrator", "System Administrator"),
         allowNull: true
       },
       student_number: {
@@ -201,6 +201,22 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: true
       },
+      workplace_institution_id: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: { model: "institutions", key: "id" },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL"
+      },
+      workplace_name: {
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+      must_change_password: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+        allowNull: false
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -213,12 +229,8 @@ module.exports = {
       }
     });
 
-    await queryInterface.addIndex("users", ["username"], { unique: true });
-    await queryInterface.addIndex("users", ["email"], { unique: true });
-    await queryInterface.addIndex("users", ["national_id"], { unique: true });
-    await queryInterface.addIndex("users", ["student_number"], { unique: true });
-    await queryInterface.addIndex("users", ["student_code"], { unique: true });
     await queryInterface.addIndex("users", ["institution_id"]);
+    await queryInterface.addIndex("users", ["workplace_institution_id"]);
     await queryInterface.addIndex("users", ["role"]);
     await queryInterface.addIndex("users", ["user_type"]);
     await queryInterface.addIndex("users", ["education_level"]);

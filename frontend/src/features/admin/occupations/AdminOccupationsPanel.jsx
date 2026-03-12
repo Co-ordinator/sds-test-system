@@ -4,6 +4,7 @@ import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { useToast, ErrorBanner } from '../../../components/ui/StatusIndicators';
 import { adminService } from '../../../services/adminService';
+import { PermissionGate } from '../../../context/PermissionContext';
 
 const EMPTY_OCC = { name: '', category: '', primaryRiasec: 'R', demandLevel: 'medium', description: '' };
 
@@ -87,8 +88,12 @@ const AdminOccupationsPanel = () => {
       key: 'actions', header: 'Actions', stopPropagation: true,
       render: (o) => (
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setEditingOcc({ ...o })} className="p-1 rounded hover:bg-blue-50"><Edit2 className="w-3 h-3" style={{ color: GOV.blue }} /></button>
-          <button type="button" onClick={() => handleDelete(o.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3 h-3 text-red-500" /></button>
+          <PermissionGate permission="occupations.update">
+            <button type="button" onClick={() => setEditingOcc({ ...o })} className="p-1 rounded hover:bg-blue-50"><Edit2 className="w-3 h-3" style={{ color: GOV.blue }} /></button>
+          </PermissionGate>
+          <PermissionGate permission="occupations.delete">
+            <button type="button" onClick={() => handleDelete(o.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3 h-3 text-red-500" /></button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -102,13 +107,17 @@ const AdminOccupationsPanel = () => {
         <input className="form-control-with-icon pl-7 text-xs w-44" style={{ borderBottomColor: GOV.border, color: GOV.text }} placeholder="Search occupations…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <div className="ml-auto flex gap-2">
-        <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>
-          <Upload className="w-3 h-3" /> Import
-          <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
-        </label>
-        <button type="button" onClick={() => adminService.exportOccupations().catch(() => showToast('Export failed', 'error'))} className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold" style={{ borderColor: GOV.border, color: GOV.blue }}>
-          <Download className="w-3 h-3" /> Export
-        </button>
+        <PermissionGate permission="occupations.import">
+          <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>
+            <Upload className="w-3 h-3" /> Import
+            <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
+          </label>
+        </PermissionGate>
+        <PermissionGate permission="occupations.export">
+          <button type="button" onClick={() => adminService.exportOccupations().catch(() => showToast('Export failed', 'error'))} className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold" style={{ borderColor: GOV.border, color: GOV.blue }}>
+            <Download className="w-3 h-3" /> Export
+          </button>
+        </PermissionGate>
       </div>
     </>
   );
@@ -124,6 +133,7 @@ const AdminOccupationsPanel = () => {
         </div>
 
         {/* Add Occupation Panel */}
+        <PermissionGate permission="occupations.create">
         <div className="bg-white rounded-md border p-5" style={{ borderColor: GOV.border }}>
           <h4 className={`${TYPO.cardTitle} mb-4 flex items-center gap-2`} style={{ color: GOV.text }}><Plus className="w-4 h-4" /> Add Occupation</h4>
           <form className="space-y-3" onSubmit={handleCreate}>
@@ -160,6 +170,7 @@ const AdminOccupationsPanel = () => {
             </button>
           </form>
         </div>
+        </PermissionGate>
       </div>
 
       {/* Edit Modal */}

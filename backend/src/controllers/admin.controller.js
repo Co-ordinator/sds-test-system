@@ -3,6 +3,8 @@ const { Op } = require('sequelize');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 const logger = require('../utils/logger');
+const crypto = require('crypto');
+const { sendEmail } = require('../config/email.config');
 
 const buildAnalyticsFilters = (query) => {
   const { institutionId, region, userType, institutionType, startDate, endDate } = query;
@@ -248,9 +250,9 @@ module.exports = {
         }
       });
 
-      const [studentCount, counselorCount] = await Promise.all([
-        countUsersWithFilters({ userWhere, userInclude: assessmentInclude[0]?.include || [], extraWhere: { role: 'user' } }),
-        User.count({ where: { role: 'counselor' } })
+      const [testTakerCount, testAdministratorCount] = await Promise.all([
+        countUsersWithFilters({ userWhere, userInclude: assessmentInclude[0]?.include || [], extraWhere: { role: 'Test Taker' } }),
+        User.count({ where: { role: 'Test Administrator' } })
       ]);
 
       const totalAssessments = await Assessment.count({ where: assessmentWhere, include: assessmentInclude });
@@ -278,8 +280,8 @@ module.exports = {
         data: {
           totals: {
             users: totalUsers,
-            students: studentCount,
-            counselors: counselorCount,
+            testTakers: testTakerCount,
+            testAdministrators: testAdministratorCount,
             assessments: totalAssessments,
             completedAssessments
           },
@@ -447,7 +449,7 @@ module.exports = {
       const institutions = await Institution.findAll({ order: [['name', 'ASC']] });
 
       const results = await Promise.all(institutions.map(async (inst) => {
-        const totalStudents = await User.count({ where: { institutionId: inst.id, role: 'user' } });
+        const totalStudents = await User.count({ where: { institutionId: inst.id, role: 'Test Taker' } });
         const totalAssessments = await Assessment.count({
           include: [{ model: User, as: 'user', required: true, where: { institutionId: inst.id } }]
         });
@@ -671,7 +673,7 @@ module.exports = {
     try {
       const { Op, fn, col } = require('sequelize');
       const { userWhere: baseUserWhere, assessmentWhere, userInclude, assessmentInclude: baseAssessmentInclude } = buildAnalyticsFilters(req.query);
-      const userWhere = { ...baseUserWhere, role: 'user', region: baseUserWhere.region || { [Op.ne]: null } };
+      const userWhere = { ...baseUserWhere, role: 'Test Taker', region: baseUserWhere.region || { [Op.ne]: null } };
       const assessmentInclude = [{
         model: User,
         as: 'user',
@@ -982,7 +984,7 @@ module.exports = {
       const [analyticsRes, hollandRes, regionalRes] = await Promise.all([
         (async () => {
           const [studentCount, totalUsers, totalAssessments, completedAssessments, averages] = await Promise.all([
-            countUsersWithFilters({ userWhere, userInclude, extraWhere: { role: 'user' } }),
+            countUsersWithFilters({ userWhere, userInclude, extraWhere: { role: 'Test Taker' } }),
             countUsersWithFilters({ userWhere, userInclude }),
             Assessment.count({ where: assessmentWhere, include: assessmentInclude }),
             Assessment.count({ where: { ...assessmentWhere, status: 'completed' }, include: assessmentInclude }),
@@ -1022,7 +1024,7 @@ module.exports = {
         }),
         Assessment.findAll({
           where: { ...assessmentWhere, status: 'completed' },
-          include: [{ model: User, as: 'user', required: true, attributes: [], where: { ...userWhere, role: 'user', region: userWhere.region || { [Op.ne]: null } }, include: userInclude }],
+          include: [{ model: User, as: 'user', required: true, attributes: [], where: { ...userWhere, role: 'Test Taker', region: userWhere.region || { [Op.ne]: null } }, include: userInclude }],
           attributes: [
             [Assessment.sequelize.col('user.region'), 'region'],
             [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('Assessment.id')), 'completedAssessments']
@@ -1250,6 +1252,203 @@ module.exports = {
       });
     } catch (error) {
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: 'Failed to get skills pipeline', req, details: { error: error.message } });
+      next(error);
+    }
+  },
+
+  // Create user (any role) with email notification and optional permission assignment
+  createUser: async (req, res, next) => {
+    try {
+      const { firstName, lastName, email, role, institutionId, organization, permissionIds } = req.body;
+
+      if (!firstName || !lastName || !email) {
+        return res.status(400).json({ status: 'error', message: 'First name, last name, and email are required' });
+      }
+
+      const validRoles = ['System Administrator', 'Test Administrator', 'Test Taker'];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ status: 'error', message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });
+      }
+
+      const existingUser = await User.findOne({ where: { [Op.or]: [{ email }, { username: email }] } });
+      if (existingUser) {
+        return res.status(400).json({ status: 'error', message: 'A user with this email already exists' });
+      }
+
+      const tempPassword = crypto.randomBytes(8).toString('hex');
+      const assignedRole = role || 'Test Taker';
+
+      const userFields = {
+        firstName,
+        lastName,
+        email,
+        username: email,
+        password: tempPassword,
+        role: assignedRole,
+        userType: assignedRole === 'Test Administrator' ? 'Test Administrator' : assignedRole === 'System Administrator' ? 'System Administrator' : null,
+        institutionId: institutionId || null,
+        organization: organization || null,
+        isEmailVerified: true,
+        mustChangePassword: true,
+        isActive: true,
+        isConsentGiven: true,
+        consentDate: new Date()
+      };
+
+      if (assignedRole === 'Test Administrator') {
+        userFields.testAdministratorCode = `TA-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      }
+
+      const newUser = await User.create(userFields);
+
+      // Assign permissions if provided
+      if (permissionIds && permissionIds.length > 0) {
+        const { Permission, UserPermission } = require('../models');
+        const validPerms = await Permission.findAll({ where: { id: permissionIds } });
+        if (validPerms.length > 0) {
+          await UserPermission.bulkCreate(
+            validPerms.map(p => ({ userId: newUser.id, permissionId: p.id })),
+            { ignoreDuplicates: true }
+          );
+        }
+      } else if (assignedRole === 'System Administrator') {
+        // Auto-assign all permissions to admin
+        const { Permission, UserPermission } = require('../models');
+        const allPerms = await Permission.findAll();
+        if (allPerms.length > 0) {
+          await UserPermission.bulkCreate(
+            allPerms.map(p => ({ userId: newUser.id, permissionId: p.id })),
+            { ignoreDuplicates: true }
+          );
+        }
+      }
+
+      // Send welcome email with credentials
+      const roleLabel = assignedRole === 'Test Administrator' ? 'Test Administrator' : assignedRole === 'System Administrator' ? 'System Administrator' : 'Test Taker';
+      try {
+        await sendEmail({
+          email: newUser.email,
+          subject: `Welcome to SDS - Your ${roleLabel} Account`,
+          template: 'user-welcome',
+          context: {
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            email: newUser.email,
+            tempPassword,
+            role: roleLabel,
+            loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
+            organization: organization || 'SDS System'
+          }
+        });
+      } catch (emailError) {
+        logger.error({ actionType: 'EMAIL_FAILED', message: `Failed to send welcome email to ${newUser.email}`, req, details: { error: emailError.message } });
+      }
+
+      await AuditLog.create({
+        userId: req.user?.id,
+        actionType: 'USER_CREATED',
+        description: `${roleLabel} account created: ${newUser.email}`,
+        details: { resourceType: 'user', resourceId: newUser.id, role: assignedRole, requestMethod: req.method },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
+
+      logger.info({ actionType: 'USER_CREATED', message: `User created: ${newUser.email} (${assignedRole})`, req, details: { adminId: req.user?.id, newUserId: newUser.id } });
+
+      // Re-fetch with permissions
+      const created = await User.findByPk(newUser.id, {
+        attributes: { exclude: ['password', 'passwordResetToken', 'refreshToken'] },
+        include: [
+          { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region'] },
+          { model: require('../models').Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }
+        ]
+      });
+
+      res.status(201).json({
+        status: 'success',
+        message: `${roleLabel} created successfully. Login credentials sent to ${newUser.email}.`,
+        data: { user: created.toJSON(), tempPassword }
+      });
+    } catch (error) {
+      logger.error({ actionType: 'USER_CREATION_FAILED', message: 'Failed to create user', req, details: { error: error.message, stack: error.stack } });
+      next(error);
+    }
+  },
+
+  // Get all permissions
+  getAllPermissions: async (req, res, next) => {
+    try {
+      const { Permission } = require('../models');
+      const permissions = await Permission.findAll({ order: [['module', 'ASC'], ['code', 'ASC']] });
+      res.status(200).json({ status: 'success', data: { permissions } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Get permissions for a specific user
+  getUserPermissions: async (req, res, next) => {
+    try {
+      const { Permission } = require('../models');
+      const user = await User.findByPk(req.params.id, {
+        attributes: ['id', 'firstName', 'lastName', 'email', 'role'],
+        include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
+      });
+      if (!user) return res.status(404).json({ status: 'error', message: 'User not found' });
+      res.status(200).json({ status: 'success', data: { user: user.toJSON() } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Update user permissions (replace all permissions for a user)
+  updateUserPermissions: async (req, res, next) => {
+    try {
+      const { permissionIds } = req.body;
+      const { Permission, UserPermission } = require('../models');
+
+      const user = await User.findByPk(req.params.id);
+      if (!user) return res.status(404).json({ status: 'error', message: 'User not found' });
+
+      // Remove all existing permissions
+      await UserPermission.destroy({ where: { userId: user.id } });
+
+      // Add new permissions
+      if (permissionIds && permissionIds.length > 0) {
+        const validPerms = await Permission.findAll({ where: { id: permissionIds } });
+        await UserPermission.bulkCreate(
+          validPerms.map(p => ({ userId: user.id, permissionId: p.id })),
+          { ignoreDuplicates: true }
+        );
+      }
+
+      await AuditLog.create({
+        userId: req.user?.id,
+        actionType: 'PERMISSIONS_UPDATED',
+        description: `Permissions updated for user ${user.email}`,
+        details: { resourceType: 'user', resourceId: user.id, permissionCount: permissionIds?.length || 0, requestMethod: req.method },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
+
+      // Re-fetch
+      const updated = await User.findByPk(user.id, {
+        attributes: ['id', 'firstName', 'lastName', 'email', 'role'],
+        include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
+      });
+
+      res.status(200).json({ status: 'success', message: 'Permissions updated', data: { user: updated.toJSON() } });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  // Get institutions (for admin panel dropdowns)
+  getInstitutions: async (req, res, next) => {
+    try {
+      const institutions = await Institution.findAll({ order: [['name', 'ASC']] });
+      res.status(200).json({ status: 'success', data: { institutions } });
+    } catch (error) {
       next(error);
     }
   }

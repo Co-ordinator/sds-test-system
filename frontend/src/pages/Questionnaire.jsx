@@ -6,10 +6,30 @@ import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
 
 const SECTIONS = [
-  { id: 'activities', num: 'I', label: 'Activities', description: 'Would you like to do this activity?' },
-  { id: 'competencies', num: 'II', label: 'Competencies', description: 'Can you do this or have you done this?' },
-  { id: 'occupations', num: 'III', label: 'Occupations', description: 'Would you like this kind of work?' },
-  { id: 'self_estimates', num: 'IV', label: 'Self-Rating', description: 'Rate yourself compared to other people your age' }
+  { 
+    id: 'activities', 
+    num: 'I', 
+    label: 'Activities', 
+    description: 'Click YES for activities you LIKE TO DO or WOULD LIKE TO DO. Click NO for activities you are INDIFFERENT TO, HAVE NEVER DONE, or DO NOT LIKE TO DO.' 
+  },
+  { 
+    id: 'competencies', 
+    num: 'II', 
+    label: 'Competencies', 
+    description: 'Click YES for activities you HAVE KNOWLEDGE of or CAN DO WELL or COMPETENTLY. Click NO for activities you HAVE LITTLE or NO KNOWLEDGE of or HAVE NEVER PERFORMED or PERFORM POORLY.' 
+  },
+  { 
+    id: 'occupations', 
+    num: 'III', 
+    label: 'Occupations', 
+    description: 'Click YES for occupations/jobs that INTEREST or APPEAL TO you. Click NO for occupations/jobs you DISLIKE or FIND UNINTERESTING.' 
+  },
+  { 
+    id: 'self_estimates', 
+    num: 'IV', 
+    label: 'Self-Rating', 
+    description: 'Rate yourself on a scale of 1 to 6 compared to other people your age. Give the most accurate estimate of how you see yourself.' 
+  }
 ];
 
 const RATING_LABELS = [
@@ -42,6 +62,8 @@ const Questionnaire = () => {
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
@@ -160,7 +182,9 @@ const Questionnaire = () => {
   const handleComplete = async () => {
     if (!assessment?.id || totalQuestions === 0) return;
     if (answeredCount < totalQuestions) {
-      setError(`Please answer all questions (${answeredCount}/${totalQuestions} answered).`);
+      const unanswered = totalQuestions - answeredCount;
+      setError(`You must answer all questions before submitting. ${unanswered} question${unanswered > 1 ? 's' : ''} remaining (${answeredCount}/${totalQuestions} answered).`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     setSubmitting(true);
@@ -179,10 +203,22 @@ const Questionnaire = () => {
   const isLastQuestion =
     currentSectionIndex === totalSections - 1 && currentQuestionIndex === sectionQuestions.length - 1;
 
-  // Calculate estimated time remaining
-  const avgTimePerQuestion = 8; // seconds
-  const remainingQuestions = totalQuestions - answeredCount;
-  const estimatedMinutes = Math.ceil((remainingQuestions * avgTimePerQuestion) / 60);
+  // Update elapsed time every second when not paused
+  useEffect(() => {
+    if (isPaused || !assessment) return;
+    
+    const interval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [isPaused, startTime, assessment]);
+  
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Keyboard navigation
   useEffect(() => {
@@ -267,6 +303,12 @@ const Questionnaire = () => {
       contextLabel={currentSectionMeta ? `Section ${currentSectionMeta.num}: ${currentSectionMeta.label}` : 'Assessment'}
       actions={(
         <>
+          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
+            <Clock className="w-4 h-4" style={{ color: GOV.blue }} />
+            <span className="text-sm font-mono font-semibold" style={{ color: GOV.blue }}>
+              {formatTime(elapsedTime)}
+            </span>
+          </div>
           {saving && (
             <div className={`${TYPO.bodySmall} inline-flex items-center gap-1.5 px-3 py-2 rounded-md`} style={{ color: GOV.blue, backgroundColor: GOV.blueLightAlt }}>
               <Cloud className="w-4 h-4" /> Saving...
@@ -274,7 +316,10 @@ const Questionnaire = () => {
           )}
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => {
+              setIsPaused(true);
+              navigate('/dashboard');
+            }}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-white"
             style={{ color: GOV.text }}
             aria-label="Pause assessment and return to dashboard"
@@ -306,11 +351,17 @@ const Questionnaire = () => {
       {currentQuestion && (
         <div className="bg-white rounded-md p-6 md:p-8">
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm" style={{ color: GOV.textMuted }}>
-                {currentSectionMeta?.description} · Question {currentQuestionIndex + 1} of {sectionQuestions.length}
-              </p>
-              <div className="flex items-center gap-2">
+            <div className="mb-4">
+              <div className="p-3 rounded-md mb-3" style={{ backgroundColor: GOV.blueLightAlt }}>
+                <p className="text-sm font-medium" style={{ color: GOV.blue }}>
+                  {currentSectionMeta?.description}
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <p className="text-sm" style={{ color: GOV.textMuted }}>
+                  Question {currentQuestionIndex + 1} of {sectionQuestions.length}
+                </p>
+                <div className="flex items-center gap-2">
                 {currentQuestion.questionCode && (
                   <span
                     className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono"
@@ -331,6 +382,7 @@ const Questionnaire = () => {
                 >
                   {RIASEC_NAMES[currentQuestion.riasecType] || currentQuestion.riasecType}
                 </span>
+                </div>
               </div>
             </div>
             <h2 className="text-2xl font-bold leading-relaxed" style={{ color: GOV.text }}>{currentQuestion.text}</h2>
@@ -387,12 +439,10 @@ const Questionnaire = () => {
             <div className="flex items-center justify-between text-xs mb-3" style={{ color: GOV.textHint }}>
               <div className="flex items-center gap-4">
                 <span>{answeredCount} of {totalQuestions} answered</span>
-                {remainingQuestions > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    ~{estimatedMinutes} min remaining
-                  </span>
-                )}
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Time: {formatTime(elapsedTime)}
+                </span>
               </div>
               <span>{progressPercent}% complete</span>
             </div>

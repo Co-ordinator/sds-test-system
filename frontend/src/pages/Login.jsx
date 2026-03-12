@@ -21,13 +21,19 @@ const Login = () => {
       const user = result?.data?.user ?? result?.user;
 
       if (result?.status === 'success' && user) {
+        // Check if user must change password
+        if (result?.mustChangePassword) {
+          navigate('/change-password');
+          return;
+        }
+
         const userRole = user.role;
         switch (userRole) {
-          case 'admin':
+          case 'System Administrator':
             navigate('/admin/dashboard');
             break;
-          case 'counselor':
-            navigate('/counselor/dashboard');
+          case 'Test Administrator':
+            navigate('/admin/dashboard');
             break;
           default:
             navigate('/dashboard');
@@ -58,7 +64,7 @@ const Login = () => {
         >
           <div className="px-6 pt-6 pb-1">
             <h1 className={`${TYPO.pageTitle} text-center`} style={{ color: GOV.text }}>
-              Sign in
+              Welcome Back
             </h1>
             <p className={`${TYPO.bodySmall} text-center mt-1`} style={{ color: GOV.textMuted }}>
               Enter your credentials to access your account

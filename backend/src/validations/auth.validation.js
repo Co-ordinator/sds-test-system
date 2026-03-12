@@ -121,11 +121,26 @@ const resendVerification = Joi.object({
   email: Joi.string().email().required().messages({ 'any.required': 'Email is required' })
 });
 
+const changePassword = Joi.object({
+  currentPassword: Joi.string().required().messages({
+    'any.required': 'Current password is required'
+  }),
+  newPassword: Joi.string().pattern(passwordPattern).required().messages({
+    'string.pattern.base': 'New password must be at least 8 characters and contain both letters and numbers',
+    'any.required': 'New password is required'
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
+    'any.only': 'Passwords do not match',
+    'any.required': 'Please confirm your new password'
+  })
+});
+
 module.exports = {
   register,
   login,
   resetPassword,
   updateProfile,
   forgotPasswordBody,
-  resendVerification
+  resendVerification,
+  changePassword
 };

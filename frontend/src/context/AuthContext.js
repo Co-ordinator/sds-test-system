@@ -96,8 +96,8 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   const isOnVerifyPage = window.location.pathname.includes('/verify-email');
 
   const roleDashboard = (role) => {
-    if (role === 'admin') return '/admin';
-    if (role === 'counselor') return '/counselor';
+    if (role === 'System Administrator') return '/admin';
+    if (role === 'Test Administrator') return '/admin/dashboard';
     return '/dashboard';
   };
 

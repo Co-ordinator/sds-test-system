@@ -9,6 +9,7 @@ The Online Self-Directed Search (SDS) Test System database is designed to suppor
 - **Multi-language Support** - English and siSwati
 - **Comprehensive Audit Trail** - Complete logging for compliance
 - **Data Protection Compliant** - Aligned with Eswatini Data Protection Act 2022
+- **Role-Based Access Control** - System Administrator, Test Administrator, Test Taker roles with 49 granular permissions
 - **Scalable Architecture** - Supports 500+ concurrent users
 - **Career Resources Integration** - Links to local institutions and opportunities
 
@@ -19,58 +20,176 @@ The Online Self-Directed Search (SDS) Test System database is designed to suppor
 ### 1. User Management
 
 #### **users**
-Stores all system users (students, counselors, administrators)
+Stores all system users (test takers, test administrators, system administrators)
 
 **Key Fields:**
 - `id` (UUID) - Primary key
-- `email` - Unique email address
-- `password` - Bcrypt hashed password
-- `firstName`, `lastName` - User names
-- `nationalId` - Eswatini National ID (13 digits, numeric, nullable)
-- `role` - `admin` | `counselor` | `user`
-- `region` - `hhohho` | `manzini` | `lubombo` | `shiselweni`
-- `district`, `address`
-- `educationLevel` - FK → education_levels.level
-- `employmentStatus` - Current employment status
-- `currentOccupation`
-- `institutionId` - FK → institutions.id
-- `preferredLanguage` - `en` | `ss` (English/siSwati)
-- `accessibilityNeeds` - JSONB for WCAG compliance
-- `isConsentGiven`, `consentDate`
-- `isActive`
-- `isEmailVerified`, `emailVerificationToken`, `emailVerificationExpires`
-- `phoneNumber`
-- `dateOfBirth`, `gender`
-- `currentInstitution`, `gradeLevel`
-- `requiresAccessibility`
-- `lastLogin`
-- `passwordResetToken`, `passwordResetExpires`
-- `refreshToken`, `refreshTokenExpires`
-- `counselorCode` (unique, nullable)
-- `organization`
+- `username` (string, unique, nullable)
+- `email` (string, unique, nullable) - Unique email address
+- `password` (string) - Bcrypt hashed password (10 rounds)
+- `firstName`, `lastName` (string) - User names
+- `nationalId` (string, 13 digits, unique, nullable) - Eswatini National ID (auto-extracts DOB & gender)
+- `dateOfBirth` (DATEONLY, nullable) - Auto-populated from nationalId
+- `gender` (ENUM: `male` | `female` | `other` | `prefer_not_to_say`, nullable)
+- `phoneNumber` (string, nullable)
+
+**Role & Access:**
+- `role` (ENUM) - `System Administrator` | `Test Administrator` | `Test Taker`
+- `userType` (ENUM, nullable) - `High School Student` | `University Student` | `Professional` | `Test Administrator` | `System Administrator`
+- `isActive` (boolean, default: true)
+- `isEmailVerified` (boolean, default: false)
+- `createdByTestAdministrator` (boolean, default: false)
+- `mustChangePassword` (boolean, default: false)
+
+**Location:**
+- `region` (ENUM, nullable) - `hhohho` | `manzini` | `lubombo` | `shiselweni`
+- `district` (string, nullable)
+- `address` (text, nullable)
+
+**Education & Employment:**
+- `educationLevel` (UUID, nullable) - FK → education_levels.id
+- `currentInstitution` (string, nullable)
+- `gradeLevel` (string, nullable)
+- `institutionId` (UUID, nullable) - FK → institutions.id
+- `employmentStatus` (ENUM, nullable) - `student` | `employed` | `unemployed` | `self_employed` | `other`
+- `currentOccupation` (string, nullable)
+
+**Extended User Journey Fields:**
+- `studentNumber` (string, unique, nullable)
+- `className` (string, nullable)
+- `studentCode` (string, unique, nullable)
+- `degreeProgram` (string, nullable) - For university students
+- `yearOfStudy` (integer, nullable) - For university students
+- `yearsExperience` (integer, nullable) - For professionals
+- `workplaceInstitutionId` (UUID, FK → institutions, nullable) - Linked workplace institution for professionals
+- `workplaceName` (string, nullable) - Free-text workplace name for professionals (used when not matched to an institution)
+- `testAdministratorCode` (string, unique, nullable)
+- `organization` (string, nullable)
+
+**Preferences & Accessibility:**
+- `preferredLanguage` (ENUM, default: `en`) - `en` | `ss` (English/siSwati)
+- `requiresAccessibility` (boolean, default: false)
+- `accessibilityNeeds` (JSONB, default: {}) - WCAG compliance data
+
+**Consent & Privacy:**
+- `isConsentGiven` (boolean, default: false)
+- `consentDate` (DATE, nullable)
+
+**Security & Tokens:**
+- `lastLogin` (DATE, nullable)
+- `emailVerificationToken` (string, nullable)
+- `emailVerificationExpires` (DATE, nullable)
+- `passwordResetToken` (string, nullable)
+- `passwordResetExpires` (DATE, nullable)
+- `refreshToken` (string, nullable)
+- `refreshTokenExpires` (DATE, nullable)
+
+**Timestamps:**
+- `createdAt`, `updatedAt` (auto-managed)
+
+**Indexes:**
+- username (unique), email (unique), national_id (unique), student_number (unique), student_code (unique), institution_id, workplace_institution_id, role, user_type, education_level, is_active, is_email_verified
 
 **Security Features:**
-- Password hashing via bcrypt (10 rounds)
-- Password reset tokens
-- Email verification
+- Password hashing via bcrypt (10 rounds) - automatic on create/update
+- National ID parsing (auto-extracts DOB & gender)
+- Password reset tokens with expiration
+- Email verification workflow
 - Last login tracking
+- Refresh token rotation
+
+**Model Hooks:**
+- `beforeCreate`: Hash password, parse nationalId
+- `beforeUpdate`: Hash password if changed, parse nationalId if changed
+- `toJSON`: Strips sensitive fields (password, tokens)
+
+#### **user_qualifications**
+Academic certificates and qualification documents uploaded by users.
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `userId` (UUID, FK → users, CASCADE delete) - Document owner
+- `title` (string, required) - Document title e.g. "IGCSE Certificate 2022"
+- `documentType` (ENUM, default: `certificate`) - `certificate` | `degree` | `diploma` | `transcript` | `professional_licence` | `other`
+- `issuedBy` (string, nullable) - Issuing institution name
+- `issueDate` (DATEONLY, nullable) - Date the document was issued
+- `fileName` (string) - Original uploaded filename
+- `filePath` (string) - Absolute server path to stored file (`backend/uploads/qualifications/`)
+- `fileSize` (integer) - File size in bytes (max 5 MB enforced)
+- `mimeType` (string) - MIME type: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`
+
+**Indexes:** user_id
+
+**Notes:**
+- Files stored at `backend/uploads/qualifications/` with randomised filenames
+- Files are deleted from disk when the record is deleted
+- Upload endpoint enforces 5 MB limit and allowed MIME types via multer
+
+---
+
+#### **permissions**
+Granular permission system (49 permissions across 13 modules)
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `code` (string, unique) - Permission code (e.g., `users.create`, `analytics.view`)
+- `name` (string) - Human-readable name
+- `description` (string, nullable) - Permission description
+- `module` (string) - Module grouping (users, institutions, questions, occupations, subjects, assessments, results, analytics, audit, notifications, certificates, permissions, test_takers)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Permission Modules:**
+- **users**: view, create, update, delete, export
+- **institutions**: view, create, update, delete, export, import
+- **questions**: view, create, update, delete, import, export
+- **occupations**: view, create, update, delete, import, export
+- **subjects**: view, create, update, delete, import, export
+- **assessments**: view, create, update, delete, export
+- **results**: view, export
+- **analytics**: view, export
+- **audit**: view
+- **notifications**: view, manage
+- **certificates**: view, generate, download
+- **permissions**: view, manage
+- **test_takers**: manage
+
+#### **user_permissions**
+Many-to-many junction table linking users to permissions
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `userId` (UUID) - FK → users.id
+- `permissionId` (UUID) - FK → permissions.id
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
 
 ---
 
 ### 2. Test Structure
 
 #### **questions**
-Individual assessment questions (static bank)
+Individual assessment questions (228 questions from SDS booklet)
 
 **Key Fields:**
-- `id` (PK, integer, auto-increment)
-- `text` - Question text
-- `section` - `activities` | `competencies` | `occupations` | `self_estimates`
-- `riasecType` - `R` | `I` | `A` | `S` | `E` | `C`
-- `order` - Required display order
+- `id` (UUID) - Primary key
+- `text` (TEXT) - Question text as seen in SDS booklet
+- `section` (ENUM) - `activities` | `competencies` | `occupations` | `self_estimates`
+- `riasecType` (ENUM) - `R` | `I` | `A` | `S` | `E` | `C`
+- `order` (integer) - Display sequence (required)
+- `questionCode` (string, nullable) - SDS question code (e.g., R1, I12, SR1)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
 
 **Validation Notes:**
 - `order` is required (no nulls)
+- Maps to Sections I-IV of the SDS
+
+**Associations:**
+- hasMany → answers
 
 ---
 
@@ -131,65 +250,202 @@ Scoring derives from **answers** per section/riasecType; composite queries are o
 ### 5. Career Resources
 
 #### **occupations**
-Career options mapped to RIASEC codes
+Career options mapped to RIASEC codes (35+ occupations seeded)
 
 **Key Fields:**
-- `code` - 3-letter Holland code
-- `name` - Occupation name
-- `hollandCodes` - Array of matching codes
-- `primaryRiasec`, `secondaryRiasec`
-- `description`, `category`
-- `educationLevel` - FK → education_levels.level
-- `educationRequired` - Text
-- `demandLevel`, `localDemand`
-- `availableInEswatini` (boolean)
-- `skills` - Array of strings
+- `id` (UUID) - Primary key
+- `code` (string, unique) - 3-letter Holland code (e.g., `RAC`, `SAE`)
+- `name` (string) - Occupation name
+- `hollandCodes` (string[], nullable) - Array of matching Holland codes
+- `primaryRiasec` (string, nullable) - Primary RIASEC letter
+- `secondaryRiasec` (string, nullable) - Secondary RIASEC letter
+- `description` (TEXT, nullable)
+- `category` (string, nullable) - Career category
+- `educationLevel` (UUID, nullable) - FK → education_levels.id
+- `educationRequired` (string, nullable) - Text description
+- `demandLevel` (ENUM, nullable) - `low` | `medium` | `high` | `very_high` | `critical`
+- `localDemand` (ENUM, nullable) - `low` | `medium` | `high` | `critical`
+- `availableInEswatini` (boolean, default: false)
+- `skills` (string[], nullable) - Required skills array
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- belongsTo → education_levels (via educationLevel)
+
+#### **courses**
+Tertiary education courses/programs (25+ courses seeded)
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `name` (string) - Course name
+- `nameSwati` (string, nullable) - siSwati name
+- `qualificationType` (ENUM, default: `bachelor`) - `certificate` | `diploma` | `bachelor` | `honours` | `postgrad_diploma` | `masters` | `doctorate` | `short_course` | `tvet` | `other`
+- `durationYears` (DECIMAL(3,1), nullable) - Duration in years
+- `description` (TEXT, nullable)
+- `riasecCodes` (string[], default: []) - Matching RIASEC codes
+- `suggestedSubjects` (string[], default: []) - Recommended subjects
+- `fieldOfStudy` (string, nullable)
+- `isActive` (boolean, default: true)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- hasMany → course_requirements (cascade delete)
+- belongsToMany → institutions (through course_institutions)
+- hasMany → course_institutions
+
+#### **course_requirements**
+Entry requirements for courses
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `courseId` (UUID) - FK → courses.id
+- `subject` (string) - Required subject name
+- `minimumGrade` (string) - Minimum grade required
+- `isMandatory` (boolean, default: true)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- belongsTo → courses
+
+#### **course_institutions**
+Many-to-many junction linking courses to institutions
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `courseId` (UUID) - FK → courses.id
+- `institutionId` (UUID) - FK → institutions.id
+- `customRequirements` (JSONB, nullable) - Institution-specific requirements
+- `applicationUrl` (string, nullable)
+- `isActive` (boolean, default: true)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- belongsTo → courses
+- belongsTo → institutions
+
+#### **subjects**
+High school and tertiary subjects with RIASEC mapping
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `name` (string, unique) - Subject name
+- `riasecCodes` (string[], default: []) - Associated RIASEC codes
+- `description` (TEXT, nullable)
+- `level` (ENUM, default: `high_school`) - `high_school` | `tertiary` | `both`
+- `isActive` (boolean, default: true)
+- `displayOrder` (integer, default: 0)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Indexes:**
+- is_active, level, display_order
+
+**Validation:**
+- RIASEC codes must be valid (R, I, A, S, E, C)
+
+#### **school_students**
+Extended profile for school students created by test administrators
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `userId` (UUID, unique) - FK → users.id
+- `institutionId` (UUID) - FK → institutions.id
+- `studentNumber` (string) - Student number
+- `grade` (string, nullable) - Grade/form level
+- `className` (string, nullable) - Class name
+- `academicYear` (integer, nullable)
+- `loginCardPrinted` (boolean, default: false)
+- `loginCardPrintedAt` (DATE, nullable)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- belongsTo → users
+- belongsTo → institutions
 
 #### **institutions**
-Educational institutions in Eswatini
+Educational institutions in Eswatini (20+ institutions seeded)
 
 **Key Fields:**
-- `id` (UUID)
-- `name`, `nameSwati` (optional), `acronym`
-- `type` - `university` | `college` | `tvet` | `school` | `vocational` | `other`
-- `region`, `district`
-- `description`, `descriptionSwati`
-- `phoneNumber`, `email`, `website`
-- `accredited` (boolean)
-- `programs` - JSONB offerings
-- `bursariesAvailable` (boolean)
-- `facilities` - string[]
+- `id` (UUID) - Primary key
+- `name` (string) - Institution name
+- `nameSwati` (string, nullable) - siSwati name
+- `acronym` (string, nullable) - Short name (e.g., UNESWA, SANU)
+- `type` (ENUM, default: `other`) - `university` | `college` | `tvet` | `school` | `vocational` | `other`
+- `region` (ENUM, nullable) - `hhohho` | `manzini` | `lubombo` | `shiselweni` | `multiple`
+- `district` (string, nullable)
+- `description` (TEXT, nullable)
+- `descriptionSwati` (TEXT, nullable)
+- `phoneNumber` (string, nullable)
+- `email` (string, nullable)
+- `website` (string, nullable)
+- `accredited` (boolean, default: false)
+- `bursariesAvailable` (boolean, default: false)
+- `programs` (JSONB, nullable) - Program offerings: `[{ name, code, duration, riasecCodes }]`
+- `facilities` (string[], nullable)
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- hasMany → users (via institutionId)
+- belongsToMany → courses (through course_institutions)
+- hasMany → course_institutions
+- hasMany → school_students
 
 #### **education_levels**
-Lookup table for education level codes
+Lookup table for education level codes (Levels 1-5 from SDS Appendix)
 
 **Key Fields:**
-- `level` (integer) - Primary key
-- `description` (string, required)
+- `id` (UUID) - Primary key
+- `level` (integer, unique) - Education level code (1-5)
+- `description` (string) - Level description
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Associations:**
+- hasMany → occupations (via educationLevel)
+- hasMany → users (via educationLevel)
 
 ---
 
 ### 6. Audit & Compliance
 
 #### **audit_logs**
-Comprehensive activity logging for compliance
+Comprehensive activity logging for compliance and security monitoring
 
-**Fields:**
-- `id` - UUID primary key
-- `userId` - UUID (nullable foreign key)
-- `actionType` - ENUM(LOGIN, REGISTER, TEST_COMPLETE, etc)
-- `description` - String (human-readable summary)
-- `details` - JSONB (technical details/state changes)
-- `ipAddress` - String (client IP)
-- `userAgent` - String (client browser/device)
-- `createdAt` - Timestamp
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `userId` (UUID, nullable) - FK → users.id
+- `actionType` (string, max 100 chars) - Action identifier
+- `description` (string) - Human-readable summary
+- `details` (JSONB, nullable) - Technical details/state changes
+- `ipAddress` (string, nullable) - Client IP address
+- `userAgent` (string, nullable) - Client browser/device
 
-**Action Types:**
-- Authentication: LOGIN, LOGOUT, REGISTER, PASSWORD_RESET
-- Testing: TEST_START, TEST_COMPLETE
-- Profile: PROFILE_UPDATE
-- Security: ACCESS_DENIED, SUSPICIOUS_ACTIVITY
-- Admin: USER_DELETION, SYSTEM_UPDATE
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Indexes:**
+- user_id, action_type, created_at
+
+**Common Action Types:**
+- **Authentication**: LOGIN, LOGOUT, REGISTER, PASSWORD_RESET, PASSWORD_CHANGE
+- **Testing**: TEST_START, TEST_COMPLETE, ASSESSMENT_STARTED, ASSESSMENT_COMPLETED
+- **Profile**: PROFILE_UPDATE, USER_CREATED, USER_UPDATED, USER_DELETED
+- **Security**: ACCESS_DENIED, PERMISSION_DENIED, SUSPICIOUS_ACTIVITY
+- **Admin**: ADMIN_ACTION, SYSTEM_UPDATE, PERMISSION_GRANTED, PERMISSION_REVOKED
 
 **Logging Pattern:**
 ```javascript
@@ -201,8 +457,29 @@ logger.info({
 });
 ```
 
-**Validation Notes:**
-- `actionType` must match defined enum values in the model
+**Associations:**
+- belongsTo → users
+
+#### **certificates**
+Generated certificates for completed assessments
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `assessmentId` (UUID, unique) - FK → assessments.id
+- `userId` (UUID) - FK → users.id
+- `generatedBy` (UUID, nullable) - User who generated the certificate
+- `generatedAt` (DATE, default: NOW)
+- `certNumber` (string, max 50, nullable) - Certificate number
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Indexes:**
+- assessment_id (unique), user_id, generated_at
+
+**Associations:**
+- belongsTo → assessments
+- belongsTo → users
 
 ---
 
@@ -210,16 +487,29 @@ logger.info({
 
 ### One-to-Many
 - User → Assessments (user can take multiple assessments)
-- Assessment → Answers (assessment has many answers)
+- User → AuditLogs (user activity tracking)
+- Assessment → Answers (assessment has many answers, cascade delete)
+- Question → Answers (question can have many responses)
 - Institution → Users (optional affiliation)
+- Institution → SchoolStudents (school enrollment)
 - EducationLevel → Users (via educationLevel)
 - EducationLevel → Occupations (via educationLevel)
+- Course → CourseRequirements (entry requirements, cascade delete)
+- Course → CourseInstitutions (where course is offered)
+- Institution → CourseInstitutions (courses offered)
 
 ### One-to-One
-- (none currently — results are embedded on assessments)
+- User → SchoolStudent (extended school student profile)
+- Assessment → Certificate (one certificate per completed assessment)
 
 ### Many-to-Many
-- (none documented in current models)
+- User ↔ Permission (through user_permissions) - Enterprise RBAC
+- Course ↔ Institution (through course_institutions) - Course offerings
+
+### Foreign Key Constraints
+- All UUIDs use proper foreign key references
+- Cascade deletes configured where appropriate (answers, course_requirements)
+- Nullable foreign keys for optional relationships
 
 ---
 
@@ -228,19 +518,48 @@ logger.info({
 ### Performance Indexes
 ```sql
 -- User lookups
-users(email), users(national_id), users(role), users(institution_id), users(education_level), users(is_active), users(is_email_verified)
+users(username) UNIQUE
+users(email) UNIQUE
+users(national_id) UNIQUE
+users(student_number) UNIQUE
+users(student_code) UNIQUE
+users(institution_id)
+users(role)
+users(user_type)
+users(education_level)
+users(is_active)
+users(is_email_verified)
 
 -- Assessments
-assessments(user_id), assessments(status), assessments(completed_at), assessments(user_id, status), assessments(holland_code), assessments(created_at)
+assessments(user_id)
+assessments(status)
+assessments(completed_at)
+assessments(user_id, status)
+assessments(holland_code)
+assessments(created_at)
 
 -- Answers
-answers(assessment_id, question_id) UNIQUE, answers(question_id), answers(assessment_id), answers(section), answers(riasec_type), answers(assessment_id, section)
+answers(assessment_id, question_id) UNIQUE
+answers(question_id)
+answers(assessment_id)
+answers(section)
+answers(riasec_type)
+answers(assessment_id, section)
 
--- Career matching
-occupations(primary_riasec), occupations(holland_codes) USING GIN
+-- Subjects
+subjects(is_active)
+subjects(level)
+subjects(display_order)
+
+-- Certificates
+certificates(assessment_id) UNIQUE
+certificates(user_id)
+certificates(generated_at)
 
 -- Audit trails
-audit_logs(user_id), audit_logs(action_type), audit_logs(created_at)
+audit_logs(user_id)
+audit_logs(action_type)
+audit_logs(created_at)
 ```
 
 ---
@@ -424,6 +743,43 @@ For questions or issues:
 
 ---
 
-**Version:** 1.0  
-**Last Updated:** January 2026  
+---
+
+## Database Migrations
+
+All schema changes are managed through Sequelize migrations in `/backend/migrations/`:
+
+1. `20260126170000-enable-uuid-extension.js` - Enable UUID extension
+2. `20260126180000-create-education-levels.js` - Education levels table
+3. `20260126180100-create-institutions.js` - Institutions table
+4. `20260126180200-create-users.js` - Users table with RBAC
+5. `20260126180300-create-assessments.js` - Assessments table
+6. `20260126180400-create-answers.js` - Answers table
+7. `20260126180500-create-questions.js` - Questions table
+8. `20260126180600-create-occupations.js` - Occupations table
+9. `20260126180700-create-audit-logs.js` - Audit logs table
+10. `20260310100100-create-courses.js` - Courses table
+11. `20260310100200-create-course-requirements.js` - Course requirements table
+12. `20260310100300-create-course-institutions.js` - Course-institution junction
+13. `20260310100400-create-school-students.js` - School students table
+14. `20260312000002-create-subjects.js` - Subjects table
+15. `20260312170000-create-permissions-system.js` - Permissions & user_permissions
+16. `20260313000001-create-certificates.js` - Certificates table
+
+**Migration Commands:**
+```bash
+# Run all pending migrations
+npx sequelize-cli db:migrate
+
+# Undo last migration
+npx sequelize-cli db:migrate:undo
+
+# Undo all migrations
+npx sequelize-cli db:migrate:undo:all
+```
+
+---
+
+**Version:** 2.0  
+**Last Updated:** March 2026  
 **Ministry of Labour and Social Security - Kingdom of Eswatini**

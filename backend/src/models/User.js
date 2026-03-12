@@ -165,8 +165,8 @@ module.exports = (sequelize, DataTypes) => {
     
     // User Role & Status
     role: {
-      type: DataTypes.ENUM('admin', 'counselor', 'user'),
-      defaultValue: 'user',
+      type: DataTypes.ENUM('System Administrator', 'Test Administrator', 'Test Taker'),
+      defaultValue: 'Test Taker',
       allowNull: false
     },
     isActive: {
@@ -179,10 +179,10 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
       field: 'is_email_verified'
     },
-    createdByCounselor: {
+    createdByTestAdministrator: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
-      field: 'created_by_counselor'
+      field: 'created_by_test_administrator'
     },
     emailVerificationToken: {
       type: DataTypes.STRING,
@@ -244,7 +244,7 @@ module.exports = (sequelize, DataTypes) => {
     
     // Extended user journey fields
     userType: {
-      type: DataTypes.ENUM('school_student', 'university_student', 'professional', 'counselor', 'admin'),
+      type: DataTypes.ENUM('High School Student', 'University Student', 'Professional', 'Test Administrator', 'System Administrator'),
       allowNull: true,
       field: 'user_type'
     },
@@ -281,16 +281,36 @@ module.exports = (sequelize, DataTypes) => {
       field: 'years_experience'
     },
 
-    // Counselor-specific fields
-    counselorCode: {
+    // Professional workplace fields
+    workplaceInstitutionId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'workplace_institution_id'
+    },
+    workplaceName: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'workplace_name'
+    },
+
+    // Test Administrator-specific fields
+    testAdministratorCode: {
       type: DataTypes.STRING,
       unique: true,
       allowNull: true,
-      field: 'counselor_code'
+      field: 'test_administrator_code'
     },
     organization: {
       type: DataTypes.STRING,
       allowNull: true
+    },
+
+    // Password management
+    mustChangePassword: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      field: 'must_change_password'
     }
   }, {
     tableName: 'users',
@@ -390,6 +410,18 @@ module.exports = (sequelize, DataTypes) => {
     User.hasOne(models.SchoolStudent, {
       foreignKey: 'userId',
       as: 'schoolStudent'
+    });
+
+    User.belongsToMany(models.Permission, {
+      through: models.UserPermission,
+      foreignKey: 'userId',
+      otherKey: 'permissionId',
+      as: 'permissions'
+    });
+
+    User.hasMany(models.UserQualification, {
+      foreignKey: 'userId',
+      as: 'qualifications'
     });
   };
   

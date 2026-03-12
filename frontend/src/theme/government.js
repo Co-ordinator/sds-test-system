@@ -39,6 +39,7 @@ export const TYPO = {
   label: 'text-xs font-medium',
   /* Level 5: captions, overlines */
   caption: 'text-xs uppercase tracking-wide',
+  ministryBanner: 'text-xs sm:text-sm font-semibold tracking-[0.02em]',
   /* Level 6: hints, tooltips, notes – always pair with GOV.textHint */
   hint: 'text-xs',
 };

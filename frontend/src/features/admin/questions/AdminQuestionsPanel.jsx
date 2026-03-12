@@ -4,6 +4,7 @@ import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { useToast, Toast, ErrorBanner } from '../../../components/ui/StatusIndicators';
 import { adminService } from '../../../services/adminService';
+import { PermissionGate } from '../../../context/PermissionContext';
 
 const EMPTY_Q = { text: '', section: 'activities', riasecType: 'R', order: '' };
 
@@ -92,8 +93,12 @@ const AdminQuestionsPanel = () => {
       key: 'actions', header: 'Actions', stopPropagation: true,
       render: (q) => (
         <div className="flex items-center gap-1">
-          <button type="button" onClick={() => setEditingQuestion({ ...q })} className="p-1 rounded hover:bg-blue-50"><Edit2 className="w-3 h-3" style={{ color: GOV.blue }} /></button>
-          <button type="button" onClick={() => handleDelete(q.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3 h-3 text-red-500" /></button>
+          <PermissionGate permission="questions.update">
+            <button type="button" onClick={() => setEditingQuestion({ ...q })} className="p-1 rounded hover:bg-blue-50"><Edit2 className="w-3 h-3" style={{ color: GOV.blue }} /></button>
+          </PermissionGate>
+          <PermissionGate permission="questions.delete">
+            <button type="button" onClick={() => handleDelete(q.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3 h-3 text-red-500" /></button>
+          </PermissionGate>
         </div>
       ),
     },
@@ -103,13 +108,17 @@ const AdminQuestionsPanel = () => {
     <>
       <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Question Bank ({questions.length} total)</h3>
       <div className="ml-auto flex items-center gap-2">
-        <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>
-          <Upload className="w-3 h-3" /> Import CSV
-          <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
-        </label>
-        <button type="button" onClick={() => adminService.exportQuestions().catch(() => showToast('Export failed', 'error'))} className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold" style={{ borderColor: GOV.border, color: GOV.blue }}>
-          <Download className="w-3 h-3" /> Export CSV
-        </button>
+        <PermissionGate permission="questions.import">
+          <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>
+            <Upload className="w-3 h-3" /> Import CSV
+            <input type="file" accept=".csv" className="hidden" onChange={handleImport} />
+          </label>
+        </PermissionGate>
+        <PermissionGate permission="questions.export">
+          <button type="button" onClick={() => adminService.exportQuestions().catch(() => showToast('Export failed', 'error'))} className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold" style={{ borderColor: GOV.border, color: GOV.blue }}>
+            <Download className="w-3 h-3" /> Export CSV
+          </button>
+        </PermissionGate>
       </div>
     </>
   );
@@ -125,6 +134,7 @@ const AdminQuestionsPanel = () => {
         </div>
 
         {/* Add Question Panel */}
+        <PermissionGate permission="questions.create">
         <div className="bg-white rounded-md border p-5" style={{ borderColor: GOV.border }}>
           <h4 className={`${TYPO.cardTitle} mb-4 flex items-center gap-2`} style={{ color: GOV.text }}><Plus className="w-4 h-4" /> Add Question</h4>
           <form className="space-y-3" onSubmit={handleCreate}>
@@ -158,6 +168,7 @@ const AdminQuestionsPanel = () => {
             </button>
           </form>
         </div>
+        </PermissionGate>
       </div>
 
       {/* Edit Modal */}

@@ -11,7 +11,7 @@ const PDFDocument = require('pdfkit');
  */
 
 const resolveInstitutionId = (actor, queryParam) => {
-  if (actor.role === 'admin') return queryParam || null;
+  if (actor.role === 'System Administrator') return queryParam || null;
   return actor.institutionId || null;
 };
 
@@ -20,7 +20,7 @@ const getMyStudents = async (req, res, next) => {
     const actor = await User.findByPk(req.user.id);
     const institutionId = resolveInstitutionId(actor, req.query.institutionId);
 
-    const where = { role: 'user' };
+    const where = { role: 'Test Taker' };
     if (institutionId) where.institutionId = institutionId;
 
     const students = await User.findAll({
@@ -97,7 +97,7 @@ const getInstitutionStats = async (req, res, next) => {
       return res.status(200).json({ status: 'success', data: { stats: null } });
     }
 
-    const studentWhere = { institutionId, role: 'user' };
+    const studentWhere = { institutionId, role: 'Test Taker' };
     const totalStudents = await User.count({ where: studentWhere });
     const studentsWithAssessments = await User.count({
       where: studentWhere,
@@ -195,13 +195,13 @@ const importStudents = async (req, res, next) => {
 const deleteStudent = async (req, res, next) => {
   try {
     const actor = await User.findByPk(req.user.id);
-    const student = await User.findOne({ where: { id: req.params.studentId, role: 'user' } });
+    const student = await User.findOne({ where: { id: req.params.studentId, role: 'Test Taker' } });
 
     if (!student) {
       return res.status(404).json({ status: 'error', message: 'Student not found' });
     }
 
-    if (actor.role === 'counselor' && student.institutionId !== actor.institutionId) {
+    if (actor.role === 'Test Administrator' && student.institutionId !== actor.institutionId) {
       return res.status(403).json({ status: 'error', message: 'Not authorized to manage this student' });
     }
 
@@ -223,13 +223,13 @@ const deleteStudent = async (req, res, next) => {
 const updateStudent = async (req, res, next) => {
   try {
     const actor = await User.findByPk(req.user.id);
-    const student = await User.findOne({ where: { id: req.params.studentId, role: 'user' } });
+    const student = await User.findOne({ where: { id: req.params.studentId, role: 'Test Taker' } });
 
     if (!student) {
       return res.status(404).json({ status: 'error', message: 'Student not found' });
     }
 
-    if (actor.role === 'counselor' && student.institutionId !== actor.institutionId) {
+    if (actor.role === 'Test Administrator' && student.institutionId !== actor.institutionId) {
       return res.status(403).json({ status: 'error', message: 'Not authorized to manage this student' });
     }
 
@@ -252,13 +252,13 @@ const updateStudent = async (req, res, next) => {
 const getStudentResults = async (req, res, next) => {
   try {
     const actor = await User.findByPk(req.user.id);
-    const student = await User.findOne({ where: { id: req.params.studentId, role: 'user' } });
+    const student = await User.findOne({ where: { id: req.params.studentId, role: 'Test Taker' } });
 
     if (!student) {
       return res.status(404).json({ status: 'error', message: 'Student not found' });
     }
 
-    if (actor.role === 'counselor' && student.institutionId !== actor.institutionId) {
+    if (actor.role === 'Test Administrator' && student.institutionId !== actor.institutionId) {
       return res.status(403).json({ status: 'error', message: 'Not authorized to view this student' });
     }
 
@@ -306,7 +306,7 @@ const generateLoginCards = async (req, res, next) => {
       return res.status(404).json({ status: 'error', message: 'Institution not found' });
     }
 
-    const where = { institutionId, role: 'user' };
+    const where = { institutionId, role: 'Test Taker' };
     if (req.query.grade) {
       const gradeFilter = req.query.grade;
       where[Op.or] = [

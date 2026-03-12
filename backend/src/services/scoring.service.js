@@ -1,18 +1,5 @@
-const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, CourseRequirement, CourseInstitution, Institution, sequelize } = require('../models');
+const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, CourseRequirement, CourseInstitution, Institution, Subject, sequelize } = require('../models');
 const { Op } = require('sequelize');
-
-/**
- * Holland Code → Suggested High School Subjects mapping
- * Used to populate the "Suggested Subjects" section of career reports.
- */
-const HOLLAND_SUBJECTS = {
-  R: ['Mathematics', 'Physical Science', 'Technical Drawing', 'Agricultural Science', 'Computer Science'],
-  I: ['Mathematics', 'Physical Science', 'Biology', 'Chemistry', 'Computer Science'],
-  A: ['Art', 'Music', 'English Language', 'Literature', 'Drama', 'Design & Technology'],
-  S: ['Biology', 'English Language', 'History', 'Religious Education', 'Home Economics'],
-  E: ['Business Studies', 'Economics', 'Accounting', 'English Language', 'Mathematics'],
-  C: ['Accounting', 'Business Studies', 'Mathematics', 'Computer Science', 'Economics']
-};
 
 /**
  * Holland Code → Career Focus description per user type
@@ -64,11 +51,54 @@ class ScoringService {
         }
       });
 
-      const hollandCode = Object.entries(totals)
-        .sort(([, valA], [, valB]) => valB - valA)
-        .slice(0, 3)
-        .map(([key]) => key)
-        .join('');
+      // Calculate Holland code with tie handling (slash format for ties)
+      const sorted = Object.entries(totals).sort(([, valA], [, valB]) => valB - valA);
+      
+      const hollandParts = [];
+      let currentGroup = [];
+      let currentScore = null;
+      let totalLetters = 0;
+      
+      for (const [letter, score] of sorted) {
+        if (totalLetters >= 6) break;
+        
+        if (currentScore === null || score === currentScore) {
+          currentGroup.push(letter);
+          currentScore = score;
+        } else {
+          if (currentGroup.length > 0) {
+            hollandParts.push(currentGroup.join('/'));
+            totalLetters += currentGroup.length;
+          }
+          if (totalLetters >= 6) break;
+          currentGroup = [letter];
+          currentScore = score;
+        }
+      }
+      
+      if (currentGroup.length > 0 && totalLetters < 6) {
+        const remaining = 6 - totalLetters;
+        if (currentGroup.length <= remaining) {
+          hollandParts.push(currentGroup.join('/'));
+          totalLetters += currentGroup.length;
+        } else {
+          hollandParts.push(currentGroup.slice(0, remaining).join('/'));
+        }
+      }
+      
+      let hollandCode = hollandParts.join('');
+      const letterCount = hollandCode.replace(/\//g, '').length;
+      
+      if (letterCount < 3) {
+        const usedLetters = new Set(hollandCode.replace(/\//g, '').split(''));
+        const additionalLetters = sorted
+          .map(([letter]) => letter)
+          .filter(letter => !usedLetters.has(letter))
+          .slice(0, 3 - letterCount);
+        hollandCode = hollandCode + additionalLetters.join('');
+      }
+      
+      hollandCode = hollandCode || 'RIA';
 
       await assessment.update({
         scoreR: totals.R,
@@ -126,16 +156,36 @@ class ScoringService {
   }
 
   /**
-   * Get suggested subjects for a Holland code (top 3 letters).
-   * Returns deduplicated list of subjects relevant to the code.
+   * Get suggested subjects for a Holland code.
+   * Returns deduplicated list of subjects relevant to the code from database.
    */
-  getSuggestedSubjects(hollandCode) {
+  async getSuggestedSubjects(hollandCode, transaction = null) {
     if (!hollandCode) return [];
-    const subjects = new Set();
-    hollandCode.split('').forEach(letter => {
-      (HOLLAND_SUBJECTS[letter] || []).forEach(s => subjects.add(s));
-    });
-    return Array.from(subjects).slice(0, 8);
+    
+    try {
+      const opts = transaction ? { transaction } : {};
+      const cleanCode = hollandCode.replace(/\//g, '');
+      const letters = cleanCode.split('');
+      
+      const subjects = await Subject.findAll({
+        where: {
+          isActive: true,
+          [Op.or]: letters.map(letter => 
+            sequelize.where(
+              sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
+              { [Op.iLike]: `%${letter}%` }
+            )
+          )
+        },
+        order: [['display_order', 'ASC'], ['name', 'ASC']],
+        limit: 10,
+        ...opts
+      });
+      
+      return subjects.map(s => s.name);
+    } catch (err) {
+      return [];
+    }
   }
 
   /**
@@ -214,8 +264,8 @@ class ScoringService {
       courses = [];
     }
 
-    // 4. Suggested subjects from Holland code
-    const suggestedSubjects = this.getSuggestedSubjects(code);
+    // 4. Suggested subjects from Holland code (dynamic from database)
+    const suggestedSubjects = await this.getSuggestedSubjects(code, transaction);
 
     return {
       occupations,

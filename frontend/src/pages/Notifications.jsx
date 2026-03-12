@@ -43,6 +43,7 @@ const Notifications = () => {
   const getNotificationLink = (n) => {
     const t = n.actionType || '';
     const d = n.details || {};
+    if (t === 'CERTIFICATE_READY' && d.assessmentId) return `/dashboard`;
     if (t === 'assessment_completed' && d.assessmentId) return `/results?assessmentId=${d.assessmentId}`;
     if (t === 'assessment_completed') return '/admin/results';
     if (t === 'user_registered' || t === 'user_created') return '/admin/users';

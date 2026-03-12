@@ -83,13 +83,18 @@ export const useToast = () => {
 
 export const RoleBadge = ({ role }) => {
   const styles = {
-    admin: 'bg-purple-50 text-purple-700 border-purple-200',
-    counselor: 'bg-blue-50 text-blue-700 border-blue-200',
-    user: 'bg-gray-50 text-gray-600 border-gray-200',
+    'System Administrator': 'bg-purple-50 text-purple-700 border-purple-200',
+    'Test Administrator': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Test Taker': 'bg-green-50 text-green-700 border-green-200',
+  };
+  const labels = {
+    'System Administrator': 'Sys Admin',
+    'Test Administrator': 'Test Admin',
+    'Test Taker': 'Test Taker',
   };
   return (
-    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase ${styles[role] || styles.user}`}>
-      {role === 'user' ? 'student' : role}
+    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase ${styles[role] || styles['Test Taker']}`}>
+      {labels[role] || role}
     </span>
   );
 };

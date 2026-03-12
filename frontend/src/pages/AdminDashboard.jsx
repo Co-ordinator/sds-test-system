@@ -5,6 +5,7 @@ import {
 import FilterDialog from '../components/ui/FilterDialog';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { PermissionGate } from '../context/PermissionContext';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import { adminService } from '../services/adminService';
@@ -254,26 +255,32 @@ const AdminDashboard = () => {
             <p className="text-sm mt-1" style={{ color: GOV.textMuted }}>Welcome back, {displayName}. Here's your system overview.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button type="button" onClick={() => handleExport('users')} disabled={exporting === 'users'}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              style={{ borderColor: GOV.border, color: GOV.blue }}>
-              <Download className="w-3.5 h-3.5" /> {exporting === 'users' ? 'Exporting...' : 'Export Users'}
-            </button>
-            <button type="button" onClick={() => handleExport('assessments')} disabled={exporting === 'assessments'}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              style={{ borderColor: GOV.border, color: GOV.blue }}>
-              <Download className="w-3.5 h-3.5" /> {exporting === 'assessments' ? 'Exporting...' : 'Export Results'}
-            </button>
-            <button type="button" onClick={() => handleAnalyticsExport('csv')} disabled={exporting === 'analytics-csv'}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              style={{ borderColor: GOV.border, color: GOV.blue }}>
-              <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-csv' ? 'Exporting...' : 'National CSV'}
-            </button>
-            <button type="button" onClick={() => handleAnalyticsExport('pdf')} disabled={exporting === 'analytics-pdf'}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
-              style={{ backgroundColor: GOV.blue }}>
-              <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-pdf' ? 'Exporting...' : 'National PDF'}
-            </button>
+            <PermissionGate permission="users.export">
+              <button type="button" onClick={() => handleExport('users')} disabled={exporting === 'users'}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                style={{ borderColor: GOV.border, color: GOV.blue }}>
+                <Download className="w-3.5 h-3.5" /> {exporting === 'users' ? 'Exporting...' : 'Export Users'}
+              </button>
+            </PermissionGate>
+            <PermissionGate permission="results.export">
+              <button type="button" onClick={() => handleExport('assessments')} disabled={exporting === 'assessments'}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                style={{ borderColor: GOV.border, color: GOV.blue }}>
+                <Download className="w-3.5 h-3.5" /> {exporting === 'assessments' ? 'Exporting...' : 'Export Results'}
+              </button>
+            </PermissionGate>
+            <PermissionGate permission="analytics.export">
+              <button type="button" onClick={() => handleAnalyticsExport('csv')} disabled={exporting === 'analytics-csv'}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                style={{ borderColor: GOV.border, color: GOV.blue }}>
+                <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-csv' ? 'Exporting...' : 'National CSV'}
+              </button>
+              <button type="button" onClick={() => handleAnalyticsExport('pdf')} disabled={exporting === 'analytics-pdf'}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
+                style={{ backgroundColor: GOV.blue }}>
+                <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-pdf' ? 'Exporting...' : 'National PDF'}
+              </button>
+            </PermissionGate>
           </div>
         </div>
 

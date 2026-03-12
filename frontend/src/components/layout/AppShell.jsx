@@ -1,41 +1,39 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
   Users, BarChart2, Settings, Menu, X, Building2, Briefcase, Bell
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { GOV } from '../../theme/government';
+import { usePermissions } from '../../context/PermissionContext';
+import { GOV, TYPO } from '../../theme/government';
 import { useNotificationCount } from '../../hooks/useNotificationCount';
 
-const NAV_LINKS = {
-  admin: [
-    { to: '/admin/dashboard', label: 'Dashboard', Icon: Home },
-    { to: '/admin/users', label: 'Users', Icon: Users },
-    { to: '/admin/institutions', label: 'Institutions', Icon: Building2 },
-    { to: '/admin/occupations', label: 'Occupations', Icon: Briefcase },
-    { to: '/admin/analytics', label: 'Analytics', Icon: BarChart2 },
-    { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true },
-  ],
-  counselor: [
-    { to: '/counselor', label: 'Dashboard', Icon: Home },
-  ],
-  user: [
-    { to: '/dashboard', label: 'Dashboard', Icon: Home },
-    { to: '/profile', label: 'Profile', Icon: User },
-  ],
-};
+// All possible admin nav links with required permissions
+const ADMIN_NAV_LINKS = [
+  { to: '/admin/dashboard', label: 'Dashboard', Icon: Home, permission: null },
+  { to: '/admin/users', label: 'Users', Icon: Users, permission: 'users.view' },
+  { to: '/admin/institutions', label: 'Institutions', Icon: Building2, permission: 'institutions.view' },
+  { to: '/admin/occupations', label: 'Occupations', Icon: Briefcase, permission: 'occupations.view' },
+  { to: '/admin/analytics', label: 'Analytics', Icon: BarChart2, permission: 'analytics.view' },
+  { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true, permission: 'notifications.view' },
+];
+
+const TEST_TAKER_NAV = [
+  { to: '/dashboard', label: 'Dashboard', Icon: Home },
+  { to: '/profile', label: 'Profile', Icon: User },
+];
 
 const ROLE_LABELS = {
-  admin: 'Administrator',
-  counselor: 'Counselor',
-  user: 'Student',
+  'System Administrator': 'System Administrator',
+  'Test Administrator': 'Test Administrator',
+  'Test Taker': 'Test Taker',
 };
 
 const ROLE_COLORS = {
-  admin: { bg: '#ede9fe', text: '#6d28d9' },
-  counselor: { bg: '#dbeafe', text: '#1d4ed8' },
-  user: { bg: '#f0fdf4', text: '#15803d' },
+  'System Administrator': { bg: '#ede9fe', text: '#6d28d9' },
+  'Test Administrator': { bg: '#dbeafe', text: '#1d4ed8' },
+  'Test Taker': { bg: '#f0fdf4', text: '#15803d' },
 };
 
 const BREADCRUMB_MAP = {
@@ -48,8 +46,8 @@ const BREADCRUMB_MAP = {
   '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Audit Log' }],
   '/admin/analytics': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Analytics' }],
   '/admin/notifications': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Notifications' }],
-  '/counselor': [{ label: 'Counselor' }],
-  '/counselor/dashboard': [{ label: 'Counselor' }],
+  '/test-administrator': [{ label: 'Test Administrator' }],
+  '/counselor': [{ label: 'Test Administrator' }],
   '/dashboard': [{ label: 'Dashboard' }],
   '/profile': [{ label: 'Profile' }],
   '/results': [{ label: 'Dashboard', to: '/dashboard' }, { label: 'Results' }],
@@ -57,16 +55,23 @@ const BREADCRUMB_MAP = {
 
 export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
   const { user, logout } = useAuth();
+  const { hasPermission } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const role = user?.role || 'user';
-  const navLinks = NAV_LINKS[role] || NAV_LINKS.user;
+  const role = user?.role || 'Test Taker';
+  const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
+  const navLinks = useMemo(() => {
+    if (isAdminLike) {
+      return ADMIN_NAV_LINKS.filter(link => !link.permission || hasPermission(link.permission));
+    }
+    return TEST_TAKER_NAV;
+  }, [isAdminLike, hasPermission]);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
-  const notificationCount = useNotificationCount(role === 'admin');
-  const roleLabel = ROLE_LABELS[role] || 'User';
-  const roleColor = ROLE_COLORS[role] || ROLE_COLORS.user;
+  const notificationCount = useNotificationCount(isAdminLike);
+  const roleLabel = ROLE_LABELS[role] || 'Test Taker';
+  const roleColor = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
 
   const breadcrumbs = customBreadcrumbs || BREADCRUMB_MAP[location.pathname] || [];
 
@@ -91,7 +96,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
         style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.border }}
       >
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[11px]" style={{ color: GOV.textMuted }}>
+          <p className={TYPO.ministryBanner} style={{ color: GOV.blue }}>
             Ministry of Labour &amp; Social Security · Kingdom of Eswatini
           </p>
         </div>
@@ -194,7 +199,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
                       <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
                     </Link>
 
-                    {role === 'admin' && (
+                    {isAdminLike && (
                       <Link
                         to="/admin/dashboard"
                         className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
@@ -202,17 +207,6 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
                         onClick={() => setUserMenuOpen(false)}
                       >
                         <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Admin Dashboard
-                      </Link>
-                    )}
-
-                    {role === 'counselor' && (
-                      <Link
-                        to="/counselor"
-                        className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
-                        style={{ color: GOV.text }}
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Home className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Counselor Dashboard
                       </Link>
                     )}
 

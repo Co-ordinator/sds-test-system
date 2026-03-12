@@ -24,3 +24,7 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# User uploaded files — ignore contents, keep directory structure
+backend/uploads/**
+!backend/uploads/**/.gitkeep

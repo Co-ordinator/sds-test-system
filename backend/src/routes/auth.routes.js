@@ -43,4 +43,7 @@ router.post('/refresh-token', authController.refreshToken);
 // Logout
 router.post('/logout', authController.logout);
 
+// Change password (authenticated users)
+router.post('/change-password', verifyToken, validate(authValidation.changePassword), authController.changePassword);
+
 module.exports = router;

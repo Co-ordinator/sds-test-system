@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { MapPin, Info, Globe, User, Building2, Pencil, Check, Search, GraduationCap, BookOpen, Briefcase } from 'lucide-react';
 import { GOV, TYPO } from '../theme/government';
+import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 
 const USER_TYPE_META = {
   school_student: { label: 'High School Student', Icon: GraduationCap, color: '#1e3a5f', step2Label: 'Your School', step3Label: 'Academic Details' },
@@ -93,6 +94,8 @@ export default function Onboarding() {
     townCity: '',
     areaNeighborhood: '',
     schoolUniversity: '',
+    workplaceName: '',
+    workplaceInstitutionId: null,
     preferredLanguage: 'English',
     highestGrade: 'Form 5 / O-Level (Senior Secondary)',
     degreeProgram: '',
@@ -143,7 +146,9 @@ export default function Onboarding() {
       region: REGION_TO_BACKEND[form.region] || (form.region ? form.region.toLowerCase() : null),
       district: (form.townCity || '').trim() || null,
       address: (form.areaNeighborhood || '').trim() || null,
-      currentInstitution: (form.schoolUniversity || '').trim() || null,
+      currentInstitution: userType !== 'professional' ? ((form.schoolUniversity || '').trim() || null) : null,
+      workplaceName: userType === 'professional' ? ((form.workplaceName || '').trim() || null) : null,
+      workplaceInstitutionId: userType === 'professional' ? (form.workplaceInstitutionId || null) : null,
       preferredLanguage: LANGUAGE_TO_BACKEND[form.preferredLanguage] ?? (form.preferredLanguage === 'SiSwati' ? 'ss' : 'en'),
       gradeLevel: (form.highestGrade || '').trim() || null,
       degreeProgram: (form.degreeProgram || '').trim() || null,
@@ -414,57 +419,75 @@ export default function Onboarding() {
                   style={{ borderBottomColor: GOV.border, color: GOV.text }}
                 />
               </div>
-              <div className="sm:col-span-2 relative" ref={schoolDropdownRef}>
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current School / University *</label>
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: GOV.textHint }} aria-hidden />
-                  <input
-                    type="text"
-                    value={schoolDropdownOpen ? schoolQuery : form.schoolUniversity}
-                    onChange={(e) => {
-                      setSchoolQuery(e.target.value);
-                      setSchoolDropdownOpen(true);
+              {userType === 'professional' ? (
+                <div className="sm:col-span-2">
+                  <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Workplace / Employer</label>
+                  <WorkplaceSearchInput
+                    value={form.workplaceName}
+                    institutionId={form.workplaceInstitutionId}
+                    onChange={(name, id) => {
+                      update('workplaceName', name);
+                      update('workplaceInstitutionId', id);
                     }}
-                    onFocus={() => {
-                      setSchoolQuery(form.schoolUniversity);
-                      setSchoolDropdownOpen(true);
-                    }}
-                    placeholder="Search or select school..."
-                    className={`form-control-with-icon pl-8 ${TYPO.body}`}
-                    style={{ borderBottomColor: GOV.border, color: GOV.text }}
-                    autoComplete="off"
+                    placeholder="Search for your employer or organisation..."
                   />
+                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
+                    Type to search registered organisations, or enter your workplace name.
+                  </p>
                 </div>
-                {schoolDropdownOpen && (
-                  <ul
-                    className="absolute z-10 left-0 right-0 mt-0.5 py-0.5 rounded-md border overflow-auto max-h-40 bg-white"
-                    style={{ borderColor: GOV.border }}
-                  >
-                    {filteredSchools.length > 0 ? (
-                      filteredSchools.map((inst) => (
-                        <li key={inst}>
-                          <button
-                            type="button"
-                            className={`w-full text-left px-3 py-1.5 ${TYPO.bodySmall} hover:bg-gray-100 transition-colors`}
-                            style={{ color: GOV.text }}
-                            onClick={() => {
-                              update('schoolUniversity', inst);
-                              setSchoolQuery(inst);
-                              setSchoolDropdownOpen(false);
-                            }}
-                          >
-                            {inst}
-                          </button>
+              ) : (
+                <div className="sm:col-span-2 relative" ref={schoolDropdownRef}>
+                  <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current School / University *</label>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: GOV.textHint }} aria-hidden />
+                    <input
+                      type="text"
+                      value={schoolDropdownOpen ? schoolQuery : form.schoolUniversity}
+                      onChange={(e) => {
+                        setSchoolQuery(e.target.value);
+                        setSchoolDropdownOpen(true);
+                      }}
+                      onFocus={() => {
+                        setSchoolQuery(form.schoolUniversity);
+                        setSchoolDropdownOpen(true);
+                      }}
+                      placeholder="Search or select school..."
+                      className={`form-control-with-icon pl-8 ${TYPO.body}`}
+                      style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                      autoComplete="off"
+                    />
+                  </div>
+                  {schoolDropdownOpen && (
+                    <ul
+                      className="absolute z-10 left-0 right-0 mt-0.5 py-0.5 rounded-md border overflow-auto max-h-40 bg-white"
+                      style={{ borderColor: GOV.border }}
+                    >
+                      {filteredSchools.length > 0 ? (
+                        filteredSchools.map((inst) => (
+                          <li key={inst}>
+                            <button
+                              type="button"
+                              className={`w-full text-left px-3 py-1.5 ${TYPO.bodySmall} hover:bg-gray-100 transition-colors`}
+                              style={{ color: GOV.text }}
+                              onClick={() => {
+                                update('schoolUniversity', inst);
+                                setSchoolQuery(inst);
+                                setSchoolDropdownOpen(false);
+                              }}
+                            >
+                              {inst}
+                            </button>
+                          </li>
+                        ))
+                      ) : (
+                        <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
+                          No school found. Type to search.
                         </li>
-                      ))
-                    ) : (
-                      <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                        No school found. Type to search.
-                      </li>
-                    )}
-                  </ul>
-                )}
-              </div>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
             <div className="px-4 pb-4">
               <div className="rounded-md border p-3 flex gap-2.5" style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.blueLight }}>
@@ -474,7 +497,9 @@ export default function Onboarding() {
                 <div>
                   <p className={`font-semibold ${TYPO.hint} mb-0.5`} style={{ color: GOV.text }}>Why do we need this?</p>
                   <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-                    Your region and institution help the Ministry tailor career guidance and SDS reporting.
+                    {userType === 'professional'
+                      ? 'Your region and workplace help the Ministry map workforce distribution and career trends.'
+                      : 'Your region and institution help the Ministry tailor career guidance and SDS reporting.'}
                   </p>
                 </div>
               </div>
@@ -705,10 +730,17 @@ export default function Onboarding() {
                     <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Town / City</td>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.townCity || '—'}</td>
                   </tr>
-                  <tr className="border-b" style={{ borderColor: GOV.border }}>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>School / University</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.schoolUniversity || '—'}</td>
-                  </tr>
+                  {userType === 'professional' ? (
+                    <tr className="border-b" style={{ borderColor: GOV.border }}>
+                      <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Workplace</td>
+                      <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.workplaceName || '—'}</td>
+                    </tr>
+                  ) : (
+                    <tr className="border-b" style={{ borderColor: GOV.border }}>
+                      <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>School / University</td>
+                      <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.schoolUniversity || '—'}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
