@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.12.2] - 2026-03-13
 
+### Changed — Regional Map GeoJSON Integration
+- **`frontend/src/data/regionsGeoJson.js`** — Embedded precise boundary data from `Regions.geojson` (734KB detailed GeoJSON with accurate Eswatini regional boundaries) as JavaScript module export
+- **`frontend/src/data/Regions.geojson`** — Copied from `docs/Regions.geojson` (source file)
+- **`frontend/src/features/analytics/AnalyticsMapSection.jsx`** — Updated to handle `REGIONNAME` property from GeoJSON, added fullscreen button (Maximize2/Minimize2 icons), added map legend showing user density gradient and selected region indicator, proper null checks for features array
+- **`frontend/src/components/maps/EswatiniLeafletMap.jsx`** — Updated to handle `REGIONNAME` property mapping to lowercase region keys, null checks for GeoJSON features
+- **Deleted**: `frontend/src/data/eswatiniRegions.js`, `frontend/src/data/eswatiniGeoJson.js` (replaced with official GeoJSON)
+- Replaced approximate polygon coordinates with official detailed boundary data for all 4 regions (Hhohho, Manzini, Lubombo, Shiselweni)
+- Map now shows tooltips with region name, user count, completed assessments, completion percentage, and top Holland code
+- Fullscreen mode hides right panel and breakdown table for focused map view
+
 ### Changed — PDF Document Cleanup (Formal Government Style)
 - **`backend/src/controllers/report.controller.js`**:
   - **Letterhead** — matches certificate image: "GOVERNMENT [coat of arms] OF ESWATINI", Tel/Fax/Email on left, PS Office/Ministry/P.O. Box on right, horizontal rule separator
