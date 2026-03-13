@@ -52,7 +52,8 @@ Stores all system users (test takers, test administrators, system administrators
 - `gradeLevel` (string, nullable)
 - `institutionId` (UUID, nullable) - FK → institutions.id
 - `employmentStatus` (ENUM, nullable) - `student` | `employed` | `unemployed` | `self_employed` | `other`
-- `currentOccupation` (string, nullable)
+- `currentOccupation` (string, nullable) - Free-text occupation name (kept in sync with linked record)
+- `currentOccupationId` (UUID, FK → occupations.id, nullable) - Linked occupation record
 
 **Extended User Journey Fields:**
 - `studentNumber` (string, unique, nullable)
@@ -250,11 +251,11 @@ Scoring derives from **answers** per section/riasecType; composite queries are o
 ### 5. Career Resources
 
 #### **occupations**
-Career options mapped to RIASEC codes (35+ occupations seeded)
+Career options mapped to RIASEC codes (300 occupations seeded)
 
 **Key Fields:**
 - `id` (UUID) - Primary key
-- `code` (string, unique) - 3-letter Holland code (e.g., `RAC`, `SAE`)
+- `code` (string(10), nullable) - Holland code (e.g., `RAC`, `SAE`); null for user-submitted occupations pending review
 - `name` (string) - Occupation name
 - `hollandCodes` (string[], nullable) - Array of matching Holland codes
 - `primaryRiasec` (string, nullable) - Primary RIASEC letter
@@ -267,12 +268,18 @@ Career options mapped to RIASEC codes (35+ occupations seeded)
 - `localDemand` (ENUM, nullable) - `low` | `medium` | `high` | `critical`
 - `availableInEswatini` (boolean, default: false)
 - `skills` (string[], nullable) - Required skills array
+- `status` (ENUM, default: `approved`) - `approved` | `pending_review` — user-submitted occupations start as pending
+- `submittedBy` (UUID, FK → users.id, nullable) - User who submitted the occupation for review
 
 **Timestamps:**
 - `createdAt`, `updatedAt`
 
 **Associations:**
 - belongsTo → education_levels (via educationLevel)
+- belongsTo → users (via submittedBy, as 'submitter')
+- hasMany → users (via currentOccupationId)
+- belongsToMany → courses (through occupation_courses, as 'courses')
+- hasMany → occupation_courses
 
 #### **courses**
 Tertiary education courses/programs (25+ courses seeded)
@@ -296,6 +303,8 @@ Tertiary education courses/programs (25+ courses seeded)
 - hasMany → course_requirements (cascade delete)
 - belongsToMany → institutions (through course_institutions)
 - hasMany → course_institutions
+- belongsToMany → occupations (through occupation_courses, as 'occupations')
+- hasMany → occupation_courses
 
 #### **course_requirements**
 Entry requirements for courses
@@ -374,7 +383,7 @@ Extended profile for school students created by test administrators
 - belongsTo → institutions
 
 #### **institutions**
-Educational institutions in Eswatini (20+ institutions seeded)
+Educational institutions in Eswatini (41 institutions seeded)
 
 **Key Fields:**
 - `id` (UUID) - Primary key
@@ -393,12 +402,16 @@ Educational institutions in Eswatini (20+ institutions seeded)
 - `bursariesAvailable` (boolean, default: false)
 - `programs` (JSONB, nullable) - Program offerings: `[{ name, code, duration, riasecCodes }]`
 - `facilities` (string[], nullable)
+- `status` (ENUM, default: `approved`) - `approved` | `pending_review` — user-submitted institutions start as pending
+- `submittedBy` (UUID, FK → users.id, nullable) - User who submitted the institution for review
 
 **Timestamps:**
 - `createdAt`, `updatedAt`
 
 **Associations:**
+- belongsTo → users (via submittedBy, as 'submitter')
 - hasMany → users (via institutionId)
+- hasMany → users (via workplaceInstitutionId, as 'workplace')
 - belongsToMany → courses (through course_institutions)
 - hasMany → course_institutions
 - hasMany → school_students
@@ -417,6 +430,28 @@ Lookup table for education level codes (Levels 1-5 from SDS Appendix)
 **Associations:**
 - hasMany → occupations (via educationLevel)
 - hasMany → users (via educationLevel)
+- hasMany → assessments (via educationLevelAtTest)
+
+#### **occupation_courses**
+Many-to-many junction table linking occupations to relevant courses (career pathways)
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `occupationId` (UUID) - FK → occupations.id (cascade delete)
+- `courseId` (UUID) - FK → courses.id (cascade delete)
+- `relevanceScore` (DECIMAL(3,2), nullable) - Relevance score 0.00-1.00 indicating how well the course prepares for this occupation
+- `isPrimaryPathway` (boolean, default: false) - Whether this is a primary/direct pathway to the occupation
+- `notes` (TEXT, nullable) - Additional notes about this occupation-course relationship
+
+**Timestamps:**
+- `createdAt`, `updatedAt`
+
+**Indexes:**
+- occupation_id, course_id, occupation_id+course_id (unique), is_primary_pathway
+
+**Associations:**
+- belongsTo → occupations
+- belongsTo → courses
 
 ---
 
@@ -490,13 +525,18 @@ Generated certificates for completed assessments
 - User → AuditLogs (user activity tracking)
 - Assessment → Answers (assessment has many answers, cascade delete)
 - Question → Answers (question can have many responses)
-- Institution → Users (optional affiliation)
+- Institution → Users (optional affiliation via institutionId)
+- Institution → Users (workplace affiliation via workplaceInstitutionId)
 - Institution → SchoolStudents (school enrollment)
 - EducationLevel → Users (via educationLevel)
 - EducationLevel → Occupations (via educationLevel)
+- EducationLevel → Assessments (via educationLevelAtTest - historical snapshot)
+- Occupation → Users (via currentOccupationId - current occupation tracking)
 - Course → CourseRequirements (entry requirements, cascade delete)
 - Course → CourseInstitutions (where course is offered)
+- Course → OccupationCourses (career pathways)
 - Institution → CourseInstitutions (courses offered)
+- Occupation → OccupationCourses (career pathways)
 
 ### One-to-One
 - User → SchoolStudent (extended school student profile)
@@ -505,10 +545,42 @@ Generated certificates for completed assessments
 ### Many-to-Many
 - User ↔ Permission (through user_permissions) - Enterprise RBAC
 - Course ↔ Institution (through course_institutions) - Course offerings
+- **Occupation ↔ Course (through occupation_courses) - Career pathways**
+
+### Career Knowledge Graph
+The platform connects students to career outcomes through this entity graph:
+
+```
+User (Test Taker)
+  ├─→ EducationLevel (current education level)
+  ├─→ Institution (school/university affiliation)
+  ├─→ Occupation (current occupation if employed)
+  └─→ Assessment (RIASEC test)
+        ├─→ Holland Code (3-letter RIASEC profile)
+        ├─→ EducationLevel (snapshot at test time)
+        └─→ Recommendations:
+              ├─→ Occupations (matched by Holland code)
+              │     ├─→ EducationLevel (required education)
+              │     └─→ Courses (via occupation_courses - career pathways)
+              │           └─→ Institutions (via course_institutions - where to study)
+              │                 └─→ CourseRequirements (entry requirements)
+              └─→ Courses (matched by RIASEC codes)
+                    ├─→ Institutions (where offered)
+                    ├─→ CourseRequirements (entry requirements)
+                    └─→ Occupations (via occupation_courses - career outcomes)
+```
+
+**Complete Student Journey:**
+1. User takes Assessment → generates Holland Code
+2. Holland Code matches → Occupations (career options)
+3. Occupations link to → Courses (educational pathways via occupation_courses)
+4. Courses link to → Institutions (where to study via course_institutions)
+5. Courses have → CourseRequirements (what subjects/grades needed)
+6. Courses lead back to → Occupations (career outcomes)
 
 ### Foreign Key Constraints
 - All UUIDs use proper foreign key references
-- Cascade deletes configured where appropriate (answers, course_requirements)
+- Cascade deletes configured where appropriate (answers, course_requirements, occupation_courses)
 - Nullable foreign keys for optional relationships
 
 ---
@@ -764,7 +836,10 @@ All schema changes are managed through Sequelize migrations in `/backend/migrati
 13. `20260310100400-create-school-students.js` - School students table
 14. `20260312000002-create-subjects.js` - Subjects table
 15. `20260312170000-create-permissions-system.js` - Permissions & user_permissions
-16. `20260313000001-create-certificates.js` - Certificates table
+16. `20260312190000-create-user-qualifications.js` - User qualifications table
+17. `20260313000001-create-certificates.js` - Certificates table
+18. `20260313100000-add-entity-linking.js` - Add current_occupation_id FK to users, status/submitted_by to occupations & institutions, relax occupation code constraint
+19. `20260313110000-create-occupation-courses.js` - Occupation-course junction (career pathways)
 
 **Migration Commands:**
 ```bash

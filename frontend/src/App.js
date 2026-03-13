@@ -23,8 +23,13 @@ import AdminInstitutionsPage from './pages/admin/AdminInstitutionsPage';
 import AdminOccupationsPage from './pages/admin/AdminOccupationsPage';
 import AdminResultsPage from './pages/admin/AdminResultsPage';
 import AdminQuestionsPage from './pages/admin/AdminQuestionsPage';
+import AdminReportsPage from './pages/admin/AdminReportsPage';
 import AdminAuditPage from './pages/admin/AdminAuditPage';
 import AdminSubjectsPage from './pages/admin/AdminSubjectsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
+import AdminCoursesPage from './pages/admin/AdminCoursesPage';
+import AdminEducationLevelsPage from './pages/admin/AdminEducationLevelsPage';
+import AdminCertificatesPage from './pages/admin/AdminCertificatesPage';
 import Notifications from './pages/Notifications';
 import TestAdministratorDashboard from './pages/TestAdministratorDashboard';
 import Analytics from './pages/Analytics';
@@ -136,14 +141,34 @@ function App() {
               <AdminResultsPage />
             </ProtectedRoute>
           } />
-          <Route path="/admin/questions" element={
+          <Route path="/admin/reports" element={
             <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
-              <AdminQuestionsPage />
+              <AdminReportsPage />
             </ProtectedRoute>
           } />
           <Route path="/admin/audit" element={
             <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
               <AdminAuditPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
+              <AdminSettingsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/courses" element={
+            <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
+              <AdminCoursesPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/education-levels" element={
+            <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
+              <AdminEducationLevelsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/certificates" element={
+            <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
+              <AdminCertificatesPage />
             </ProtectedRoute>
           } />
           <Route path="/admin/notifications" element={

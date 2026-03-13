@@ -49,6 +49,14 @@ const PERMISSIONS = [
   { code: 'subjects.export', name: 'Export Subjects', description: 'Export subjects data', module: 'subjects' },
   { code: 'subjects.import', name: 'Import Subjects', description: 'Bulk import subjects', module: 'subjects' },
 
+  // Courses
+  { code: 'courses.view', name: 'View Courses', description: 'View courses and programmes', module: 'courses' },
+  { code: 'courses.create', name: 'Create Courses', description: 'Add new courses', module: 'courses' },
+  { code: 'courses.update', name: 'Update Courses', description: 'Edit course details', module: 'courses' },
+  { code: 'courses.delete', name: 'Delete Courses', description: 'Remove courses', module: 'courses' },
+  { code: 'courses.export', name: 'Export Courses', description: 'Export courses data', module: 'courses' },
+  { code: 'courses.import', name: 'Import Courses', description: 'Bulk import courses', module: 'courses' },
+
   // Assessments
   { code: 'assessments.view', name: 'View Assessments', description: 'View all assessments', module: 'assessments' },
   { code: 'assessments.export', name: 'Export Assessments', description: 'Export assessment data', module: 'assessments' },
@@ -96,6 +104,7 @@ const TEST_ADMIN_DEFAULT_CODES = [
   'analytics.view',
   'notifications.view', 'notifications.manage',
   'certificates.view', 'certificates.download',
+  'courses.view',
 ];
 
 module.exports = {

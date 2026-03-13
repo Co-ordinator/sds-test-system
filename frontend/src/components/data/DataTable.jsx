@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { GOV, TYPO } from '../../theme/government';
 import { LoadingState, EmptyState } from '../ui/StatusIndicators';
@@ -22,6 +22,10 @@ import { LoadingState, EmptyState } from '../ui/StatusIndicators';
  * pageSize?: number       — rows per page (default: 25, 0 = no pagination)
  * toolbar?: ReactNode     — rendered above the table
  * onRowClick?: (row) => void
+ * selectable?: boolean    — show checkboxes for multi-select
+ * selectedIds?: Set       — controlled set of selected row keys
+ * onSelectionChange?: (Set) => void  — called when selection changes
+ * bulkActions?: ReactNode — rendered in the bulk-actions bar when items are selected
  */
 const DataTable = ({
   columns = [],
@@ -30,16 +34,29 @@ const DataTable = ({
   loading = false,
   emptyTitle = 'No data',
   emptyMessage = '',
-  pageSize = 25,
+  pageSize = 7,
   toolbar,
   onRowClick,
   stickyHeader = false,
+  selectable = false,
+  selectedIds,
+  onSelectionChange,
+  bulkActions,
 }) => {
   const [sortKey, setSortKey] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
 
   const getKey = (row) => (typeof rowKey === 'function' ? rowKey(row) : row[rowKey]);
+
+  // Selection helpers
+  const sel = selectable && selectedIds ? selectedIds : new Set();
+  const toggleOne = useCallback((id) => {
+    if (!onSelectionChange) return;
+    const next = new Set(sel);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onSelectionChange(next);
+  }, [sel, onSelectionChange]);
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -86,11 +103,37 @@ const DataTable = ({
     return 'text-left';
   };
 
+  const visibleKeys = useMemo(() => new Set(visible.map(getKey)), [visible, getKey]);
+  const allPageSelected = selectable && visible.length > 0 && visible.every(r => sel.has(getKey(r)));
+  const somePageSelected = selectable && visible.some(r => sel.has(getKey(r)));
+  const toggleAllPage = useCallback(() => {
+    if (!onSelectionChange) return;
+    const next = new Set(sel);
+    if (allPageSelected) {
+      visible.forEach(r => next.delete(getKey(r)));
+    } else {
+      visible.forEach(r => next.add(getKey(r)));
+    }
+    onSelectionChange(next);
+  }, [sel, visible, allPageSelected, onSelectionChange, getKey]);
+
+  const colCount = columns.length + (selectable ? 1 : 0);
+
   return (
     <div className="flex flex-col gap-0">
       {toolbar && (
         <div className="p-3 border-b flex flex-wrap items-center gap-2" style={{ borderColor: GOV.border }}>
           {toolbar}
+        </div>
+      )}
+
+      {selectable && sel.size > 0 && bulkActions && (
+        <div className="px-3 py-2 border-b flex items-center gap-3" style={{ backgroundColor: '#eff6ff', borderColor: GOV.border }}>
+          <span className="text-xs font-semibold" style={{ color: GOV.blue }}>{sel.size} selected</span>
+          <div className="flex items-center gap-2">
+            {bulkActions}
+          </div>
+          <button type="button" onClick={() => onSelectionChange?.(new Set())} className="ml-auto text-xs underline" style={{ color: GOV.textMuted }}>Clear</button>
         </div>
       )}
 
@@ -105,6 +148,17 @@ const DataTable = ({
                 style={{ backgroundColor: GOV.blueLightAlt, color: GOV.textMuted }}
               >
                 <tr>
+                  {selectable && (
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        ref={el => { if (el) el.indeterminate = somePageSelected && !allPageSelected; }}
+                        onChange={toggleAllPage}
+                        className="w-3.5 h-3.5 rounded border-gray-300 accent-blue-600 cursor-pointer"
+                      />
+                    </th>
+                  )}
                   {columns.map(col => (
                     <th
                       key={col.key}
@@ -122,30 +176,44 @@ const DataTable = ({
               <tbody>
                 {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={columns.length}>
+                    <td colSpan={colCount}>
                       <EmptyState title={emptyTitle} message={emptyMessage} />
                     </td>
                   </tr>
                 ) : (
-                  visible.map(row => (
-                    <tr
-                      key={getKey(row)}
-                      className={`border-b transition-colors ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50/50'}`}
-                      style={{ borderColor: GOV.borderLight }}
-                      onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    >
-                      {columns.map(col => (
-                        <td
-                          key={col.key}
-                          className={`px-4 py-3 ${alignClass(col.align)} ${col.width || ''}`}
-                          style={{ color: GOV.text }}
-                          onClick={col.stopPropagation ? e => e.stopPropagation() : undefined}
-                        >
-                          {col.render ? col.render(row) : (row[col.key] ?? '–')}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
+                  visible.map(row => {
+                    const rk = getKey(row);
+                    const isSelected = sel.has(rk);
+                    return (
+                      <tr
+                        key={rk}
+                        className={`border-b transition-colors ${isSelected ? 'bg-blue-50/60' : ''} ${onRowClick ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50/50'}`}
+                        style={{ borderColor: GOV.borderLight }}
+                        onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      >
+                        {selectable && (
+                          <td className="px-3 py-3 w-10" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleOne(rk)}
+                              className="w-3.5 h-3.5 rounded border-gray-300 accent-blue-600 cursor-pointer"
+                            />
+                          </td>
+                        )}
+                        {columns.map(col => (
+                          <td
+                            key={col.key}
+                            className={`px-4 py-3 ${alignClass(col.align)} ${col.width || ''}`}
+                            style={{ color: GOV.text }}
+                            onClick={col.stopPropagation ? e => e.stopPropagation() : undefined}
+                          >
+                            {col.render ? col.render(row) : (row[col.key] ?? '–')}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

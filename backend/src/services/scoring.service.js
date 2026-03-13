@@ -1,4 +1,4 @@
-const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, CourseRequirement, CourseInstitution, Institution, Subject, sequelize } = require('../models');
+const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, CourseRequirement, CourseInstitution, Institution, Subject, OccupationCourse, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -204,9 +204,25 @@ class ScoringService {
       : null;
 
     // 2. Find matching occupations (exact code match or any letter overlap)
+    const occupationIncludes = [
+      { model: EducationLevel, as: 'education' },
+      {
+        model: Course, as: 'courses', required: false,
+        through: { attributes: ['relevanceScore', 'isPrimaryPathway'] },
+        attributes: ['id', 'name', 'qualificationType', 'durationYears', 'riasecCodes'],
+        include: [
+          {
+            model: CourseInstitution, as: 'courseInstitutions', required: false,
+            where: { isActive: true },
+            include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region'] }]
+          }
+        ]
+      }
+    ];
+
     let occupations = await Occupation.findAll({
       where: { code },
-      include: [{ model: EducationLevel, as: 'education' }],
+      include: occupationIncludes,
       ...opts
     });
 
@@ -220,7 +236,7 @@ class ScoringService {
           }))
         },
         limit: 15,
-        include: [{ model: EducationLevel, as: 'education' }],
+        include: occupationIncludes,
         ...opts
       });
     }
@@ -255,6 +271,11 @@ class ScoringService {
                 attributes: ['id', 'name', 'type', 'region', 'website', 'accredited']
               }
             ]
+          },
+          {
+            model: Occupation, as: 'occupations', required: false,
+            through: { attributes: ['relevanceScore', 'isPrimaryPathway'] },
+            attributes: ['id', 'name', 'primaryRiasec', 'code', 'demandLevel', 'localDemand', 'category']
           }
         ],
         limit: 12,

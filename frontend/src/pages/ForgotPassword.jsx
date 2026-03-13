@@ -48,7 +48,7 @@ export default function ForgotPassword() {
                 className={`inline-block mt-4 ${TYPO.hint} font-medium`}
                 style={{ color: GOV.blue }}
               >
-                Back to sign in
+                Back to Login
               </Link>
             </div>
           ) : (
@@ -89,7 +89,7 @@ export default function ForgotPassword() {
 
           <div className="px-6 pb-6 pt-0 text-center border-t" style={{ borderColor: GOV.borderLight }}>
             <Link to="/login" className={`${TYPO.hint} font-medium`} style={{ color: GOV.blue }}>
-              Back to sign in
+              Back to Login
             </Link>
           </div>
         </div>

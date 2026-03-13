@@ -18,6 +18,8 @@ Authorization: Bearer <token>
 - `POST /api/v1/auth/forgot-password`
 - `POST /api/v1/auth/reset-password/:token`
 - `GET /api/v1/institutions` (public list for registration)
+- `GET /api/v1/institutions/search?q=` (public fuzzy search for institutions)
+- `GET /api/v1/occupations/search?q=` (public fuzzy search for occupations)
 
 ### Role-Based Access Control (RBAC)
 
@@ -117,6 +119,8 @@ GET    /users/:id                   Get user details (users.view)
 POST   /users                       Create user (users.create)
 PATCH  /users/:id                   Update user (users.update)
 DELETE /users/:id                   Delete user (users.delete, no self-deletion)
+POST   /users/bulk-delete           Bulk delete users (users.delete, self-deletion prevented)
+POST   /users/bulk-update           Bulk activate/deactivate users (users.update)
 PATCH  /users/:id/permissions       Update user permissions (permissions.manage)
 ```
 
@@ -132,6 +136,7 @@ GET    /questions                   List questions (questions.view)
 POST   /questions                   Create question (questions.create)
 PATCH  /questions/:id               Update question (questions.update)
 DELETE /questions/:id               Delete question (questions.delete)
+POST   /questions/bulk-delete        Bulk delete questions (questions.delete)
 POST   /questions/import            Import questions CSV/JSON (questions.import)
 GET    /questions/export            Export questions (questions.export)
 ```
@@ -141,7 +146,10 @@ GET    /questions/export            Export questions (questions.export)
 GET    /occupations                 List occupations (occupations.view)
 POST   /occupations                 Create occupation (occupations.create)
 PATCH  /occupations/:id             Update occupation (occupations.update)
+PATCH  /occupations/:id/review      Review/approve pending occupation (occupations.update)
 DELETE /occupations/:id             Delete occupation (occupations.delete)
+POST   /occupations/bulk-delete      Bulk delete occupations (occupations.delete)
+POST   /occupations/bulk-approve     Bulk approve pending occupations (occupations.update)
 POST   /occupations/import          Import occupations CSV (occupations.import)
 GET    /occupations/export          Export occupations (occupations.export)
 ```
@@ -200,9 +208,23 @@ GET    /audit-logs                  List audit logs (audit.view)
 GET    /audit-logs/:id              Get audit log details (audit.view)
 ```
 
-**Institution Management:**
+**Institution Management (`/api/v1/institutions`):**
 ```
-GET    /institutions                List institutions (institutions.view)
+GET    /                            List all institutions (public)
+GET    /search?q=                   Search institutions by name (public, iLike, max 20)
+POST   /                            Create institution (System/Test Administrator)
+PATCH  /:id                         Update institution (System/Test Administrator)
+PATCH  /:id/review                  Review/approve pending institution (System/Test Administrator)
+DELETE /:id                         Delete institution (System/Test Administrator)
+POST   /bulk-delete                  Bulk delete institutions (System/Test Administrator)
+POST   /bulk-approve                 Bulk approve pending institutions (System/Test Administrator)
+GET    /export                      Export institutions CSV (System/Test Administrator)
+POST   /import                      Import institutions CSV (System/Test Administrator)
+```
+
+**Occupation Search (`/api/v1/occupations`):**
+```
+GET    /search?q=                   Search occupations by name/category (public, iLike, max 20)
 ```
 
 ### Test Administrator/Counselor (`/api/v1/counselor`)
@@ -241,40 +263,72 @@ POST   /import                      Import institutions CSV (admin only)
 
 ## Request/Response Examples
 
-### Register User
+### Registration
 
-**Request:**
+**Request (Simplified - v2.2.0):**
 ```http
 POST /api/v1/auth/register
 Content-Type: application/json
 
 {
+  "nationalId": "0312150123456",
   "email": "student@example.com",
   "password": "SecurePass@123",
-  "firstName": "Thabo",
-  "lastName": "Dlamini",
-  "userType": "High School Student",
-  "region": "manzini",
-  "isConsentGiven": true
+  "consent": true
 }
 ```
+
+**Required Fields:**
+- `nationalId` (string, 13 digits) - Eswatini National ID number
+- `email` (string, valid email) - User's email address
+- `password` (string, min 8 chars, letters + numbers) - Account password
+- `consent` (boolean, must be true) - Data processing consent
 
 **Response:**
 ```json
 {
   "status": "success",
-  "message": "Registration successful. Please check your email to verify your account.",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "data": {
     "user": {
       "id": "uuid",
+      "nationalId": "0312150123456",
       "email": "student@example.com",
-      "firstName": "Thabo",
-      "lastName": "Dlamini",
+      "firstName": "Pending",
+      "lastName": "Onboarding",
+      "dateOfBirth": "2003-12-15",
+      "gender": "female",
       "role": "Test Taker",
-      "userType": "High School Student",
-      "isEmailVerified": false
+      "studentCode": "SDS-2026-001234",
+      "isEmailVerified": false,
+      "isConsentGiven": true
     }
   }
+}
+```
+
+**Notes:**
+- Date of birth and gender are automatically extracted from National ID
+- User type and other profile details collected during onboarding flow
+- Returns JWT token for immediate authentication
+- Email verification required before taking assessments
+- National ID must be unique (returns 409 Conflict if duplicate)
+
+**Error Responses:**
+
+*Duplicate National ID (409):*
+```json
+{
+  "status": "error",
+  "message": "An account with this National ID already exists. Please login instead."
+}
+```
+
+*Invalid National ID Format (400):*
+```json
+{
+  "status": "error",
+  "message": "National ID must be exactly 13 digits"
 }
 ```
 

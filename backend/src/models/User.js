@@ -152,6 +152,15 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'current_occupation'
     },
+    currentOccupationId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'current_occupation_id',
+      references: {
+        model: 'occupations',
+        key: 'id'
+      }
+    },
 
     institutionId: {
       type: DataTypes.UUID,
@@ -398,13 +407,23 @@ module.exports = (sequelize, DataTypes) => {
 
     User.belongsTo(models.EducationLevel, {
       foreignKey: 'educationLevel',
-      targetKey: 'level',
+      targetKey: 'id',
       as: 'education'
     });
 
     User.belongsTo(models.Institution, {
       foreignKey: 'institutionId',
       as: 'institution'
+    });
+
+    User.belongsTo(models.Occupation, {
+      foreignKey: 'currentOccupationId',
+      as: 'occupation'
+    });
+
+    User.belongsTo(models.Institution, {
+      foreignKey: 'workplaceInstitutionId',
+      as: 'workplace'
     });
 
     User.hasOne(models.SchoolStudent, {

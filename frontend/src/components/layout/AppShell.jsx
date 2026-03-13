@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
-  Users, BarChart2, Settings, Menu, X, Building2, Briefcase, Bell
+  BarChart2, Settings, Menu, X, Bell, Award, FileText,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
@@ -12,11 +12,11 @@ import { useNotificationCount } from '../../hooks/useNotificationCount';
 // All possible admin nav links with required permissions
 const ADMIN_NAV_LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: Home, permission: null },
-  { to: '/admin/users', label: 'Users', Icon: Users, permission: 'users.view' },
-  { to: '/admin/institutions', label: 'Institutions', Icon: Building2, permission: 'institutions.view' },
-  { to: '/admin/occupations', label: 'Occupations', Icon: Briefcase, permission: 'occupations.view' },
+  { to: '/admin/results', label: 'Results', Icon: Award, permission: 'results.view' },
   { to: '/admin/analytics', label: 'Analytics', Icon: BarChart2, permission: 'analytics.view' },
+  { to: '/admin/reports', label: 'Reports', Icon: FileText, permission: 'analytics.view' },
   { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true, permission: 'notifications.view' },
+  { to: '/admin/settings', label: 'Settings', Icon: Settings, permission: null },
 ];
 
 const TEST_TAKER_NAV = [
@@ -38,14 +38,18 @@ const ROLE_COLORS = {
 
 const BREADCRUMB_MAP = {
   '/admin/dashboard': [{ label: 'Admin' }],
-  '/admin/users': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Users' }],
-  '/admin/institutions': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Institutions' }],
-  '/admin/occupations': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Occupations' }],
+  '/admin/users': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Users' }],
+  '/admin/institutions': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Institutions' }],
+  '/admin/occupations': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Occupations' }],
   '/admin/results': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Results' }],
-  '/admin/questions': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Questions' }],
-  '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Audit Log' }],
+  '/admin/reports': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Reports' }],
+  '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Audit Log' }],
   '/admin/analytics': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Analytics' }],
   '/admin/notifications': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Notifications' }],
+  '/admin/settings': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings' }],
+  '/admin/courses': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Courses' }],
+  '/admin/education-levels': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Education Levels' }],
+  '/admin/certificates': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Certificates' }],
   '/test-administrator': [{ label: 'Test Administrator' }],
   '/counselor': [{ label: 'Test Administrator' }],
   '/dashboard': [{ label: 'Dashboard' }],
@@ -85,22 +89,26 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
     if (to === '/admin/dashboard') {
       return location.pathname === '/admin/dashboard' || location.pathname === '/admin';
     }
+    if (to === '/admin/settings') {
+      return location.pathname.startsWith('/admin/settings');
+    }
     return location.pathname === to;
   }, [location.pathname]);
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* ── Top government banner ── */}
       <div
-        className="flex-shrink-0 py-1 border-b"
+        className="flex-shrink-0 py-0.5 border-b"
         style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.border }}
       >
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className={TYPO.ministryBanner} style={{ color: GOV.blue }}>
+          <p className="text-[11px] font-medium tracking-normal" style={{ color: GOV.textHint }}>
             Ministry of Labour &amp; Social Security · Kingdom of Eswatini
           </p>
         </div>
       </div>
+
+      <div style={{ height: 1, background: 'linear-gradient(90deg, #c8a84b 0%, #e8d48b 50%, #c8a84b 100%)' }} />
 
       {/* ── Primary nav bar ── */}
       <header
@@ -256,17 +264,17 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
 
       {/* ── Breadcrumbs ── */}
       {breadcrumbs.length > 0 && (
-        <div className="border-b" style={{ borderColor: GOV.borderLight, backgroundColor: GOV.blueLightAlt }}>
-          <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center gap-1.5">
+        <div className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }}>
+          <div className="max-w-7xl mx-auto px-6 py-1.5 flex items-center gap-1">
             {breadcrumbs.map((crumb, idx) => (
               <React.Fragment key={idx}>
                 {idx > 0 && <ChevronRight className="w-3 h-3" style={{ color: GOV.textHint }} />}
                 {crumb.to ? (
-                  <Link to={crumb.to} className="text-xs font-medium hover:underline" style={{ color: GOV.blue }}>
+                  <Link to={crumb.to} className="text-[11px] font-medium hover:underline" style={{ color: GOV.blue }}>
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className="text-xs font-semibold" style={{ color: '#3b82f6' }}>{crumb.label}</span>
+                  <span className="text-[11px] font-semibold" style={{ color: GOV.textMuted }}>{crumb.label}</span>
                 )}
               </React.Fragment>
             ))}
@@ -278,18 +286,6 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
       <main className="flex-1">
         {children}
       </main>
-
-      {/* ── Footer ── */}
-      <footer
-        className="border-t py-3"
-        style={{ borderColor: GOV.border, backgroundColor: GOV.blueLightAlt }}
-      >
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[11px]" style={{ color: GOV.textMuted }}>
-            © {new Date().getFullYear()} Kingdom of Eswatini · Skills Development System · All rights reserved
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

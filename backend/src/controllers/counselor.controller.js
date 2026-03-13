@@ -1,220 +1,51 @@
-const { User, Assessment, Institution, SchoolStudent } = require('../models');
-const { Op } = require('sequelize');
-const logger = require('../utils/logger');
-const { bulkCreateStudents } = require('../services/studentImport.service');
-const scoringService = require('../services/scoring.service');
+const counselorService = require('../services/counselor.service');
 const PDFDocument = require('pdfkit');
-
-/**
- * Counselor Controller
- * Admin can access all features. Counselor is scoped to their institution.
- */
-
-const resolveInstitutionId = (actor, queryParam) => {
-  if (actor.role === 'System Administrator') return queryParam || null;
-  return actor.institutionId || null;
-};
+const logger = require('../utils/logger');
 
 const getMyStudents = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const institutionId = resolveInstitutionId(actor, req.query.institutionId);
-
-    const where = { role: 'Test Taker' };
-    if (institutionId) where.institutionId = institutionId;
-
-    const students = await User.findAll({
-      where,
-      attributes: ['id', 'firstName', 'lastName', 'email', 'gradeLevel', 'institutionId', 'createdAt'],
-      include: [
-        {
-          model: Assessment,
-          as: 'assessments',
-          separate: true,
-          limit: 1,
-          order: [['createdAt', 'DESC']],
-          attributes: ['id', 'status', 'progress', 'hollandCode', 'createdAt', 'completedAt',
-            'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC']
-        },
-        { model: Institution, as: 'institution', attributes: ['id', 'name'] }
-      ],
-      order: [['lastName', 'ASC'], ['firstName', 'ASC']]
-    });
-
-    const formatted = students.map((student) => {
-      const latestAssessment = student.assessments?.[0] || null;
-      return {
-        id: student.id,
-        firstName: student.firstName,
-        lastName: student.lastName,
-        email: student.email,
-        gradeLevel: student.gradeLevel,
-        institutionId: student.institutionId,
-        institutionName: student.institution?.name || null,
-        createdAt: student.createdAt,
-        latestAssessment: latestAssessment ? {
-          id: latestAssessment.id,
-          status: latestAssessment.status,
-          progress: Number(latestAssessment.progress),
-          hollandCode: latestAssessment.hollandCode,
-          createdAt: latestAssessment.createdAt,
-          completedAt: latestAssessment.completedAt,
-          scoreR: latestAssessment.scoreR,
-          scoreI: latestAssessment.scoreI,
-          scoreA: latestAssessment.scoreA,
-          scoreS: latestAssessment.scoreS,
-          scoreE: latestAssessment.scoreE,
-          scoreC: latestAssessment.scoreC
-        } : null
-      };
-    });
-
-    logger.info({
-      actionType: 'COUNSELOR_STUDENTS_FETCHED',
-      message: `${actor.role} ${actor.id} fetched ${formatted.length} students`,
-      req,
-      details: { actorId: actor.id, institutionId }
-    });
-
+    const { formatted, actor, institutionId } = await counselorService.getMyStudents(req.user.id, req.query.institutionId);
+    logger.info({ actionType: 'COUNSELOR_STUDENTS_FETCHED', message: `${actor.role} ${actor.id} fetched ${formatted.length} students`, req, details: { actorId: actor.id, institutionId } });
     return res.status(200).json({ status: 'success', data: { students: formatted } });
   } catch (error) {
-    logger.error({
-      actionType: 'COUNSELOR_STUDENTS_FAILED',
-      message: 'Failed to fetch students',
-      req,
-      details: { error: error.message, stack: error.stack }
-    });
+    logger.error({ actionType: 'COUNSELOR_STUDENTS_FAILED', message: 'Failed to fetch students', req, details: { error: error.message, stack: error.stack } });
     return next(error);
   }
 };
 
 const getInstitutionStats = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const institutionId = resolveInstitutionId(actor, req.query.institutionId);
-
-    if (!institutionId) {
-      return res.status(200).json({ status: 'success', data: { stats: null } });
-    }
-
-    const studentWhere = { institutionId, role: 'Test Taker' };
-    const totalStudents = await User.count({ where: studentWhere });
-    const studentsWithAssessments = await User.count({
-      where: studentWhere,
-      include: [{ model: Assessment, as: 'assessments', required: true }]
-    });
-
-    const stats = await Assessment.findOne({
-      where: { status: 'completed' },
-      attributes: [
-        [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('Assessment.id')), 'completedCount'],
-        [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_r')), 'avgR'],
-        [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_i')), 'avgI'],
-        [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_a')), 'avgA'],
-        [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_s')), 'avgS'],
-        [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_e')), 'avgE'],
-        [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_c')), 'avgC']
-      ],
-      include: [{
-        model: User, as: 'user', required: true, attributes: [],
-        where: { institutionId }
-      }],
-      raw: true
-    });
-
-    const hollandDist = await Assessment.findAll({
-      where: { status: 'completed', hollandCode: { [Op.ne]: null } },
-      attributes: [
-        'hollandCode',
-        [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('Assessment.id')), 'count']
-      ],
-      include: [{
-        model: User, as: 'user', required: true, attributes: [],
-        where: { institutionId }
-      }],
-      group: ['hollandCode'],
-      raw: true
-    });
-
-    logger.info({
-      actionType: 'COUNSELOR_INSTITUTION_STATS',
-      message: `Fetched institution stats for ${actor.role} ${actor.id}`,
-      req,
-      details: { actorId: actor.id, institutionId }
-    });
-
-    return res.status(200).json({
-      status: 'success',
-      data: { stats: { ...stats, totalStudents, studentsWithAssessments }, hollandDistribution: hollandDist }
-    });
+    const { stats, hollandDistribution, actor } = await counselorService.getInstitutionStats(req.user.id, req.query.institutionId);
+    if (!stats) return res.status(200).json({ status: 'success', data: { stats: null } });
+    logger.info({ actionType: 'COUNSELOR_INSTITUTION_STATS', message: `Fetched institution stats for ${actor.role} ${actor.id}`, req, details: { actorId: actor.id } });
+    return res.status(200).json({ status: 'success', data: { stats, hollandDistribution } });
   } catch (error) {
-    logger.error({
-      actionType: 'COUNSELOR_INSTITUTION_STATS_FAILED',
-      message: 'Failed to fetch institution stats',
-      req,
-      details: { error: error.message, stack: error.stack }
-    });
+    logger.error({ actionType: 'COUNSELOR_INSTITUTION_STATS_FAILED', message: 'Failed to fetch institution stats', req, details: { error: error.message, stack: error.stack } });
     return next(error);
   }
 };
 
 const importStudents = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const institutionId = resolveInstitutionId(actor, req.query.institutionId || req.body?.institutionId);
-
-    if (!req.body || typeof req.body !== 'string' || !req.body.trim()) {
-      return res.status(400).json({ status: 'error', message: 'CSV data is required' });
-    }
-
-    if (!institutionId) {
-      return res.status(400).json({ status: 'error', message: 'Institution is required' });
-    }
-
-    const credentials = await bulkCreateStudents(req.body, institutionId);
-
-    logger.info({
-      actionType: 'COUNSELOR_STUDENTS_IMPORTED',
-      message: `${actor.role} ${actor.id} imported ${credentials.length} students`,
-      req,
-      details: { actorId: actor.id, institutionId, count: credentials.length }
-    });
-
+    const queryInstitutionId = req.query.institutionId || req.body?.institutionId;
+    const { credentials, actor, institutionId } = await counselorService.importStudents(req.user.id, req.body, queryInstitutionId);
+    logger.info({ actionType: 'COUNSELOR_STUDENTS_IMPORTED', message: `${actor.role} ${actor.id} imported ${credentials.length} students`, req, details: { actorId: actor.id, institutionId, count: credentials.length } });
     return res.status(201).json({ status: 'success', data: { credentials } });
   } catch (error) {
-    logger.error({
-      actionType: 'COUNSELOR_STUDENTS_IMPORT_FAILED',
-      message: 'Failed to import students',
-      req,
-      details: { error: error.message, stack: error.stack }
-    });
+    if (error.message === 'CSV data is required' || error.message === 'Institution is required') return res.status(400).json({ status: 'error', message: error.message });
+    logger.error({ actionType: 'COUNSELOR_STUDENTS_IMPORT_FAILED', message: 'Failed to import students', req, details: { error: error.message, stack: error.stack } });
     return next(error);
   }
 };
 
 const deleteStudent = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const student = await User.findOne({ where: { id: req.params.studentId, role: 'Test Taker' } });
-
-    if (!student) {
-      return res.status(404).json({ status: 'error', message: 'Student not found' });
-    }
-
-    if (actor.role === 'Test Administrator' && student.institutionId !== actor.institutionId) {
-      return res.status(403).json({ status: 'error', message: 'Not authorized to manage this student' });
-    }
-
-    await student.destroy();
-
-    logger.info({
-      actionType: 'STUDENT_DELETED',
-      message: `Student ${req.params.studentId} deleted by ${actor.role} ${actor.id}`,
-      req
-    });
-
+    await counselorService.deleteStudent(req.user.id, req.user.role, req.user.institutionId, req.params.studentId);
+    logger.info({ actionType: 'STUDENT_DELETED', message: `Student ${req.params.studentId} deleted by ${req.user.role} ${req.user.id}`, req });
     return res.status(200).json({ status: 'success', message: 'Student deleted' });
   } catch (error) {
+    if (error.message === 'Student not found') return res.status(404).json({ status: 'error', message: error.message });
+    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'STUDENT_DELETE_FAILED', message: 'Failed to delete student', req, details: { error: error.message } });
     return next(error);
   }
@@ -222,28 +53,11 @@ const deleteStudent = async (req, res, next) => {
 
 const updateStudent = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const student = await User.findOne({ where: { id: req.params.studentId, role: 'Test Taker' } });
-
-    if (!student) {
-      return res.status(404).json({ status: 'error', message: 'Student not found' });
-    }
-
-    if (actor.role === 'Test Administrator' && student.institutionId !== actor.institutionId) {
-      return res.status(403).json({ status: 'error', message: 'Not authorized to manage this student' });
-    }
-
-    const allowed = ['firstName', 'lastName', 'gradeLevel', 'email', 'institutionId'];
-    const updates = {};
-    for (const key of allowed) {
-      if (req.body[key] !== undefined) updates[key] = req.body[key];
-    }
-
-    await student.update(updates);
-    const updated = await User.findByPk(student.id, { attributes: { exclude: ['password', 'passwordResetToken', 'refreshToken'] } });
-
+    const updated = await counselorService.updateStudent(req.user.role, req.user.institutionId, req.params.studentId, req.body);
     return res.status(200).json({ status: 'success', data: { student: updated } });
   } catch (error) {
+    if (error.message === 'Student not found') return res.status(404).json({ status: 'error', message: error.message });
+    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'STUDENT_UPDATE_FAILED', message: 'Failed to update student', req, details: { error: error.message } });
     return next(error);
   }
@@ -251,37 +65,14 @@ const updateStudent = async (req, res, next) => {
 
 const getStudentResults = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const student = await User.findOne({ where: { id: req.params.studentId, role: 'Test Taker' } });
-
-    if (!student) {
-      return res.status(404).json({ status: 'error', message: 'Student not found' });
-    }
-
-    if (actor.role === 'Test Administrator' && student.institutionId !== actor.institutionId) {
-      return res.status(403).json({ status: 'error', message: 'Not authorized to view this student' });
-    }
-
-    const assessments = await Assessment.findAll({
-      where: { userId: student.id },
-      order: [['createdAt', 'DESC']]
-    });
-
-    const completed = assessments.find((a) => a.status === 'completed');
-    let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
-    if (completed) {
-      try {
-        recommendations = await scoringService.getRecommendations(
-          completed.hollandCode, completed.educationLevelAtTest
-        );
-      } catch (_) { recommendations = { occupations: [], courses: [], suggestedSubjects: [] }; }
-    }
-
+    const { student, assessments, recommendations } = await counselorService.getStudentResults(req.user.role, req.user.institutionId, req.params.studentId);
     return res.status(200).json({
       status: 'success',
       data: { student: { id: student.id, firstName: student.firstName, lastName: student.lastName, email: student.email }, assessments, recommendations }
     });
   } catch (error) {
+    if (error.message === 'Student not found') return res.status(404).json({ status: 'error', message: error.message });
+    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'STUDENT_RESULTS_FAILED', message: 'Failed to get student results', req, details: { error: error.message } });
     return next(error);
   }
@@ -294,42 +85,9 @@ const getStudentResults = async (req, res, next) => {
  */
 const generateLoginCards = async (req, res, next) => {
   try {
-    const actor = await User.findByPk(req.user.id);
-    const institutionId = resolveInstitutionId(actor, req.query.institutionId);
-
-    if (!institutionId) {
-      return res.status(400).json({ status: 'error', message: 'Institution is required' });
-    }
-
-    const institution = await Institution.findByPk(institutionId);
-    if (!institution) {
-      return res.status(404).json({ status: 'error', message: 'Institution not found' });
-    }
-
-    const where = { institutionId, role: 'Test Taker' };
-    if (req.query.grade) {
-      const gradeFilter = req.query.grade;
-      where[Op.or] = [
-        { gradeLevel: gradeFilter },
-        { className: gradeFilter }
-      ];
-    }
-
-    const students = await User.findAll({
-      where,
-      attributes: ['id', 'firstName', 'lastName', 'username', 'gradeLevel', 'className', 'studentNumber', 'studentCode', 'createdAt'],
-      include: [{
-        model: SchoolStudent,
-        as: 'schoolStudent',
-        required: false,
-        attributes: ['studentNumber', 'grade', 'className', 'loginCardPrinted']
-      }],
-      order: [['lastName', 'ASC'], ['firstName', 'ASC']]
-    });
-
-    if (students.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'No students found for these criteria' });
-    }
+    const { students, institution, actor } = await counselorService.getLoginCardsData(
+      req.user.id, req.user.role, req.user.institutionId, req.query.institutionId, req.query.grade
+    );
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -415,25 +173,13 @@ const generateLoginCards = async (req, res, next) => {
 
     doc.end();
 
-    // Mark cards as printed (fire-and-forget)
-    const schoolStudentIds = students
-      .map(s => s.schoolStudent?.id)
-      .filter(Boolean);
-    if (schoolStudentIds.length > 0) {
-      SchoolStudent.update(
-        { loginCardPrinted: true, loginCardPrintedAt: new Date() },
-        { where: { id: schoolStudentIds } }
-      ).catch(() => {});
-    }
+    counselorService.markLoginCardsPrinted(students);
 
-    logger.info({
-      actionType: 'LOGIN_CARDS_GENERATED',
-      message: `${actor.role} ${actor.id} generated ${students.length} login cards for institution ${institutionId}`,
-      req,
-      details: { actorId: actor.id, institutionId, count: students.length }
-    });
+    logger.info({ actionType: 'LOGIN_CARDS_GENERATED', message: `${actor.role} ${actor.id} generated ${students.length} login cards for institution ${institution.id}`, req, details: { actorId: actor.id, institutionId: institution.id, count: students.length } });
 
   } catch (error) {
+    if (error.message === 'Institution is required') return res.status(400).json({ status: 'error', message: error.message });
+    if (error.message === 'Institution not found' || error.message === 'No students found for these criteria') return res.status(404).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'LOGIN_CARDS_FAILED', message: 'Failed to generate login cards', req, details: { error: error.message } });
     return next(error);
   }

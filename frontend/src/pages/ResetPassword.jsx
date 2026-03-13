@@ -49,14 +49,14 @@ export default function ResetPassword() {
           {success ? (
             <div className="px-6 py-6 text-center">
               <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                Password updated successfully. Redirecting to sign in…
+                Password updated successfully. Redirecting to Login…
               </p>
               <Link
                 to="/login"
                 className={`inline-block mt-4 ${TYPO.hint} font-medium`}
                 style={{ color: GOV.blue }}
               >
-                Go to sign in
+                Go to Login
               </Link>
             </div>
           ) : (
@@ -121,7 +121,7 @@ export default function ResetPassword() {
 
           <div className="px-6 pb-6 pt-0 text-center border-t" style={{ borderColor: GOV.borderLight }}>
             <Link to="/login" className={`${TYPO.hint} font-medium`} style={{ color: GOV.blue }}>
-              Back to sign in
+              Back to Login
             </Link>
           </div>
         </div>

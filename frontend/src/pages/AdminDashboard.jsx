@@ -46,7 +46,7 @@ const AdminDashboard = () => {
     endDate: '',
   });
 
-  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Administrator';
+  const firstName = user?.firstName?.trim() || 'User';
 
   const buildParams = () => {
     const p = new URLSearchParams();
@@ -63,10 +63,10 @@ const AdminDashboard = () => {
       try {
         const qs = buildParams();
         const [aRes, rRes, hRes, tRes, assessmentsRes, institutionsRes] = await Promise.all([
-          api.get(`/api/v1/admin/analytics${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/regional${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/trend${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/analytics${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/analytics/regional${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
+          api.get(`/api/v1/analytics/trend${qs ? `?${qs}` : ''}`),
           adminService.getAssessments(1000),
           adminService.getInstitutions(),
         ]);
@@ -105,7 +105,7 @@ const AdminDashboard = () => {
     setExporting(`analytics-${format}`);
     try {
       const qs = buildParams();
-      const res = await api.get(`/api/v1/admin/analytics/export?format=${format}${qs ? `&${qs}` : ''}`, { responseType: 'blob' });
+      const res = await api.get(`/api/v1/analytics/export?format=${format}${qs ? `&${qs}` : ''}`, { responseType: 'blob' });
       const mime = format === 'pdf' ? 'application/pdf' : 'text/csv';
       const url = window.URL.createObjectURL(new Blob([res.data], { type: mime }));
       const a = document.createElement('a');
@@ -251,8 +251,7 @@ const AdminDashboard = () => {
         {/* Header */}
         <div className="flex items-start justify-between flex-wrap gap-5 pb-1">
           <div className="pt-1">
-            <h1 className="text-2xl font-bold" style={{ color: GOV.text }}>Dashboard</h1>
-            <p className="text-sm mt-1" style={{ color: GOV.textMuted }}>Welcome back, {displayName}. Here's your system overview.</p>
+            <h1 className="text-2xl font-bold" style={{ color: GOV.text }}>Welcome back, {firstName}</h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <PermissionGate permission="users.export">
@@ -505,7 +504,7 @@ const AdminDashboard = () => {
             rows={schoolUsageRows}
             rowKey="id"
             loading={loading}
-            pageSize={15}
+            pageSize={7}
             emptyTitle="No school usage data"
             emptyMessage="Adjust region/school/date filters to broaden results."
             toolbar={(

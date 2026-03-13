@@ -1,7 +1,7 @@
 module.exports = (sequelize, DataTypes) => {
   const Occupation = sequelize.define('Occupation', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-    code: { type: DataTypes.STRING(3), allowNull: false, unique: true }, // Holland 3-letter code e.g., 'RAC'
+    code: { type: DataTypes.STRING(10), allowNull: true }, // Holland 3-letter code e.g., 'RAC'; nullable for user-submitted occupations
     name: { type: DataTypes.STRING, allowNull: false },
     hollandCodes: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
     primaryRiasec: { type: DataTypes.STRING(1), allowNull: true },
@@ -33,7 +33,17 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'local_demand'
     },
-    skills: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true }
+    skills: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
+    status: {
+      type: DataTypes.ENUM('approved', 'pending_review'),
+      allowNull: false,
+      defaultValue: 'approved'
+    },
+    submittedBy: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'submitted_by'
+    }
   }, {
     tableName: 'occupations',
     underscored: true,
@@ -45,6 +55,24 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: 'educationLevel',
       targetKey: 'id',
       as: 'education'
+    });
+    Occupation.belongsTo(models.User, {
+      foreignKey: 'submittedBy',
+      as: 'submitter'
+    });
+    Occupation.hasMany(models.User, {
+      foreignKey: 'currentOccupationId',
+      as: 'users'
+    });
+    Occupation.belongsToMany(models.Course, {
+      through: models.OccupationCourse,
+      foreignKey: 'occupationId',
+      otherKey: 'courseId',
+      as: 'courses'
+    });
+    Occupation.hasMany(models.OccupationCourse, {
+      foreignKey: 'occupationId',
+      as: 'occupationCourses'
     });
   };
 
