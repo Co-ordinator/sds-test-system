@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock } from 'lucide-react';
 import api from '../services/api';
@@ -50,6 +50,9 @@ const RIASEC_NAMES = {
   S: 'Social', E: 'Enterprising', C: 'Conventional'
 };
 
+const getTimerStorageKey = (assessmentId) => `sds.timer.elapsed.${assessmentId}`;
+const getPositionStorageKey = (assessmentId) => `sds.position.${assessmentId}`;
+
 const Questionnaire = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -61,10 +64,10 @@ const Questionnaire = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [startTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
+  const timerAnchorRef = useRef(null);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
@@ -78,6 +81,82 @@ const Questionnaire = () => {
   const progressPercent = allAnswered ? 100 : Math.floor(rawProgressPercent);
   const currentSectionMeta = SECTIONS[currentSectionIndex];
 
+  const persistElapsedTime = useCallback((assessmentId, seconds) => {
+    if (!assessmentId) return;
+    localStorage.setItem(getTimerStorageKey(assessmentId), String(Math.max(0, Math.floor(seconds))));
+  }, []);
+
+  const clearElapsedTime = useCallback((assessmentId) => {
+    if (!assessmentId) return;
+    localStorage.removeItem(getTimerStorageKey(assessmentId));
+  }, []);
+
+  const persistQuestionPosition = useCallback((assessmentId, sectionIndex, questionIndex) => {
+    if (!assessmentId) return;
+    localStorage.setItem(
+      getPositionStorageKey(assessmentId),
+      JSON.stringify({ sectionIndex, questionIndex })
+    );
+  }, []);
+
+  const clearQuestionPosition = useCallback((assessmentId) => {
+    if (!assessmentId) return;
+    localStorage.removeItem(getPositionStorageKey(assessmentId));
+  }, []);
+
+  const restoreElapsedTime = useCallback((assessmentData) => {
+    if (!assessmentData?.id) return 0;
+    const raw = localStorage.getItem(getTimerStorageKey(assessmentData.id));
+    const saved = Number.parseInt(raw || '', 10);
+    if (Number.isFinite(saved) && saved >= 0) return saved;
+
+    const createdAtMs = Date.parse(assessmentData.createdAt || '');
+    if (Number.isFinite(createdAtMs)) {
+      return Math.max(0, Math.floor((Date.now() - createdAtMs) / 1000));
+    }
+    return 0;
+  }, []);
+
+  const restoreQuestionPosition = useCallback((assessmentId, bySection, savedAnswers = {}) => {
+    if (!assessmentId) return { sectionIndex: 0, questionIndex: 0 };
+
+    const raw = localStorage.getItem(getPositionStorageKey(assessmentId));
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        const sectionIndex = Number(parsed?.sectionIndex);
+        const questionIndex = Number(parsed?.questionIndex);
+        const validSection = Number.isInteger(sectionIndex) && sectionIndex >= 0 && sectionIndex < SECTIONS.length;
+        if (validSection) {
+          const sectionQuestions = bySection[SECTIONS[sectionIndex].id] || [];
+          const validQuestion = Number.isInteger(questionIndex) && questionIndex >= 0 && questionIndex < sectionQuestions.length;
+          if (validQuestion) {
+            return { sectionIndex, questionIndex };
+          }
+        }
+      } catch (_) {
+        // Fall through to unanswered-question fallback.
+      }
+    }
+
+    for (let s = 0; s < SECTIONS.length; s += 1) {
+      const questions = bySection[SECTIONS[s].id] || [];
+      for (let q = 0; q < questions.length; q += 1) {
+        const answer = savedAnswers[questions[q].id];
+        if (answer === undefined || answer === null || answer === '') {
+          return { sectionIndex: s, questionIndex: q };
+        }
+      }
+    }
+
+    const lastSectionIndex = Math.max(SECTIONS.length - 1, 0);
+    const lastSectionQuestions = bySection[SECTIONS[lastSectionIndex].id] || [];
+    return {
+      sectionIndex: lastSectionIndex,
+      questionIndex: Math.max(lastSectionQuestions.length - 1, 0)
+    };
+  }, []);
+
   const loadQuestions = useCallback(async () => {
     try {
       const res = await api.get('/api/v1/assessments/questions');
@@ -90,8 +169,10 @@ const Questionnaire = () => {
         bySection[s.id] = list.filter((q) => q.section === s.id).sort((a, b) => (a.order || 0) - (b.order || 0));
       });
       setQuestionsBySection(bySection);
+      return bySection;
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to load questions');
+      return {};
     }
   }, []);
 
@@ -99,19 +180,26 @@ const Questionnaire = () => {
     (async () => {
       setLoading(true);
       setError(null);
-      await loadQuestions();
+      const bySection = await loadQuestions();
       try {
         const res = await api.post('/api/v1/assessments');
         const data = res.data?.data?.assessment;
         if (data) {
-          setAssessment(data);
+          let savedAnswers = {};
+          const restoredElapsed = restoreElapsedTime(data);
           try {
             const progRes = await api.get(`/api/v1/assessments/${data.id}/progress`);
-            const saved = progRes.data?.data?.answers || {};
-            if (Object.keys(saved).length) setAnswers(saved);
+            savedAnswers = progRes.data?.data?.answers || {};
           } catch (_) {
-            // non-fatal — start with empty answers
+            // non-fatal: start with empty answers
           }
+          const restoredPosition = restoreQuestionPosition(data.id, bySection, savedAnswers);
+          setAssessment(data);
+          setElapsedTime(restoredElapsed);
+          timerAnchorRef.current = Date.now() - (restoredElapsed * 1000);
+          if (Object.keys(savedAnswers).length) setAnswers(savedAnswers);
+          setCurrentSectionIndex(restoredPosition.sectionIndex);
+          setCurrentQuestionIndex(restoredPosition.questionIndex);
         } else {
           setError('Failed to initialize assessment. Please try again.');
         }
@@ -120,7 +208,7 @@ const Questionnaire = () => {
       }
       setLoading(false);
     })();
-  }, [loadQuestions]);
+  }, [loadQuestions, restoreElapsedTime, restoreQuestionPosition]);
 
   const saveProgress = useCallback(
     async (newAnswers) => {
@@ -191,6 +279,8 @@ const Questionnaire = () => {
     setError(null);
     try {
       await api.post(`/api/v1/assessments/${assessment.id}/complete`);
+      clearElapsedTime(assessment.id);
+      clearQuestionPosition(assessment.id);
       navigate('/test-complete', { replace: true });
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to submit. You may need to answer all 228 questions.');
@@ -203,17 +293,38 @@ const Questionnaire = () => {
   const isLastQuestion =
     currentSectionIndex === totalSections - 1 && currentQuestionIndex === sectionQuestions.length - 1;
 
-  // Update elapsed time every second when not paused
+  // Update elapsed time every second when not paused.
   useEffect(() => {
-    if (isPaused || !assessment) return;
-    
+    if (isPaused || !assessment?.id) return;
+
+    if (timerAnchorRef.current == null) {
+      timerAnchorRef.current = Date.now();
+    }
+
     const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      const seconds = Math.max(0, Math.floor((Date.now() - timerAnchorRef.current) / 1000));
+      setElapsedTime(seconds);
+      persistElapsedTime(assessment.id, seconds);
     }, 1000);
-    
+
     return () => clearInterval(interval);
-  }, [isPaused, startTime, assessment]);
-  
+  }, [isPaused, assessment?.id, persistElapsedTime]);
+
+  useEffect(() => {
+    return () => {
+      if (!assessment?.id || timerAnchorRef.current == null) return;
+      const seconds = isPaused
+        ? elapsedTime
+        : Math.max(0, Math.floor((Date.now() - timerAnchorRef.current) / 1000));
+      persistElapsedTime(assessment.id, seconds);
+    };
+  }, [assessment?.id, elapsedTime, isPaused, persistElapsedTime]);
+
+  useEffect(() => {
+    if (!assessment?.id) return;
+    persistQuestionPosition(assessment.id, currentSectionIndex, currentQuestionIndex);
+  }, [assessment?.id, currentSectionIndex, currentQuestionIndex, persistQuestionPosition]);
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -317,6 +428,14 @@ const Questionnaire = () => {
           <button
             type="button"
             onClick={() => {
+              if (assessment?.id && timerAnchorRef.current != null) {
+                const seconds = Math.max(0, Math.floor((Date.now() - timerAnchorRef.current) / 1000));
+                setElapsedTime(seconds);
+                persistElapsedTime(assessment.id, seconds);
+              }
+              if (assessment?.id) {
+                persistQuestionPosition(assessment.id, currentSectionIndex, currentQuestionIndex);
+              }
               setIsPaused(true);
               navigate('/dashboard');
             }}
@@ -503,3 +622,4 @@ const Questionnaire = () => {
 };
 
 export default Questionnaire;
+

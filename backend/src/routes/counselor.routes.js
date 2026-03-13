@@ -1,10 +1,11 @@
 const express = require('express');
 const { verifyToken, restrictTo } = require('../middleware/authentication.middleware');
+const { ROLES } = require('../constants/roles');
 const CounselorController = require('../controllers/counselor.controller');
 
 const router = express.Router();
 
-router.use(verifyToken, restrictTo('counselor', 'admin'));
+router.use(verifyToken, restrictTo(ROLES.TEST_ADMIN, ROLES.SYSTEM_ADMIN));
 
 router.get('/students', CounselorController.getMyStudents);
 router.get('/institution-stats', CounselorController.getInstitutionStats);

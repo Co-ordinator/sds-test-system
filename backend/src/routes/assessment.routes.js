@@ -1,5 +1,6 @@
 const express = require('express');
 const { verifyToken, restrictTo } = require('../middleware/authentication.middleware');
+const { ROLES } = require('../constants/roles');
 const AssessmentController = require('../controllers/assessment.controller');
 const CertificateController = require('../controllers/certificate.controller');
 
@@ -7,13 +8,13 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-router.post('/', restrictTo('user'), AssessmentController.startAssessment);
-router.get('/', restrictTo('user'), AssessmentController.listMyAssessments);
-router.get('/questions', restrictTo('user'), AssessmentController.getQuestions);
-router.get('/:assessmentId', restrictTo('user'), AssessmentController.getAssessment);
-router.get('/:assessmentId/progress', restrictTo('user'), AssessmentController.getProgress);
-router.post('/:assessmentId/progress', restrictTo('user'), AssessmentController.saveProgress);
-router.post('/:assessmentId/complete', restrictTo('user'), AssessmentController.submitAssessment);
+router.post('/', restrictTo(ROLES.TEST_TAKER), AssessmentController.startAssessment);
+router.get('/', restrictTo(ROLES.TEST_TAKER), AssessmentController.listMyAssessments);
+router.get('/questions', restrictTo(ROLES.TEST_TAKER), AssessmentController.getQuestions);
+router.get('/:assessmentId', restrictTo(ROLES.TEST_TAKER), AssessmentController.getAssessment);
+router.get('/:assessmentId/progress', restrictTo(ROLES.TEST_TAKER), AssessmentController.getProgress);
+router.post('/:assessmentId/progress', restrictTo(ROLES.TEST_TAKER), AssessmentController.saveProgress);
+router.post('/:assessmentId/complete', restrictTo(ROLES.TEST_TAKER), AssessmentController.submitAssessment);
 router.get('/:assessmentId/results', AssessmentController.getResults);
 router.get('/:assessmentId/pdf', AssessmentController.downloadResultsPdf);
 
