@@ -70,6 +70,16 @@ module.exports = (sequelize, DataTypes) => {
     facilities: {
       type: DataTypes.ARRAY(DataTypes.STRING),
       allowNull: true
+    },
+    status: {
+      type: DataTypes.ENUM('approved', 'pending_review'),
+      allowNull: false,
+      defaultValue: 'approved'
+    },
+    submittedBy: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'submitted_by'
     }
   }, {
     tableName: 'institutions',
@@ -78,6 +88,10 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Institution.associate = (models) => {
+    Institution.belongsTo(models.User, {
+      foreignKey: 'submittedBy',
+      as: 'submitter'
+    });
     Institution.hasMany(models.User, {
       foreignKey: 'institutionId',
       as: 'users'

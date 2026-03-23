@@ -8,6 +8,7 @@ export default function RegistrationSuccess() {
   const navigate = useNavigate();
   const [showResendModal, setShowResendModal] = useState(false);
   const email = location.state?.email || '';
+  const fromRegistration = location.state?.fromRegistration || false;
 
   return (
     <div className="min-h-screen flex flex-col relative bg-white">
@@ -44,19 +45,32 @@ export default function RegistrationSuccess() {
             </div>
 
             <h2 className={`${TYPO.pageTitle} mb-1`} style={{ color: GOV.text }}>
-              Check your email
+              Account created!
             </h2>
-            <p className={`${TYPO.bodySmall} mb-4`} style={{ color: GOV.textMuted }}>
-              We sent a verification link to <span className="font-medium" style={{ color: GOV.text }}>{email || 'your email'}</span>.
-              Click the link, then complete your profile.
+            <p className={`${TYPO.bodySmall} mb-1`} style={{ color: GOV.textMuted }}>
+              A verification link is being sent to{' '}
+              <span className="font-medium" style={{ color: GOV.text }}>{email || 'your email'}</span>.
+            </p>
+            <p className={`${TYPO.hint} mb-5`} style={{ color: GOV.textHint }}>
+              You can complete your profile now and verify your email later.
             </p>
 
             <div className="space-y-2">
+              {fromRegistration && (
+                <button
+                  type="button"
+                  onClick={() => navigate('/onboarding')}
+                  className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  Complete your profile →
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowResendModal(true)}
-                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
-                style={{ backgroundColor: GOV.blue }}
+                className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
+                style={{ borderColor: GOV.blue, color: GOV.blue, backgroundColor: GOV.blueLightAlt }}
               >
                 Resend verification link
               </button>
@@ -66,7 +80,7 @@ export default function RegistrationSuccess() {
                 className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
                 style={{ borderColor: GOV.border, color: GOV.text }}
               >
-                Back to sign in
+                Back to Login
               </button>
             </div>
           </div>

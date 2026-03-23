@@ -1,11 +1,11 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Users, CheckCircle, TrendingUp, MoreHorizontal } from 'lucide-react';
+import { MapPin, Users, CheckCircle, TrendingUp, MoreHorizontal, Maximize2, Minimize2 } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
 import { GOV } from '../../theme/government';
 import { REGION_COLORS, REGION_LABELS, RIASEC_COLORS } from './analyticsConstants';
-import { ESWATINI_GEOJSON } from '../../data/eswatiniGeoJson';
+import { ESWATINI_GEOJSON } from '../../data/regionsGeoJson';
 
 const ESWATINI_CENTER = [-26.52, 31.47];
 const ESWATINI_ZOOM = 9;
@@ -40,8 +40,13 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
     [regionData]
   );
 
+  const getRegionKey = useCallback((feature) => {
+    const regionName = feature.properties?.REGIONNAME || feature.properties?.NAME || '';
+    return regionName.toLowerCase();
+  }, []);
+
   const regionStyle = useCallback((feature) => {
-    const key = feature.properties.region;
+    const key = getRegionKey(feature);
     const info = getRegionInfo(key);
     const users = Number(info.totalUsers) || 0;
     const intensity = 0.20 + (users / maxUsers) * 0.68;
@@ -53,10 +58,11 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
       weight: isSelected ? 3 : 1.5,
       dashArray: isSelected ? '' : '',
     };
-  }, [selectedRegion, maxUsers, getRegionInfo]);
+  }, [selectedRegion, maxUsers, getRegionInfo, getRegionKey]);
 
   const onEachFeature = useCallback((feature, layer) => {
-    const key = feature.properties.region;
+    const key = getRegionKey(feature);
+    const regionName = feature.properties?.REGIONNAME || feature.properties?.NAME || key;
     const info = getRegionInfo(key);
     const users = Number(info.totalUsers) || 0;
     const completed = Number(info.completedAssessments) || 0;
@@ -65,7 +71,7 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
 
     layer.bindTooltip(
       `<div style="font-family:sans-serif;min-width:140px">
-        <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#111827">${feature.properties.name}</div>
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#111827">${regionName}</div>
         <div style="font-size:11px;color:#374151;line-height:1.7">
           👥 Users: <strong>${users}</strong><br/>
           ✅ Completed: <strong>${completed}</strong><br/>
@@ -76,12 +82,13 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
       { permanent: false, direction: 'auto', className: 'leaflet-custom-tooltip' }
     );
 
+    const currentIntensity = 0.20 + (users / maxUsers) * 0.68;
     layer.on({
       click: () => onRegionChange(prev => prev === key ? null : key),
-      mouseover: (e) => e.target.setStyle({ weight: 2.5, fillOpacity: Math.min(intensity(key, maxUsers, info) + 0.12, 1) }),
+      mouseover: (e) => e.target.setStyle({ weight: 2.5, fillOpacity: Math.min(currentIntensity + 0.12, 1) }),
       mouseout: (e) => e.target.setStyle(regionStyle(feature)),
     });
-  }, [getRegionInfo, maxUsers, onRegionChange, regionStyle]);
+  }, [getRegionInfo, getRegionKey, maxUsers, onRegionChange, regionStyle]);
 
   const geoJsonKey = useMemo(
     () => `map-${selectedRegion || 'none'}-${(regionData || []).map(r => r.totalUsers).join('-')}`,
@@ -118,6 +125,10 @@ function intensity(key, maxUsers, info) {
 }
 
 const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, onRegionChange }) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
+
   const selectedDetail = useMemo(
     () => selectedRegion && regionalData?.regions
       ? regionalData.regions.find(r => r.region === selectedRegion)
@@ -138,9 +149,10 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
     : 0;
 
   return (
+    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white p-6 overflow-auto' : ''}`}>
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridAutoRows: 'min-content' }}>
         {/* Map */}
-        <div className="col-span-12 lg:col-span-7 bg-white rounded-lg border p-4" style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+        <div className={`${isFullscreen ? 'col-span-12' : 'col-span-12 lg:col-span-7'} bg-white rounded-lg border p-4`} style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
           <div className="flex items-start justify-between mb-3">
             <div>
               <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>Eswatini Regional Map</p>
@@ -153,7 +165,15 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
                   Clear selection
                 </button>
               )}
-              <button className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }}><MoreHorizontal className="w-4 h-4" /></button>
+              <button 
+                type="button"
+                onClick={toggleFullscreen}
+                className="p-1.5 rounded hover:bg-gray-100 transition-colors" 
+                style={{ color: GOV.blue }}
+                title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+              >
+                {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
             </div>
           </div>
           <LeafletChoropleth
@@ -161,6 +181,22 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
             selectedRegion={selectedRegion}
             onRegionChange={onRegionChange}
           />
+          
+          {/* Legend */}
+          <div className="mt-3 p-3 rounded-lg border" style={{ borderColor: GOV.borderLight, backgroundColor: '#fafafa' }}>
+            <p className="text-xs font-semibold mb-2" style={{ color: GOV.textMuted }}>Legend</p>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(to right, rgba(30,58,95,0.2), rgba(30,58,95,0.88))' }} />
+                <span style={{ color: GOV.text }}>User Density</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 rounded" style={{ borderColor: '#111827' }} />
+                <span style={{ color: GOV.text }}>Selected Region</span>
+              </div>
+            </div>
+          </div>
+
           <div className="mt-3 flex flex-wrap gap-3">
             {Object.entries(REGION_LABELS).map(([key, label]) => (
               <button
@@ -182,7 +218,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
         </div>
 
         {/* Right panel */}
-        <div className="col-span-12 lg:col-span-5 flex flex-col gap-4">
+        <div className={`${isFullscreen ? 'hidden' : 'col-span-12 lg:col-span-5'} flex flex-col gap-4`}>
           {selectedDetail ? (
             <div className="bg-white rounded-lg border p-4 flex-1" style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
               <div className="flex items-start justify-between mb-4">
@@ -254,7 +290,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
         </div>
 
       {/* Breakdown table */}
-      {regionalData?.regions?.length > 0 && (
+      {regionalData?.regions?.length > 0 && !isFullscreen && (
         <div className="col-span-12 bg-white rounded-lg border overflow-hidden" style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
           <div className="flex items-start justify-between px-4 pt-4 pb-2">
             <div>
@@ -314,6 +350,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

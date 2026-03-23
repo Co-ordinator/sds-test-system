@@ -9,6 +9,7 @@ const QuestionController = require('../controllers/question.controller');
 const OccupationController = require('../controllers/occupation.controller');
 const SubjectController = require('../controllers/subject.controller');
 const CertificateController = require('../controllers/certificate.controller');
+const EducationLevelController = require('../controllers/educationLevel.controller');
 const {
   createQuestionSchema,
   updateQuestionSchema,
@@ -29,6 +30,8 @@ router.get('/users/:id', requirePermission('users.view'), AdminController.getUse
 router.post('/users', requirePermission('users.create'), AdminController.createUser);
 router.patch('/users/:id', requirePermission('users.update'), AdminController.updateUser);
 router.delete('/users/:id', requirePermission('users.delete'), preventSelfDeletion, AdminController.deleteUser);
+router.post('/users/bulk-delete', requirePermission('users.delete'), AdminController.bulkDeleteUsers);
+router.post('/users/bulk-update', requirePermission('users.update'), AdminController.bulkUpdateUsers);
 router.patch('/users/:id/permissions', requirePermission('permissions.manage'), AdminController.updateUserPermissions);
 
 // ── Permission management ──────────────────────────────────────────────
@@ -40,6 +43,7 @@ router.get('/questions', requirePermission('questions.view'), QuestionController
 router.post('/questions', requirePermission('questions.create'), validate(createQuestionSchema), QuestionController.createQuestion);
 router.patch('/questions/:id', requirePermission('questions.update'), validate(updateQuestionSchema), QuestionController.updateQuestion);
 router.delete('/questions/:id', requirePermission('questions.delete'), QuestionController.deleteQuestion);
+router.post('/questions/bulk-delete', requirePermission('questions.delete'), QuestionController.bulkDeleteQuestions);
 router.post(
   '/questions/import',
   requirePermission('questions.import'),
@@ -56,7 +60,10 @@ router.get('/questions/export', requirePermission('questions.export'), QuestionC
 router.get('/occupations', requirePermission('occupations.view'), OccupationController.listOccupations);
 router.post('/occupations', requirePermission('occupations.create'), validate(createOccupationSchema), OccupationController.createOccupation);
 router.patch('/occupations/:id', requirePermission('occupations.update'), validate(updateOccupationSchema), OccupationController.updateOccupation);
+router.patch('/occupations/:id/review', requirePermission('occupations.update'), OccupationController.reviewOccupation);
 router.delete('/occupations/:id', requirePermission('occupations.delete'), OccupationController.deleteOccupation);
+router.post('/occupations/bulk-delete', requirePermission('occupations.delete'), OccupationController.bulkDeleteOccupations);
+router.post('/occupations/bulk-approve', requirePermission('occupations.update'), OccupationController.bulkApproveOccupations);
 router.post(
   '/occupations/import',
   requirePermission('occupations.import'),
@@ -68,17 +75,6 @@ router.post(
   OccupationController.importOccupations
 );
 router.get('/occupations/export', requirePermission('occupations.export'), OccupationController.exportOccupations);
-
-// ── Analytics ──────────────────────────────────────────────────────────
-router.get('/analytics', requirePermission('analytics.view'), AdminController.getAnalytics);
-router.get('/analytics/institutions', requirePermission('analytics.view'), AdminController.getInstitutionAnalytics);
-router.get('/analytics/holland-distribution', requirePermission('analytics.view'), AdminController.getHollandDistribution);
-router.get('/analytics/trend', requirePermission('analytics.view'), AdminController.getAssessmentTrend);
-router.get('/analytics/regional', requirePermission('analytics.view'), AdminController.getRegionalAnalytics);
-router.get('/analytics/knowledge-graph', requirePermission('analytics.view'), AdminController.getKnowledgeGraphAnalytics);
-router.get('/analytics/export', requirePermission('analytics.export'), AdminController.exportAnalytics);
-router.get('/analytics/segmentation', requirePermission('analytics.view'), AdminController.getSegmentationAnalytics);
-router.get('/analytics/skills-pipeline', requirePermission('analytics.view'), AdminController.getSkillsPipeline);
 
 // ── Assessments (admin view) ───────────────────────────────────────────
 router.get('/assessments', requirePermission('assessments.view'), AdminController.getAllAssessments);
@@ -110,8 +106,15 @@ router.get('/certificates', requirePermission('certificates.view'), CertificateC
 router.post('/certificates/:assessmentId/generate', requirePermission('certificates.generate'), CertificateController.generateCertificate);
 router.get('/certificates/:assessmentId/download', requirePermission('certificates.download'), CertificateController.downloadCertificate);
 
-// ── Audit logs ─────────────────────────────────────────────────────────
+// ── Education levels ───────────────────────────────────────────────────────
+router.get('/education-levels', requirePermission('courses.view'), EducationLevelController.listEducationLevels);
+router.post('/education-levels', requirePermission('courses.create'), EducationLevelController.createEducationLevel);
+router.patch('/education-levels/:id', requirePermission('courses.update'), EducationLevelController.updateEducationLevel);
+router.delete('/education-levels/:id', requirePermission('courses.delete'), EducationLevelController.deleteEducationLevel);
+
+// ── Audit logs ─────────────────────────────────────────────────────────────
 router.get('/audit-logs', requirePermission('audit.view'), AdminController.getAuditLogs);
+router.get('/audit-logs/export', requirePermission('audit.view'), AdminController.exportAuditLogs);
 router.get('/audit-logs/:id', requirePermission('audit.view'), AdminController.getAuditLog);
 
 // ── Institution management (admin-only) ────────────────────────────────

@@ -1,6 +1,4 @@
-const scoringService = require('../services/scoring.service');
-const { Assessment, Answer, Question, User } = require('../models');
-const { Op } = require('sequelize');
+const assessmentService = require('../services/assessment.service');
 const PDFDocument = require('pdfkit');
 const logger = require('../utils/logger');
 const path = require('path');
@@ -24,353 +22,99 @@ const DEMAND_PDF_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d
  * Coordinates starting assessments, progress saving, and final Holland Code calculation.
  */
 class AssessmentController {
-  /**
-   * Start a new assessment for the current user.
-   * Optionally reuses an in-progress assessment if one exists.
-   */
   async startAssessment(req, res, next) {
     try {
-      const userId = req.user.id;
-
-      const existing = await Assessment.findOne({
-        where: { userId, status: 'in_progress' },
-        order: [['createdAt', 'DESC']]
-      });
-
-      if (existing) {
-        return res.status(200).json({
-          status: 'success',
-          data: { assessment: existing, resumed: true }
-        });
-      }
-
-      const assessment = await Assessment.create({
-        userId,
-        status: 'in_progress',
-        progress: 0
-      });
-
-      logger.info({
-        actionType: 'TEST_START',
-        message: `Assessment started for user ${userId}`,
-        req,
-        details: { assessmentId: assessment.id, userId }
-      });
-
-      return res.status(201).json({
-        status: 'success',
-        data: { assessment, resumed: false }
-      });
+      const { assessment, resumed } = await assessmentService.startAssessment(req.user.id);
+      logger.info({ actionType: 'TEST_START', message: `Assessment ${resumed ? 'resumed' : 'started'} for user ${req.user.id}`, req, details: { assessmentId: assessment.id, userId: req.user.id } });
+      return res.status(resumed ? 200 : 201).json({ status: 'success', data: { assessment, resumed } });
     } catch (error) {
-      logger.error({
-        actionType: 'ASSESSMENT_START_FAILED',
-        message: 'Failed to start assessment',
-        req,
-        details: { error: error.message, stack: error.stack }
-      });
+      logger.error({ actionType: 'ASSESSMENT_START_FAILED', message: 'Failed to start assessment', req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
   }
 
-  /**
-   * List assessments for the current user (for dashboard).
-   */
   async listMyAssessments(req, res, next) {
     try {
-      const userId = req.user.id;
-      const assessments = await Assessment.findAll({
-        where: { userId },
-        order: [['createdAt', 'DESC']],
-        attributes: ['id', 'status', 'progress', 'hollandCode', 'completedAt', 'createdAt', 'updatedAt']
-      });
-      return res.status(200).json({
-        status: 'success',
-        data: { assessments }
-      });
+      const assessments = await assessmentService.listMyAssessments(req.user.id);
+      return res.status(200).json({ status: 'success', data: { assessments } });
     } catch (error) {
-      logger.error({
-        actionType: 'ASSESSMENT_LIST_FAILED',
-        message: 'Failed to list assessments',
-        req,
-        details: { error: error.message }
-      });
+      logger.error({ actionType: 'ASSESSMENT_LIST_FAILED', message: 'Failed to list assessments', req, details: { error: error.message } });
       return next(error);
     }
   }
 
-  /**
-   * Get one assessment (for resume or detail). Ensures ownership.
-   */
   async getAssessment(req, res, next) {
     try {
-      const { assessmentId } = req.params;
-      const assessment = await Assessment.findOne({
-        where: { id: assessmentId, userId: req.user.id }
-      });
-      if (!assessment) {
-        return res.status(404).json({ status: 'error', message: 'Assessment not found' });
-      }
+      const assessment = await assessmentService.getAssessment(req.params.assessmentId, req.user.id);
       return res.status(200).json({ status: 'success', data: { assessment } });
     } catch (error) {
+      if (error.message === 'Assessment not found') return res.status(404).json({ status: 'error', message: error.message });
       return next(error);
     }
   }
 
-  /**
-   * Get saved answers for an in-progress assessment (used to restore progress on page refresh).
-   */
   async getProgress(req, res, next) {
     try {
-      const { assessmentId } = req.params;
-      const assessment = await Assessment.findOne({
-        where: { id: assessmentId, userId: req.user.id }
-      });
-      if (!assessment) {
-        return res.status(404).json({ status: 'error', message: 'Assessment not found' });
-      }
-      const saved = await Answer.findAll({
-        where: { assessmentId },
-        attributes: ['questionId', 'value']
-      });
-      const answers = {};
-      saved.forEach((a) => { answers[a.questionId] = a.value; });
+      const answers = await assessmentService.getProgress(req.params.assessmentId, req.user.id);
       return res.status(200).json({ status: 'success', data: { answers } });
     } catch (error) {
+      if (error.message === 'Assessment not found') return res.status(404).json({ status: 'error', message: error.message });
       return next(error);
     }
   }
 
-  /**
-   * Get questions for the test (by section). Used by the test-taking UI.
-   */
   async getQuestions(req, res, next) {
     try {
-      const { section } = req.query;
-      const where = section ? { section } : {};
-      const questions = await Question.findAll({
-        where,
-        order: [['section'], ['order']],
-        attributes: ['id', 'text', 'section', 'riasecType', 'order', 'questionCode']
-      });
-      return res.status(200).json({
-        status: 'success',
-        data: { questions }
-      });
+      const questions = await assessmentService.getQuestions(req.query.section);
+      return res.status(200).json({ status: 'success', data: { questions } });
     } catch (error) {
-      logger.error({
-        actionType: 'QUESTIONS_FETCH_FAILED',
-        message: 'Failed to fetch questions',
-        req,
-        details: { error: error.message }
-      });
+      logger.error({ actionType: 'QUESTIONS_FETCH_FAILED', message: 'Failed to fetch questions', req, details: { error: error.message } });
       return next(error);
     }
   }
 
-  /**
-   * Saves a single answer or a batch of answers as the user progresses.
-   * Updates the progress percentage for the Student Dashboard.
-   */
   async saveProgress(req, res, next) {
     try {
-      const assessmentId = req.params.assessmentId;
-      const { answers } = req.body; // answers: [{questionId, value, section, riasecType}]
-
-      const assessment = await Assessment.findOne({
-        where: { id: assessmentId, userId: req.user.id }
-      });
-      if (!assessment || assessment.status !== 'in_progress') {
-        return res.status(404).json({ status: 'error', message: 'Assessment not found or not in progress' });
-      }
-
-      if (!Array.isArray(answers) || answers.length === 0) {
-        return res.status(400).json({ status: 'error', message: 'answers array is required' });
-      }
-
-      const totalQuestions = await Question.count();
-
-      const normalizeValue = (v, section) => {
-        const s = String(v).trim();
-        if (section === 'self_estimates') {
-          const n = parseInt(s, 10);
-          if (n >= 1 && n <= 6) return String(n);
-          return s;
-        }
-        if (['yes', 'no'].includes(s.toLowerCase())) return s.toUpperCase();
-        return s;
-      };
-
-      for (const ans of answers) {
-        const value = normalizeValue(ans.value, ans.section);
-        await Answer.upsert({
-          assessmentId,
-          questionId: ans.questionId,
-          value,
-          section: ans.section,
-          riasecType: ans.riasecType
-        });
-      }
-
-      // 2. Calculate and update progress percentage
-      const answeredCount = await Answer.count({ where: { assessmentId } });
-      const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-
-      await Assessment.update(
-        { progress: progress.toFixed(2) },
-        { where: { id: assessmentId } }
-      );
-
-      logger.info({
-        actionType: 'ASSESSMENT_PROGRESS_SAVED',
-        message: `Progress saved for assessment ${assessmentId}`,
-        req,
-        details: { assessmentId, answeredCount, progress }
-      });
-
-      return res.status(200).json({ 
-        status: 'success',
-        data: { progress: Number(progress.toFixed(2)) }
-      });
+      const { progress, answeredCount } = await assessmentService.saveProgress(req.params.assessmentId, req.user.id, req.body.answers);
+      logger.info({ actionType: 'ASSESSMENT_PROGRESS_SAVED', message: `Progress saved for assessment ${req.params.assessmentId}`, req, details: { assessmentId: req.params.assessmentId, answeredCount, progress } });
+      return res.status(200).json({ status: 'success', data: { progress } });
     } catch (error) {
-      logger.error({
-        actionType: 'ASSESSMENT_PROGRESS_FAILED',
-        message: 'Failed to save progress',
-        req,
-        details: { error: error.message, stack: error.stack }
-      });
+      if (error.message === 'Assessment not found or not in progress') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.message === 'answers array is required') return res.status(400).json({ status: 'error', message: error.message });
+      logger.error({ actionType: 'ASSESSMENT_PROGRESS_FAILED', message: 'Failed to save progress', req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
   }
 
-  /**
-   * Final submission: Calculates scores and generates Holland Code.
-   */
   async submitAssessment(req, res, next) {
     try {
-      const assessmentId = req.params.assessmentId;
-
-      const assessment = await Assessment.findOne({
-        where: { id: assessmentId, userId: req.user.id }
-      });
-      if (!assessment || assessment.status !== 'in_progress') {
-        return res.status(404).json({ status: 'error', message: 'Assessment not found or not in progress' });
-      }
-
-      const answeredCount = await Answer.count({ where: { assessmentId } });
-      if (answeredCount < 228) {
-        return res.status(400).json({ 
-          status: 'error',
-          message: 'Assessment is incomplete', 
-          answered: answeredCount 
-        });
-      }
-
-      // Trigger the Scoring Service
-      const results = await scoringService.finalizeAssessment(assessmentId);
-
-      logger.info({
-        actionType: 'ASSESSMENT_COMPLETED',
-        message: `Assessment ${assessmentId} finalized`,
-        req,
-        details: { assessmentId, hollandCode: results.hollandCode }
-      });
-
-      return res.status(200).json({
-        status: 'success',
-        data: {
-          hollandCode: results.hollandCode,
-          scores: results.scores,
-          recommendations: results.recommendations
-        }
-      });
+      const results = await assessmentService.submitAssessment(req.params.assessmentId, req.user.id);
+      logger.info({ actionType: 'ASSESSMENT_COMPLETED', message: `Assessment ${req.params.assessmentId} finalized`, req, details: { assessmentId: req.params.assessmentId, hollandCode: results.hollandCode } });
+      return res.status(200).json({ status: 'success', data: { hollandCode: results.hollandCode, scores: results.scores, recommendations: results.recommendations } });
     } catch (error) {
-      logger.error({
-        actionType: 'ASSESSMENT_COMPLETE_FAILED',
-        message: `Failed to finalize assessment ${req.params.assessmentId}`,
-        req,
-        details: { error: error.message, stack: error.stack }
-      });
+      if (error.message === 'Assessment not found or not in progress') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.message === 'Assessment is incomplete') return res.status(400).json({ status: 'error', message: error.message, answered: error.answered });
+      logger.error({ actionType: 'ASSESSMENT_COMPLETE_FAILED', message: `Failed to finalize assessment ${req.params.assessmentId}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
   }
 
-  /**
-   * Retrieves results for the Dashboard "View Results" action.
-   */
   async getResults(req, res, next) {
     try {
-      const assessmentId = req.params.assessmentId;
-      const assessment = await Assessment.findByPk(assessmentId);
-
-      if (!assessment || assessment.status !== 'completed') {
-        return res.status(404).json({ status: 'error', message: 'Results not found' });
-      }
-
-      const isOwner = assessment.userId === req.user.id;
-      const isStaff = ['System Administrator', 'Test Administrator'].includes(req.user.role);
-      if (!isOwner && !isStaff) {
-        return res.status(403).json({ status: 'error', message: 'Not authorized to view these results' });
-      }
-
-      const recommendations = await scoringService.getRecommendations(
-        assessment.hollandCode,
-        assessment.educationLevelAtTest
-      );
-
-      logger.info({
-        actionType: 'ASSESSMENT_RESULTS_FETCHED',
-        message: `Results fetched for assessment ${assessmentId}`,
-        req,
-        details: { assessmentId }
-      });
-
-      return res.status(200).json({
-        status: 'success',
-        data: {
-          assessment,
-          recommendations
-        }
-      });
+      const { assessment, recommendations } = await assessmentService.getResults(req.params.assessmentId, req.user.id, req.user.role);
+      logger.info({ actionType: 'ASSESSMENT_RESULTS_FETCHED', message: `Results fetched for assessment ${req.params.assessmentId}`, req, details: { assessmentId: req.params.assessmentId } });
+      return res.status(200).json({ status: 'success', data: { assessment, recommendations } });
     } catch (error) {
-      logger.error({
-        actionType: 'ASSESSMENT_RESULTS_FAILED',
-        message: `Failed to fetch results for assessment ${req.params.assessmentId}`,
-        req,
-        details: { error: error.message, stack: error.stack }
-      });
+      if (error.message === 'Results not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.message === 'Not authorized to view these results') return res.status(403).json({ status: 'error', message: error.message });
+      logger.error({ actionType: 'ASSESSMENT_RESULTS_FAILED', message: `Failed to fetch results for assessment ${req.params.assessmentId}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
   }
 
-  /**
-   * Generate a full PDF Career Report for a completed assessment.
-   * Enterprise-grade layout with colorful charts, embedded logo, and Holland Code interpretation.
-   */
   async downloadResultsPdf(req, res, next) {
     try {
-      const assessmentId = req.params.assessmentId;
-      const assessment = await Assessment.findByPk(assessmentId, {
-        include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel'] }]
-      });
-
-      if (!assessment || assessment.status !== 'completed') {
-        return res.status(404).json({ status: 'error', message: 'Completed assessment not found' });
-      }
-
-      const isOwner = assessment.userId === req.user.id;
-      const isAdmin = req.user.role === 'System Administrator';
-      const isCounselor = req.user.role === 'Test Administrator';
-      if (!isOwner && !isAdmin && !isCounselor) {
-        return res.status(403).json({ status: 'error', message: 'Not authorized' });
-      }
-
-      let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
-      try {
-        recommendations = await scoringService.getRecommendations(
-          assessment.hollandCode,
-          assessment.educationLevelAtTest
-        );
-      } catch (_) {}
+      const { assessment, recommendations } = await assessmentService.getResultsForPdf(req.params.assessmentId, req.user.id, req.user.role);
 
       const student = assessment.user || {};
       const studentName = [student.firstName, student.lastName].filter(Boolean).join(' ') || 'Student';
@@ -387,10 +131,15 @@ class AssessmentController {
 
       const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="CareerReport_${assessmentId}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="CareerReport_${assessment.id}.pdf"`);
       doc.pipe(res);
 
       const govBlue = '#1e3a5f';
+      const gold = '#c8a84b';
+      const text = '#111827';
+      const muted = '#6b7280';
+      const border = '#d1d5db';
+      const stripe = '#f7f9fc';
       const pageWidth = doc.page.width - 100;
       const pageHeight = doc.page.height;
       const leftMargin = 50;
@@ -398,54 +147,57 @@ class AssessmentController {
       let logoPath = path.join(__dirname, '../../../frontend/public/siyinqaba.png');
       if (!fs.existsSync(logoPath)) logoPath = null;
 
-      const drawFooter = () => {
-        doc.save();
-        doc.moveTo(leftMargin, pageHeight - 55).lineTo(leftMargin + pageWidth, pageHeight - 55)
-          .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
-        doc.fillColor('#9ca3af').fontSize(7).font('Helvetica')
-          .text('Eswatini National Career Guidance Platform \u00b7 Ministry of Labour \u00b7 careers.gov.sz',
-            leftMargin, pageHeight - 45, { width: pageWidth, align: 'center' });
-        doc.fillColor('#9ca3af').fontSize(6)
-          .text(`Generated: ${dateStr}`, leftMargin, pageHeight - 35, { width: pageWidth, align: 'center' });
-        doc.restore();
+      const drawLetterhead = (title) => {
+        doc.font('Helvetica-Bold').fontSize(18).fillColor(text);
+        doc.text('GOVERNMENT', leftMargin + 10, 28);
+        doc.text('OF   ESWATINI', leftMargin, 28, { width: pageWidth - 10, align: 'right' });
+        if (logoPath) {
+          try { doc.image(logoPath, (doc.page.width - 72) / 2, 18, { width: 72 }); } catch (_) {}
+        }
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(text);
+        doc.text('Tel:  +268 4041971/2/3', leftMargin, 74);
+        doc.text('Fax: +268 4049889', leftMargin, 86);
+        doc.text('Email: mkhaliphi@gov.sz', leftMargin, 98);
+        doc.text('Principal Secretary\'s Office', leftMargin, 74, { width: pageWidth, align: 'right' });
+        doc.font('Helvetica').fontSize(8);
+        doc.text('Ministry of Labour & Social Security', leftMargin, 86, { width: pageWidth, align: 'right' });
+        doc.text('P.O. Box 198, Mbabane H100', leftMargin, 98, { width: pageWidth, align: 'right' });
+        doc.moveTo(leftMargin, 116).lineTo(leftMargin + pageWidth, 116).strokeColor('#000000').lineWidth(0.7).stroke();
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(text)
+          .text(title, leftMargin, 128, { width: pageWidth, align: 'center' });
+        doc.font('Helvetica').fontSize(7.5).fillColor(muted)
+          .text(`Generated: ${dateStr}`, leftMargin, 144, { width: pageWidth, align: 'center' });
+        doc.moveTo(leftMargin, 156).lineTo(leftMargin + pageWidth, 156).strokeColor(border).lineWidth(0.6).stroke();
       };
 
       // ══ PAGE 1: Header, Info, RIASEC Radar + Bars, Holland Code ══
-      doc.rect(leftMargin, 30, pageWidth, 55).fill(govBlue);
-      if (logoPath) {
-        try { doc.image(logoPath, leftMargin + 8, 35, { height: 45 }); } catch (_) {}
-      }
-      const titleX = logoPath ? leftMargin + 65 : leftMargin + 15;
-      doc.fillColor('white').fontSize(16).font('Helvetica-Bold')
-        .text('CAREER ASSESSMENT REPORT', titleX, 42);
-      doc.fontSize(8).font('Helvetica')
-        .text('Kingdom of Eswatini \u00b7 Ministry of Labour and Social Security', titleX, 60);
+      drawLetterhead('CAREER ASSESSMENT REPORT');
 
       // Student information box
-      const infoBoxY = 95;
-      doc.roundedRect(leftMargin, infoBoxY, pageWidth, 50, 4).strokeColor('#e5e7eb').lineWidth(1).stroke();
+      const infoBoxY = 170;
+      doc.rect(leftMargin, infoBoxY, pageWidth, 50).strokeColor(border).lineWidth(0.8).stroke();
       doc.fillColor(govBlue).fontSize(9).font('Helvetica-Bold');
       doc.text('Name:', leftMargin + 12, infoBoxY + 10);
       doc.text('Holland Code:', leftMargin + 12, infoBoxY + 26);
       doc.text('Date:', leftMargin + 260, infoBoxY + 10);
       if (student.gradeLevel) doc.text('Grade:', leftMargin + 260, infoBoxY + 26);
-      doc.fillColor('#374151').fontSize(9).font('Helvetica');
+      doc.fillColor(text).fontSize(9).font('Helvetica');
       doc.text(studentName, leftMargin + 70, infoBoxY + 10);
       doc.text(dateStr, leftMargin + 300, infoBoxY + 10);
       if (student.gradeLevel) doc.text(student.gradeLevel, leftMargin + 300, infoBoxY + 26);
 
-      // Holland Code colored letter boxes
+      // Holland Code plain letter cells
       let hcX = leftMargin + 100;
       hollandLetters.forEach(c => {
-        doc.roundedRect(hcX, infoBoxY + 22, 18, 18, 3).fill(RIASEC_COLORS[c] || govBlue);
-        doc.fillColor('white').fontSize(10).font('Helvetica-Bold').text(c, hcX + 4.5, infoBoxY + 25);
+        doc.rect(hcX, infoBoxY + 22, 18, 18).strokeColor(border).lineWidth(0.6).stroke();
+        doc.fillColor(text).fontSize(10).font('Helvetica-Bold').text(c, hcX + 4.5, infoBoxY + 25);
         hcX += 22;
       });
-      doc.fillColor('#6b7280').fontSize(7.5).font('Helvetica')
-        .text(hollandLetters.map(c => RIASEC_LABELS[c]).join(' \u00b7 '), hcX + 4, infoBoxY + 28);
+      doc.fillColor(muted).fontSize(7.5).font('Helvetica')
+        .text(hollandLetters.map(c => RIASEC_LABELS[c]).join(' · '), hcX + 4, infoBoxY + 28);
 
       // RIASEC Radar Chart (hexagonal)
-      const radarSectionY = 160;
+      const radarSectionY = 240;
       doc.fillColor(govBlue).fontSize(11).font('Helvetica-Bold')
         .text('Your RIASEC Profile', leftMargin, radarSectionY);
       doc.moveTo(leftMargin, radarSectionY + 14).lineTo(leftMargin + pageWidth, radarSectionY + 14)
@@ -520,11 +272,11 @@ class AssessmentController {
         const score = scores[key];
         const pct = (score / maxScore) * barWidth;
         const color = RIASEC_COLORS[key];
-        doc.roundedRect(barsX, rowY, 16, 16, 2).fill(color);
-        doc.fillColor('white').fontSize(8).font('Helvetica-Bold').text(key, barsX + 4, rowY + 3);
+        doc.rect(barsX, rowY, 16, 16).strokeColor(border).lineWidth(0.6).stroke();
+        doc.fillColor(text).fontSize(8).font('Helvetica-Bold').text(key, barsX + 4, rowY + 3);
         doc.fillColor('#374151').fontSize(8).font('Helvetica').text(RIASEC_LABELS[key], barsX + 22, rowY + 3);
-        doc.roundedRect(barsX + 90, rowY + 2, barWidth, 10, 3).fill('#f3f4f6');
-        if (pct > 0) doc.roundedRect(barsX + 90, rowY + 2, Math.max(pct, 6), 10, 3).fill(color);
+        doc.rect(barsX + 90, rowY + 2, barWidth, 10).fill('#f3f4f6');
+        if (pct > 0) doc.rect(barsX + 90, rowY + 2, Math.max(pct, 6), 10).fill(color);
         doc.fillColor(color).fontSize(8.5).font('Helvetica-Bold').text(`${score}`, barsX + 90 + barWidth + 8, rowY + 2);
       });
 
@@ -538,12 +290,10 @@ class AssessmentController {
       hollandLetters.slice(0, 3).forEach((c, i) => {
         const cardY = hcSectionY + 20 + i * 42;
         const color = RIASEC_COLORS[c];
-        doc.roundedRect(leftMargin, cardY, 4, 34, 2).fill(color);
-        doc.circle(leftMargin + 18, cardY + 10, 8).fill(color);
-        doc.fillColor('white').fontSize(8).font('Helvetica-Bold').text(`${i + 1}`, leftMargin + 14, cardY + 6);
-        doc.fillColor(color).fontSize(10).font('Helvetica-Bold')
-          .text(`${RIASEC_LABELS[c]} (${c})`, leftMargin + 32, cardY + 4);
-        doc.fillColor('#6b7280').fontSize(8).font('Helvetica')
+        doc.rect(leftMargin, cardY, pageWidth, 34).strokeColor(border).lineWidth(0.6).stroke();
+        doc.font('Helvetica-Bold').fontSize(10).fillColor(text)
+          .text(`${i + 1}. ${RIASEC_LABELS[c]} (${c})`, leftMargin + 10, cardY + 6);
+        doc.fillColor(muted).fontSize(8).font('Helvetica')
           .text(RIASEC_DESC[c], leftMargin + 32, cardY + 18, { width: pageWidth - 40 });
       });
 
@@ -560,24 +310,20 @@ class AssessmentController {
         subjects.forEach(s => {
           const tw = doc.widthOfString(s) + 16;
           if (pillX + tw > leftMargin + pageWidth) { pillX = leftMargin; curY += 18; }
-          doc.roundedRect(pillX, curY, tw, 16, 8).fill('#ecfdf5');
-          doc.fillColor('#059669').fontSize(7.5).font('Helvetica-Bold').text(s, pillX + 8, curY + 3.5);
+          doc.rect(pillX, curY, tw, 16).strokeColor(border).lineWidth(0.5).stroke();
+          doc.fillColor(text).fontSize(7.5).font('Helvetica-Bold').text(s, pillX + 8, curY + 3.5);
           pillX += tw + 6;
         });
         curY += 24;
       }
 
-      drawFooter();
-
       // ══ PAGE 2: Career Recommendations ══
       if (occupations.length > 0) {
         doc.addPage();
-        doc.rect(leftMargin, 30, pageWidth, 28).fill(govBlue);
-        doc.fillColor('white').fontSize(11).font('Helvetica-Bold')
-          .text('RECOMMENDED CAREER PATHS', leftMargin + 15, 38);
+        drawLetterhead('RECOMMENDED CAREER PATHS');
 
-        let occY = 70;
-        doc.fillColor('#6b7280').fontSize(8).font('Helvetica')
+        let occY = 170;
+        doc.fillColor(muted).fontSize(8).font('Helvetica')
           .text('Careers aligned with your Holland Code profile. Demand levels indicate local labour market outlook.', leftMargin, occY);
         occY += 18;
 
@@ -586,9 +332,9 @@ class AssessmentController {
           const rLetter = occ.primaryRiasec || hollandLetters[0] || 'R';
           const color = RIASEC_COLORS[rLetter] || govBlue;
 
-          doc.roundedRect(leftMargin, occY, 18, 18, 3).fill(color);
-          doc.fillColor('white').fontSize(9).font('Helvetica-Bold').text(rLetter, leftMargin + 5, occY + 4);
-          doc.fillColor('#111827').fontSize(9.5).font('Helvetica-Bold')
+          doc.rect(leftMargin, occY, 18, 18).strokeColor(border).lineWidth(0.6).stroke();
+          doc.fillColor(text).fontSize(9).font('Helvetica-Bold').text(rLetter, leftMargin + 5, occY + 4);
+          doc.fillColor(text).fontSize(9.5).font('Helvetica-Bold')
             .text(occ.name, leftMargin + 24, occY + 1);
 
           const demand = occ.localDemand || occ.demandLevel;
@@ -596,30 +342,27 @@ class AssessmentController {
             const dColor = DEMAND_PDF_COLORS[demand] || '#6b7280';
             const dLabel = DEMAND_LABELS[demand] || demand;
             const dX = leftMargin + 24 + doc.widthOfString(occ.name) + 8;
-            doc.roundedRect(dX, occY + 1, doc.widthOfString(dLabel) + 14, 13, 6).fill(dColor + '20');
+            doc.rect(dX, occY + 1, doc.widthOfString(dLabel) + 14, 13).strokeColor(border).lineWidth(0.5).stroke();
             doc.fillColor(dColor).fontSize(7).font('Helvetica-Bold').text(dLabel, dX + 7, occY + 4);
           }
 
           if (occ.description) {
-            doc.fillColor('#6b7280').fontSize(8).font('Helvetica')
+            doc.fillColor(muted).fontSize(8).font('Helvetica')
               .text(occ.description, leftMargin + 24, occY + 14, { width: pageWidth - 30 });
             occY += 8;
           }
+          doc.moveTo(leftMargin, occY + 22).lineTo(leftMargin + pageWidth, occY + 22).strokeColor(border).lineWidth(0.5).stroke();
           occY += 26;
         });
-
-        drawFooter();
       }
 
       // ══ PAGE 3: Courses & Qualifications ══
       if (courses.length > 0) {
         doc.addPage();
-        doc.rect(leftMargin, 30, pageWidth, 28).fill(govBlue);
-        doc.fillColor('white').fontSize(11).font('Helvetica-Bold')
-          .text('RECOMMENDED COURSES & QUALIFICATIONS', leftMargin + 15, 38);
+        drawLetterhead('RECOMMENDED COURSES & QUALIFICATIONS');
 
-        let crsY = 70;
-        doc.fillColor('#6b7280').fontSize(8).font('Helvetica')
+        let crsY = 170;
+        doc.fillColor(muted).fontSize(8).font('Helvetica')
           .text('Study programmes aligned to your profile with entry requirements and institutions.', leftMargin, crsY);
         crsY += 18;
 
@@ -629,30 +372,19 @@ class AssessmentController {
 
           if (qualType) {
             const qw = doc.widthOfString(qualType) + 12;
-            doc.roundedRect(leftMargin, crsY, qw, 14, 4).fill('#e8eef4');
-            doc.fillColor(govBlue).fontSize(7).font('Helvetica-Bold').text(qualType, leftMargin + 6, crsY + 3);
+            doc.rect(leftMargin, crsY, qw, 14).strokeColor(border).lineWidth(0.5).stroke();
+            doc.fillColor(text).fontSize(7).font('Helvetica-Bold').text(qualType, leftMargin + 6, crsY + 3);
           }
 
           doc.fillColor(govBlue).fontSize(9.5).font('Helvetica-Bold')
             .text(course.name, leftMargin + (qualType ? doc.widthOfString(qualType) + 18 : 0), crsY + 1);
+
           crsY += 18;
 
           if (course.description) {
             doc.fillColor('#374151').fontSize(8).font('Helvetica')
               .text(course.description, leftMargin + 10, crsY, { width: pageWidth - 20 });
             crsY += doc.heightOfString(course.description, { width: pageWidth - 20, fontSize: 8 }) + 4;
-          }
-
-          const reqs = course.requirements || [];
-          if (reqs.length > 0) {
-            doc.fillColor('#059669').fontSize(8).font('Helvetica-Bold').text('Entry Requirements:', leftMargin + 10, crsY);
-            crsY += 12;
-            reqs.forEach(r => {
-              const mColor = r.isMandatory ? govBlue : '#9ca3af';
-              doc.fillColor(mColor).fontSize(7.5).font('Helvetica')
-                .text(`${r.subject}: ${r.minimumGrade}${r.isMandatory ? '' : ' (recommended)'}`, leftMargin + 20, crsY);
-              crsY += 11;
-            });
           }
 
           const insts = (course.courseInstitutions || []).map(ci => ci.institution?.name).filter(Boolean);
@@ -663,8 +395,8 @@ class AssessmentController {
             insts.forEach(name => {
               const tw = doc.widthOfString(name) + 14;
               if (instX + tw > leftMargin + pageWidth) { instX = leftMargin + 20; crsY += 16; }
-              doc.roundedRect(instX, crsY, tw, 14, 7).fill('#e8eef4');
-              doc.fillColor(govBlue).fontSize(7).font('Helvetica-Bold').text(name, instX + 7, crsY + 3);
+              doc.rect(instX, crsY, tw, 14).strokeColor(border).lineWidth(0.5).stroke();
+              doc.fillColor(text).fontSize(7).font('Helvetica-Bold').text(name, instX + 7, crsY + 3);
               instX += tw + 4;
             });
             crsY += 20;
@@ -674,18 +406,13 @@ class AssessmentController {
             .strokeColor('#f3f4f6').lineWidth(0.5).stroke();
           crsY += 10;
         });
-
-        drawFooter();
       }
 
       doc.end();
     } catch (error) {
-      logger.error({
-        actionType: 'PDF_GENERATION_FAILED',
-        message: `PDF generation failed for assessment ${req.params.assessmentId}`,
-        req,
-        details: { error: error.message, stack: error.stack }
-      });
+      if (error.message === 'Completed assessment not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.message === 'Not authorized') return res.status(403).json({ status: 'error', message: error.message });
+      logger.error({ actionType: 'PDF_GENERATION_FAILED', message: `PDF generation failed for assessment ${req.params.assessmentId}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
   }

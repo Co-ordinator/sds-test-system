@@ -119,7 +119,7 @@ const CounselorStudentsPanel = ({ students, isAdmin, loading, error, onRefresh, 
       {error && <ErrorBanner message={error} onRetry={onRefresh} className="mb-3" />}
 
       <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
-        <DataTable columns={columns} rows={students} rowKey="id" loading={loading} emptyTitle="No students found" toolbar={toolbar} pageSize={25} />
+        <DataTable columns={columns} rows={students} rowKey="id" loading={loading} emptyTitle="No students found" toolbar={toolbar} pageSize={7} />
       </div>
 
       {/* Edit Student Modal */}

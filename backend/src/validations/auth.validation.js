@@ -28,7 +28,7 @@ const isValidDate = (yyMMdd) => {
     date.getDate() === dd;
 };
 
-// National ID validation (13 digits, valid date, Luhn check)
+// National ID validation (13 digits, valid date)
 const validateNationalId = (value, helpers) => {
   if (!/^\d{13}$/.test(value)) {
     return helpers.error('string.pattern.base');
@@ -38,9 +38,7 @@ const validateNationalId = (value, helpers) => {
     return helpers.error('date.invalid');
   }
   
-  if (!luhnCheck(value)) {
-    return helpers.error('luhn.invalid');
-  }
+  // Luhn check removed for practical use - not all IDs use this algorithm
   
   return value;
 };
@@ -50,13 +48,17 @@ const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
 
 const phonePattern = /^\+268\d{8}$/;
 
-// Simple registration: email OR phone, password, consent. One identifier required.
+// Simplified registration (v2.2.0): nationalId, email, password, consent required
 const register = Joi.object({
-  email: Joi.string().email().allow('', null).optional().messages({
-    'string.email': 'Please provide a valid email address'
+  nationalId: Joi.string().custom(validateNationalId).required().messages({
+    'any.required': 'National ID is required',
+    'string.pattern.base': 'National ID must be exactly 13 digits',
+    'date.invalid': 'National ID contains an invalid date',
+    'luhn.invalid': 'National ID checksum is invalid'
   }),
-  phoneNumber: Joi.string().pattern(phonePattern).allow('', null).optional().messages({
-    'string.pattern.base': 'Phone must be in Eswatini format (+268 followed by 8 digits)'
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required'
   }),
   password: Joi.string().pattern(passwordPattern).required().messages({
     'string.pattern.base': 'Password must be at least 8 characters and contain both letters and numbers',
@@ -67,8 +69,6 @@ const register = Joi.object({
     'any.only': 'You must accept the data processing terms to register',
     'any.required': 'You must accept the data processing terms to register'
   })
-}).or('email', 'phoneNumber').messages({
-  'object.missing': 'Email or phone is required'
 });
 
 const login = Joi.object({

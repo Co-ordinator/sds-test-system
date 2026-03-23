@@ -57,7 +57,7 @@ export default function Home() {
               className="w-full inline-flex items-center justify-center px-6 py-3 rounded-md font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 text-sm"
               style={{ backgroundColor: GOV.blue }}
             >
-              Sign In
+              Login
             </Link>
             <Link
               to="/register"

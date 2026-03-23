@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { ESWATINI_REGIONS_GEOJSON, ESWATINI_CENTER, ESWATINI_BOUNDS } from '../../data/eswatiniRegions';
+import { ESWATINI_GEOJSON as ESWATINI_REGIONS_GEOJSON, ESWATINI_CENTER, ESWATINI_BOUNDS } from '../../data/regionsGeoJson';
 import { REGION_COLORS } from '../../features/analytics/analyticsConstants';
 import { GOV } from '../../theme/government';
 
@@ -52,7 +52,7 @@ const EswatiniLeafletMap = ({ regionRows, selectedRegion, onSelectRegion }) => {
   }, []);
 
   useEffect(() => {
-    if (!mapInstanceRef.current || !regionRows.length) return;
+    if (!mapInstanceRef.current || !regionRows.length || !ESWATINI_REGIONS_GEOJSON?.features) return;
 
     const map = mapInstanceRef.current;
 
@@ -66,13 +66,18 @@ const EswatiniLeafletMap = ({ regionRows, selectedRegion, onSelectRegion }) => {
 
     // Calculate max users for opacity scaling
     const maxUsers = Math.max(
-      ...ESWATINI_REGIONS_GEOJSON.features.map(f => getRegionMetric(f.properties.region, 'totalUsers')),
+      ...ESWATINI_REGIONS_GEOJSON.features.map(f => {
+        const regionName = f.properties?.REGIONNAME || f.properties?.NAME || '';
+        const regionKey = regionName.toLowerCase();
+        return getRegionMetric(regionKey, 'totalUsers');
+      }),
       1
     );
 
     // Add region polygons
     ESWATINI_REGIONS_GEOJSON.features.forEach(feature => {
-      const regionKey = feature.properties.region;
+      const regionName = feature.properties?.REGIONNAME || feature.properties?.NAME || '';
+      const regionKey = regionName.toLowerCase();
       const users = getRegionMetric(regionKey, 'totalUsers');
       const completed = getRegionMetric(regionKey, 'completedAssessments');
       const topCode = regionRows.find(r => r.region === regionKey)?.topCode || '—';
@@ -93,7 +98,7 @@ const EswatiniLeafletMap = ({ regionRows, selectedRegion, onSelectRegion }) => {
           // Tooltip
           lyr.bindTooltip(
             `<div style="font-family: system-ui, -apple-system, sans-serif; font-size: 12px;">
-              <strong style="font-size: 13px; color: #111827;">${feature.properties.name}</strong><br/>
+              <strong style="font-size: 13px; color: #111827;">${regionName}</strong><br/>
               <span style="color: #6b7280;">Users: <strong style="color: #111827;">${users}</strong></span><br/>
               <span style="color: #6b7280;">Completed: <strong style="color: #111827;">${completed}</strong></span><br/>
               <span style="color: #6b7280;">Top Code: <strong style="color: #2563eb;">${topCode}</strong></span>

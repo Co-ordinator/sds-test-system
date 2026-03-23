@@ -102,7 +102,7 @@ export default function VerifyEmail() {
                 className={`w-full py-2 rounded-md font-semibold ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
                 style={{ borderColor: GOV.border, color: GOV.text }}
               >
-                Back to Sign in
+                Back to Login
               </button>
             </div>
           )}

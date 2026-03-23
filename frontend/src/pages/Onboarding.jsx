@@ -4,15 +4,23 @@ import OnboardingLayout from '../components/onboarding/OnboardingLayout';
 import { useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { MapPin, Info, Globe, User, Building2, Pencil, Check, Search, GraduationCap, BookOpen, Briefcase } from 'lucide-react';
+import { MapPin, Info, Globe, User, Building2, Pencil, Check, Search, GraduationCap, BookOpen, Briefcase, ChevronLeft } from 'lucide-react';
 import { GOV, TYPO } from '../theme/government';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
+import OccupationSearchInput from '../components/ui/OccupationSearchInput';
+import InstitutionSearchInput from '../components/ui/InstitutionSearchInput';
 
 const USER_TYPE_META = {
-  school_student: { label: 'High School Student', Icon: GraduationCap, color: '#1e3a5f', step2Label: 'Your School', step3Label: 'Academic Details' },
-  university_student: { label: 'University Student', Icon: BookOpen, color: '#2563eb', step2Label: 'Your University', step3Label: 'Programme Details' },
-  professional: { label: 'Professional', Icon: Briefcase, color: '#7c3aed', step2Label: 'Your Organisation', step3Label: 'Career Background' },
+  school_student: { label: 'High School Student', Icon: GraduationCap, color: '#1e3a5f', step2Label: 'Your School', step3Label: 'Academic Details', description: 'Discover careers and choose the right subjects for your future.' },
+  university_student: { label: 'University Student', Icon: BookOpen, color: '#2563eb', step2Label: 'Your University', step3Label: 'Programme Details', description: 'Explore specialisations and graduate career pathways.' },
+  professional: { label: 'Professional', Icon: Briefcase, color: '#7c3aed', step2Label: 'Your Organisation', step3Label: 'Career Background', description: 'Find new opportunities and plan your career transition.' },
 };
+
+const USER_TYPE_OPTIONS = [
+  { id: 'school_student', ...USER_TYPE_META.school_student },
+  { id: 'university_student', ...USER_TYPE_META.university_student },
+  { id: 'professional', ...USER_TYPE_META.professional }
+];
 
 const GENDERS = ['Male', 'Female'];
 const LANGUAGES = ['English', 'SiSwati'];
@@ -74,9 +82,10 @@ const ESWATINI_INSTITUTIONS = [
 export default function Onboarding() {
   const navigate = useNavigate();
   const { setSession, user } = useAuth();
-  const userType = user?.userType || null;
+  const [selectedUserType, setSelectedUserType] = useState(user?.userType || '');
+  const userType = selectedUserType;
   const typeMeta = USER_TYPE_META[userType] || null;
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [schoolQuery, setSchoolQuery] = useState('');
   const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false);
   const schoolDropdownRef = useRef(null);
@@ -88,12 +97,12 @@ export default function Onboarding() {
 
   const [form, setForm] = useState({
     fullName: '',
-    nationalId: '',
     gender: '',
     region: 'Hhohho',
     townCity: '',
     areaNeighborhood: '',
     schoolUniversity: '',
+    institutionId: null,
     workplaceName: '',
     workplaceInstitutionId: null,
     preferredLanguage: 'English',
@@ -101,6 +110,7 @@ export default function Onboarding() {
     degreeProgram: '',
     yearOfStudy: '',
     currentOccupation: '',
+    currentOccupationId: null,
     yearsExperience: '',
   });
 
@@ -138,15 +148,23 @@ export default function Onboarding() {
     const parts = fullName.split(/\s+/).filter(Boolean);
     const firstName = parts[0] || '';
     const lastName = parts.slice(1).join(' ') || '';
+    
+    // Map userType to backend enum values
+    const userTypeMap = {
+      'school_student': 'High School Student',
+      'university_student': 'University Student',
+      'professional': 'Professional'
+    };
+    
     return {
       firstName: firstName || null,
       lastName: lastName || null,
-      nationalId: (form.nationalId || '').trim() || null,
       gender: form.gender === 'Male' ? 'male' : form.gender === 'Female' ? 'female' : null,
       region: REGION_TO_BACKEND[form.region] || (form.region ? form.region.toLowerCase() : null),
       district: (form.townCity || '').trim() || null,
       address: (form.areaNeighborhood || '').trim() || null,
       currentInstitution: userType !== 'professional' ? ((form.schoolUniversity || '').trim() || null) : null,
+      institutionId: userType !== 'professional' ? (form.institutionId || null) : null,
       workplaceName: userType === 'professional' ? ((form.workplaceName || '').trim() || null) : null,
       workplaceInstitutionId: userType === 'professional' ? (form.workplaceInstitutionId || null) : null,
       preferredLanguage: LANGUAGE_TO_BACKEND[form.preferredLanguage] ?? (form.preferredLanguage === 'SiSwati' ? 'ss' : 'en'),
@@ -154,7 +172,9 @@ export default function Onboarding() {
       degreeProgram: (form.degreeProgram || '').trim() || null,
       yearOfStudy: form.yearOfStudy ? parseInt(form.yearOfStudy, 10) : null,
       currentOccupation: (form.currentOccupation || '').trim() || null,
+      currentOccupationId: form.currentOccupationId || null,
       yearsExperience: form.yearsExperience ? parseInt(form.yearsExperience, 10) : null,
+      userType: userTypeMap[userType] || null,
     };
   };
 
@@ -171,7 +191,7 @@ export default function Onboarding() {
       navigate('/dashboard');
     } catch (err) {
       if (err.response?.status === 401) {
-        navigate('/login', { state: { message: 'Please sign in to complete your profile.' } });
+        navigate('/login', { state: { message: 'Please Login to complete your profile.' } });
         return;
       }
       setSubmitError(err.response?.data?.message || 'Failed to save profile. Please try again.');
@@ -181,14 +201,12 @@ export default function Onboarding() {
   };
 
   const handleContinue = () => {
+    if (step === 0) {
+      if (!selectedUserType) return;
+    }
     if (step === 1) {
       const errors = {};
       if (!form.fullName.trim()) errors.fullName = 'Full name is required';
-      if (!form.nationalId.trim()) {
-        errors.nationalId = 'National ID / PIN is required';
-      } else if (!/^\d{13}$/.test(form.nationalId.trim())) {
-        errors.nationalId = 'National ID must be exactly 13 digits';
-      }
       if (Object.keys(errors).length > 0) {
         setStep1Errors(errors);
         return;
@@ -203,25 +221,72 @@ export default function Onboarding() {
 
   return (
     <OnboardingLayout>
+      {/* Step 0: User Type Selection */}
+      {step === 0 && (
+        <div className="w-full max-w-[440px] mx-auto">
+          <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+            <div className="p-6 space-y-6">
+              <div className="mb-2">
+                <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>
+                  Complete Your Profile
+                </h1>
+                <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
+                  Please select your current status to continue.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {USER_TYPE_OPTIONS.map(({ id, label, description, Icon, color }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedUserType(id)}
+                    className="w-full flex items-center gap-4 p-4 rounded-md border-2 text-left transition-all"
+                    style={{
+                      borderColor: selectedUserType === id ? color : GOV.border,
+                      backgroundColor: selectedUserType === id ? `${color}08` : 'white'
+                    }}
+                  >
+                    <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}15` }}>
+                      <Icon className="w-5 h-5" style={{ color }} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm" style={{ color: GOV.text }}>{label}</p>
+                      <p className="text-xs mt-0.5" style={{ color: GOV.textMuted }}>{description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={!selectedUserType}
+                className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white disabled:opacity-40 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:hover:scale-100`}
+                style={{ backgroundColor: GOV.blue }}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Step 1: Tell us about yourself */}
       {step === 1 && (
-        <div className="flex flex-col gap-6">
-          <div>
-            {typeMeta && (
-              <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md" style={{ backgroundColor: `${typeMeta.color}10`, border: `1px solid ${typeMeta.color}30` }}>
-                <typeMeta.Icon className="w-4 h-4" style={{ color: typeMeta.color }} />
-                <span className="text-xs font-medium" style={{ color: typeMeta.color }}>{typeMeta.label}</span>
+        <div className="w-full max-w-[440px] mx-auto">
+          <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+            <div className="p-6 space-y-6">
+              <div className="mb-2">
+                <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>
+                  Personal Information
+                </h1>
+                <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
+                  Please provide your personal details as they appear on your national ID.
+                </p>
               </div>
-            )}
-            <h1 className={`${TYPO.pageTitle} mb-1`} style={{ color: GOV.text }}>
-              Tell us about yourself
-            </h1>
-            <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-              We need a few basic details to set up your profile for the career assessment.
-            </p>
-          </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>
                 Full Legal Name *
@@ -243,33 +308,6 @@ export default function Onboarding() {
               }
             </div>
 
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>
-                National ID / PIN *
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={13}
-                value={form.nationalId}
-                onChange={(e) => { update('nationalId', e.target.value.replace(/\D/g, '')); setStep1Errors(p => ({ ...p, nationalId: '' })); }}
-                placeholder="13-digit national ID number"
-                className={`form-control font-mono ${TYPO.body}`}
-                style={{ borderBottomColor: step1Errors.nationalId ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {step1Errors.nationalId
-                ? <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{step1Errors.nationalId}</p>
-                : <p className={`mt-1 flex items-center gap-1.5 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                    <span className="w-3 h-3 rounded-full border flex items-center justify-center text-[9px] font-bold flex-shrink-0" style={{ borderColor: GOV.textHint, color: GOV.textHint }}>i</span>
-                    Found on your national ID card. Used to link your account across life stages.
-                  </p>
-              }
-              {form.nationalId.length > 0 && (
-                <p className={`mt-1 ${TYPO.hint}`} style={{ color: form.nationalId.length === 13 ? '#16a34a' : GOV.textMuted }}>
-                  {form.nationalId.length}/13 digits
-                </p>
-              )}
-            </div>
 
             <div>
               <label className={`block ${TYPO.label} mb-1.5`} style={{ color: GOV.text }}>
@@ -295,46 +333,46 @@ export default function Onboarding() {
             </div>
           </div>
 
-          <div className="pt-2 space-y-2">
-            <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-              Your information is secure and used only by the Ministry for the SDS career assessment in Eswatini.
-            </p>
-            <p className={TYPO.hint}>
-              Need help? <a href="#" className="font-medium hover:underline" style={{ color: GOV.blue }}>Contact Support</a>
-            </p>
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleContinue}
-                className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white`}
-                style={{ backgroundColor: GOV.blue }}
-              >
-                Continue
-              </button>
+              <p className={`${TYPO.hint} text-center mt-2`} style={{ color: GOV.textMuted }}>
+                Your information is secure and used only by the Ministry of Labour and Social Security.
+              </p>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ borderColor: GOV.border, color: GOV.text }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  className={`flex-1 py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Step 2: Tell us where you study */}
+      {/* Step 2: Location & Institution */}
       {step === 2 && (
-        <div className="flex flex-col gap-4">
-          <div>
-            <h1 className={`${TYPO.pageTitle} mb-1`} style={{ color: GOV.text }}>
-              Tell us where you study
-            </h1>
-            <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-              Provide your region and educational institution in Eswatini for the career assessment.
-            </p>
-          </div>
+        <div className="w-full max-w-[440px] mx-auto">
+          <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+            <div className="p-6 space-y-6">
+              <div className="mb-2">
+                <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>
+                  Location & Institution
+                </h1>
+                <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
+                  Please provide your region and current institution.
+                </p>
+              </div>
 
           <div className="rounded-md border overflow-hidden bg-white" style={{ borderColor: GOV.borderLight }}>
             <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: GOV.borderLight }}>
@@ -436,56 +474,21 @@ export default function Onboarding() {
                   </p>
                 </div>
               ) : (
-                <div className="sm:col-span-2 relative" ref={schoolDropdownRef}>
+                <div className="sm:col-span-2">
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current School / University *</label>
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: GOV.textHint }} aria-hidden />
-                    <input
-                      type="text"
-                      value={schoolDropdownOpen ? schoolQuery : form.schoolUniversity}
-                      onChange={(e) => {
-                        setSchoolQuery(e.target.value);
-                        setSchoolDropdownOpen(true);
-                      }}
-                      onFocus={() => {
-                        setSchoolQuery(form.schoolUniversity);
-                        setSchoolDropdownOpen(true);
-                      }}
-                      placeholder="Search or select school..."
-                      className={`form-control-with-icon pl-8 ${TYPO.body}`}
-                      style={{ borderBottomColor: GOV.border, color: GOV.text }}
-                      autoComplete="off"
-                    />
-                  </div>
-                  {schoolDropdownOpen && (
-                    <ul
-                      className="absolute z-10 left-0 right-0 mt-0.5 py-0.5 rounded-md border overflow-auto max-h-40 bg-white"
-                      style={{ borderColor: GOV.border }}
-                    >
-                      {filteredSchools.length > 0 ? (
-                        filteredSchools.map((inst) => (
-                          <li key={inst}>
-                            <button
-                              type="button"
-                              className={`w-full text-left px-3 py-1.5 ${TYPO.bodySmall} hover:bg-gray-100 transition-colors`}
-                              style={{ color: GOV.text }}
-                              onClick={() => {
-                                update('schoolUniversity', inst);
-                                setSchoolQuery(inst);
-                                setSchoolDropdownOpen(false);
-                              }}
-                            >
-                              {inst}
-                            </button>
-                          </li>
-                        ))
-                      ) : (
-                        <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                          No school found. Type to search.
-                        </li>
-                      )}
-                    </ul>
-                  )}
+                  <InstitutionSearchInput
+                    value={form.schoolUniversity}
+                    institutionId={form.institutionId}
+                    onChange={(name, id) => {
+                      update('schoolUniversity', name);
+                      update('institutionId', id);
+                    }}
+                    placeholder="Search for your school or university..."
+                    inputClassName={TYPO.body}
+                  />
+                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
+                    Search registered institutions or type your school name.
+                  </p>
                 </div>
               )}
             </div>
@@ -512,40 +515,44 @@ export default function Onboarding() {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-              style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleContinue}
-              className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white`}
-              style={{ backgroundColor: GOV.blue }}
-            >
-              Continue &gt;
-            </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ borderColor: GOV.border, color: GOV.text }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  className={`flex-1 py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Step 3: Academic / Language / Career Background */}
       {step === 3 && (
-        <div className="flex flex-col gap-4">
-          <div>
-            <h1 className={`${TYPO.pageTitle} mb-1`} style={{ color: GOV.text }}>
-              {typeMeta?.step3Label || 'Academic & Language'}
-            </h1>
-            <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-              {userType === 'professional'
-                ? 'Tell us about your career background to personalise your recommendations.'
-                : 'Final details to tailor your career assessment and recommendations.'}
-            </p>
-          </div>
+        <div className="w-full max-w-[440px] mx-auto">
+          <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+            <div className="p-6 space-y-6">
+              <div className="mb-2">
+                <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>
+                  {typeMeta?.step3Label || 'Academic & Language'}
+                </h1>
+                <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
+                  {userType === 'professional'
+                    ? 'Please provide your career background information.'
+                    : 'Please provide your academic and language preferences.'}
+                </p>
+              </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -618,13 +625,15 @@ export default function Onboarding() {
               </div>
               <div className="sm:col-span-2">
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current Occupation</label>
-                <input
-                  type="text"
+                <OccupationSearchInput
                   value={form.currentOccupation}
-                  onChange={(e) => update('currentOccupation', e.target.value)}
-                  placeholder="e.g. Secondary School Teacher"
-                  className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  occupationId={form.currentOccupationId}
+                  onChange={(name, id) => {
+                    update('currentOccupation', name);
+                    update('currentOccupationId', id);
+                  }}
+                  placeholder="Search for your occupation..."
+                  inputClassName={TYPO.body}
                 />
               </div>
               <div>
@@ -642,48 +651,46 @@ export default function Onboarding() {
             </div>
           )}
 
-          <div className="rounded-md border p-3 flex gap-2.5" style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.borderLight }}>
-            <Globe className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: GOV.blue }} />
-            <div>
-              <p className={`font-semibold ${TYPO.hint} mb-0.5`} style={{ color: GOV.text }}>Language &amp; grade</p>
-              <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-                You can change these later in account settings.
+              <p className={`${TYPO.hint} text-center mt-2`} style={{ color: GOV.textMuted }}>
+                You can update these details later in your account settings.
               </p>
-            </div>
-          </div>
 
-          <div className="flex gap-2 pt-2">
-            <button
-              type="button"
-              onClick={handleBack}
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-              style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleContinue}
-              className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white`}
-              style={{ backgroundColor: GOV.blue }}
-            >
-              Continue &gt;
-            </button>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ borderColor: GOV.border, color: GOV.text }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  className={`flex-1 py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Step 4: Summary Review only – table-like, clean, white, flat */}
+      {/* Step 4: Summary Review */}
       {step === 4 && (
-        <div className="flex flex-col gap-4">
-          <div>
-            <h1 className={`${TYPO.pageTitle} mb-1`} style={{ color: GOV.text }}>
-              Review Your Profile
-            </h1>
-            <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-              Ensure all details are correct before submitting.
-            </p>
-          </div>
+        <div className="w-full max-w-[440px] mx-auto">
+          <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+            <div className="p-6 space-y-6">
+              <div className="mb-2">
+                <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>
+                  Review Your Profile
+                </h1>
+                <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
+                  Please review your information before submitting.
+                </p>
+              </div>
 
           <div className="bg-white border rounded-md overflow-hidden" style={{ borderColor: GOV.border }}>
             <div className="border-b" style={{ borderColor: GOV.border }}>
@@ -698,12 +705,6 @@ export default function Onboarding() {
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} w-1/3`} style={{ color: GOV.textHint }}>Full name</td>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.fullName || '—'}</td>
-                  </tr>
-                  <tr className="border-b" style={{ borderColor: GOV.border }}>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>National ID / PIN</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium font-mono`} style={{ color: form.nationalId ? GOV.text : GOV.error }}>
-                      {form.nationalId || '⚠ Required — please go back and enter'}
-                    </td>
                   </tr>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Gender</td>
@@ -767,38 +768,40 @@ export default function Onboarding() {
             </div>
           </div>
 
-          <p className={TYPO.hint} style={{ color: GOV.textHint }}>
-            By submitting, you agree to the Ministry&apos;s data use policy.
-          </p>
+              <p className={`${TYPO.hint} text-center mt-2`} style={{ color: GOV.textMuted }}>
+                By submitting, you agree to the Ministry of Labour and Social Security&apos;s data use policy.
+              </p>
 
-          {submitError && (
-            <div
-              className={`rounded-md px-3 py-2 ${TYPO.hint}`}
-              style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder || '#fecaca'}` }}
-            >
-              {submitError}
+              {submitError && (
+                <div
+                  className={`rounded-md px-3 py-2 ${TYPO.hint}`}
+                  style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder || '#fecaca'}` }}
+                >
+                  {submitError}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  disabled={submitting}
+                  className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
+                  style={{ borderColor: GOV.border, color: GOV.text }}
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  disabled={submitting}
+                  className={`flex-1 py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  {submitting ? 'Submitting…' : 'Submit Profile'}
+                </button>
+              </div>
             </div>
-          )}
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleBack}
-              disabled={submitting}
-              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all duration-150 hover:scale-110 active:scale-95 focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleContinue}
-              disabled={submitting}
-              className={`px-5 py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-              style={{ backgroundColor: GOV.blue }}
-            >
-              {submitting ? 'Saving…' : 'Submit & Complete Profile'}
-            </button>
           </div>
         </div>
       )}

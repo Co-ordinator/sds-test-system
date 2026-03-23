@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { StatusBadge, useToast, ErrorBanner } from '../../../components/ui/StatusIndicators';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import { adminService } from '../../../services/adminService';
-import { PermissionGate } from '../../../context/PermissionContext';
+import { usePermissions, PermissionGate } from '../../../context/PermissionContext';
 
 const AdminResultsPanel = () => {
   const navigate = useNavigate();
@@ -16,6 +17,8 @@ const AdminResultsPanel = () => {
   const [generatingCert, setGeneratingCert] = useState(null);
   const [generatedCerts, setGeneratedCerts] = useState({});
   const { toast, showToast, Toast: ToastComp } = useToast();
+  const { hasPermission } = usePermissions();
+  const [selectedResults, setSelectedResults] = useState(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,45 +98,22 @@ const AdminResultsPanel = () => {
       render: (a) => <span className="text-xs" style={{ color: GOV.textMuted }}>{a.completedAt ? new Date(a.completedAt).toLocaleDateString() : '–'}</span>,
     },
     {
-      key: 'actions',
-      header: 'Actions',
-      stopPropagation: true,
-      render: (a) => a.status === 'completed' ? (
-        <div className="flex gap-1 items-center">
-          <button type="button" onClick={() => navigate('/results', { state: { assessmentId: a.id } })} className="p-1 rounded hover:bg-gray-100" title="View Results">
-            <Eye className="w-3.5 h-3.5" style={{ color: GOV.blue }} />
-          </button>
-          <PermissionGate permission="results.download_pdf">
-            <button type="button" onClick={() => adminService.downloadResultPdf(a.id).catch(() => showToast('PDF download failed', 'error'))} className="p-1 rounded hover:bg-gray-100" title="Download Career Report PDF">
-              <Download className="w-3.5 h-3.5 text-green-600" />
-            </button>
-          </PermissionGate>
-          <PermissionGate permission="certificates.generate">
-            {generatedCerts[a.id] ? (
-              <button type="button" onClick={() => handleDownloadCert(a)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border"
-                style={{ borderColor: '#d97706', color: '#d97706', backgroundColor: '#fffbeb' }}
-                title={`Download Certificate ${generatedCerts[a.id]?.certNumber || ''}`}>
-                <CheckCircle className="w-3 h-3" /> Certificate
-              </button>
-            ) : (
-              <button type="button" onClick={() => handleGenerateCert(a)}
-                disabled={generatingCert === a.id}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border disabled:opacity-50"
-                style={{ borderColor: GOV.border, color: GOV.blue }}
-                title="Generate SDS Certificate">
-                {generatingCert === a.id ? '…' : <><Award className="w-3 h-3" /> Certify</>}
-              </button>
-            )}
-          </PermissionGate>
-        </div>
-      ) : null,
+      key: 'actions', header: '', stopPropagation: true, width: 'w-10', align: 'right',
+      render: (a) => a.status !== 'completed' ? null : (
+        <ActionMenu actions={[
+          { label: 'View Results', Icon: Eye, onClick: () => navigate('/results', { state: { assessmentId: a.id } }) },
+          hasPermission('results.download_pdf') && { label: 'Download PDF', Icon: Download, onClick: () => adminService.downloadResultPdf(a.id).catch(() => showToast('PDF download failed', 'error')) },
+          hasPermission('certificates.generate') && generatedCerts[a.id]
+            ? { label: `Download Certificate`, Icon: CheckCircle, onClick: () => handleDownloadCert(a) }
+            : hasPermission('certificates.generate') && { label: generatingCert === a.id ? 'Generating…' : 'Generate Certificate', Icon: Award, onClick: () => handleGenerateCert(a) },
+        ]} />
+      ),
     },
   ];
 
   const toolbar = (
     <>
-      <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>All Assessment Results ({filtered.length})</h3>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>{filtered.length} results</span>
       <div className="flex items-center gap-2 border rounded-md px-3 py-1.5 ml-auto" style={{ borderColor: GOV.border }}>
         <Search className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} />
         <input
@@ -158,10 +138,13 @@ const AdminResultsPanel = () => {
           rows={filtered}
           rowKey="id"
           loading={loading}
-          emptyTitle="No assessments found"
-          emptyMessage="Try adjusting your search."
+          emptyTitle="No assessments"
+          emptyMessage="No completed assessments found."
           toolbar={toolbar}
-          pageSize={25}
+          pageSize={7}
+          selectable
+          selectedIds={selectedResults}
+          onSelectionChange={setSelectedResults}
         />
       </div>
     </>

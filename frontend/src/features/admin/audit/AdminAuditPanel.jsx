@@ -1,12 +1,54 @@
-import React, { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, X, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { X, RefreshCw, Eye, Search, Download, Filter } from 'lucide-react';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import { GOV, TYPO } from '../../../theme/government';
-import { LoadingState, EmptyState, ErrorBanner } from '../../../components/ui/StatusIndicators';
-import { useAuditLogs } from '../../../hooks/useAuditLogs';
+import DataTable from '../../../components/data/DataTable';
+import { ErrorBanner } from '../../../components/ui/StatusIndicators';
+import { adminService } from '../../../services/adminService';
+
+const ACTION_TYPES = [
+  'USER_CREATED','USER_UPDATED','USER_DELETED',
+  'ASSESSMENT_COMPLETED','ASSESSMENT_COMPLETED_NOTIFY',
+  'COURSE_CREATED','COURSE_UPDATED','COURSE_DELETED','COURSES_IMPORTED',
+  'OCCUPATION_CREATED','OCCUPATION_UPDATED','OCCUPATION_DELETED',
+  'EDUCATION_LEVEL_CREATED','EDUCATION_LEVEL_UPDATED','EDUCATION_LEVEL_DELETED',
+  'PERMISSIONS_UPDATED','ADMIN_ACTION','ADMIN_ACTION_FAILED',
+];
 
 const AdminAuditPanel = () => {
-  const { logs, loading, error, selectedLog, loadingDetail, load, viewDetail, clearDetail } = useAuditLogs();
-  const [expandedLog, setExpandedLog] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedLog, setSelectedLog] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [selectedLogs, setSelectedLogs] = useState(new Set());
+  const [filters, setFilters] = useState({ actionType: '', search: '', startDate: '', endDate: '' });
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const result = await adminService.getAuditLogs({
+        ...filters,
+        limit: PAGE_SIZE,
+        offset: page * PAGE_SIZE
+      });
+      setLogs(result.logs);
+      setTotal(result.total);
+    } catch { setError('Failed to load audit logs'); }
+    setLoading(false);
+  }, [filters, page]);
+
+  const viewDetail = async (id) => {
+    setLoadingDetail(true);
+    try { setSelectedLog(await adminService.getAuditLog(id)); }
+    catch { setSelectedLog(null); }
+    setLoadingDetail(false);
+  };
+
+  const clearDetail = () => setSelectedLog(null);
 
   useEffect(() => { load(); }, [load]);
 
@@ -87,74 +129,101 @@ const AdminAuditPanel = () => {
       {error && <ErrorBanner message={error} onRetry={load} className="mb-3" />}
 
       <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
-        <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: GOV.border }}>
-          <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Audit Logs (latest 100)</h3>
-          <button type="button" onClick={load} className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.blue }}>
-            <RefreshCw className="w-3 h-3" /> Refresh
-          </button>
-        </div>
-
-        {loading ? <LoadingState /> : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead style={{ backgroundColor: GOV.blueLightAlt, color: GOV.textMuted }}>
-                <tr>
-                  <th className="px-4 py-3 text-xs uppercase w-6"></th>
-                  <th className="px-4 py-3 text-xs uppercase">Time</th>
-                  <th className="px-4 py-3 text-xs uppercase">Action</th>
-                  <th className="px-4 py-3 text-xs uppercase">Actor</th>
-                  <th className="px-4 py-3 text-xs uppercase">Description</th>
-                  <th className="px-4 py-3 text-xs uppercase">Detail</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logs.length === 0 ? (
-                  <tr><td colSpan={6}><EmptyState title="No audit logs" /></td></tr>
-                ) : logs.map(log => (
-                  <React.Fragment key={log.id}>
-                    <tr
-                      className="border-b cursor-pointer hover:bg-gray-50"
-                      style={{ borderColor: GOV.borderLight }}
-                      onClick={() => setExpandedLog(expandedLog === log.id ? null : log.id)}
-                    >
-                      <td className="pl-4 py-2">
-                        {expandedLog === log.id
-                          ? <ChevronDown className="w-3 h-3" style={{ color: GOV.textMuted }} />
-                          : <ChevronRight className="w-3 h-3" style={{ color: GOV.textMuted }} />}
-                      </td>
-                      <td className="px-4 py-2 text-xs" style={{ color: GOV.textMuted }}>{log.createdAt ? new Date(log.createdAt).toLocaleString() : '–'}</td>
-                      <td className="px-4 py-2 text-xs font-mono font-semibold" style={{ color: GOV.text }}>{log.actionType}</td>
-                      <td className="px-4 py-2 text-xs" style={{ color: GOV.textMuted }}>{log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() || log.user.email : '–'}</td>
-                      <td className="px-4 py-2 text-xs" style={{ color: GOV.textMuted }}>{log.description || '–'}</td>
-                      <td className="px-4 py-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); viewDetail(log.id); }}
-                          className="px-2 py-1 border rounded text-[11px] font-semibold"
-                          style={{ borderColor: GOV.border, color: GOV.blue }}
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                    {expandedLog === log.id && (
-                      <tr style={{ backgroundColor: GOV.blueLightAlt }}>
-                        <td colSpan={6} className="px-8 py-3">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-                            <div><span className="font-semibold" style={{ color: GOV.textMuted }}>Log ID: </span><span className="font-mono" style={{ color: GOV.text }}>{log.id}</span></div>
-                            <div><span className="font-semibold" style={{ color: GOV.textMuted }}>IP Address: </span><span style={{ color: GOV.text }}>{log.ipAddress || '–'}</span></div>
-                            <div><span className="font-semibold" style={{ color: GOV.textMuted }}>User ID: </span><span className="font-mono" style={{ color: GOV.text }}>{log.userId || '–'}</span></div>
-                            <div><span className="font-semibold" style={{ color: GOV.textMuted }}>Entity: </span><span style={{ color: GOV.text }}>{log.entityType ? `${log.entityType} #${log.entityId}` : '–'}</span></div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          columns={[
+            {
+              key: 'actionType',
+              header: 'Action',
+              sortable: true,
+              render: (log) => <span className="text-xs font-semibold" style={{ color: GOV.text }}>{log.actionType || '–'}</span>,
+            },
+            {
+              key: 'description',
+              header: 'Description',
+              render: (log) => <span className="text-xs" style={{ color: GOV.text }}>{log.description || '–'}</span>,
+            },
+            {
+              key: 'user',
+              header: 'User',
+              render: (log) => (
+                <span className="text-xs" style={{ color: GOV.textMuted }}>
+                  {log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''}`.trim() || log.user.email : '–'}
+                </span>
+              ),
+            },
+            {
+              key: 'ipAddress',
+              header: 'IP',
+              render: (log) => <span className="text-xs font-mono" style={{ color: GOV.textMuted }}>{log.ipAddress || '–'}</span>,
+            },
+            {
+              key: 'createdAt',
+              header: 'Timestamp',
+              sortable: true,
+              render: (log) => (
+                <span className="text-xs" style={{ color: GOV.textMuted }}>
+                  {log.createdAt ? new Date(log.createdAt).toLocaleString() : '–'}
+                </span>
+              ),
+            },
+            {
+              key: 'actions',
+              header: '',
+              stopPropagation: true,
+              width: 'w-10',
+              align: 'right',
+              render: (log) => (
+                <ActionMenu actions={[
+                  { label: 'View Details', Icon: Eye, onClick: () => viewDetail(log.id) },
+                ]} />
+              ),
+            },
+          ]}
+          rows={logs}
+          rowKey="id"
+          loading={loading}
+          emptyTitle="No audit logs"
+          emptyMessage="No audit activity recorded yet."
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2 w-full">
+              <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Audit Logs</h3>
+              <span className="text-xs" style={{ color: GOV.textMuted }}>{total} total</span>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: GOV.textMuted }} />
+                <input className="pl-7 pr-3 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text, width: 180 }}
+                  placeholder="Search action or description…"
+                  value={filters.search}
+                  onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(0); }} />
+              </div>
+              <select className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+                value={filters.actionType}
+                onChange={e => { setFilters(f => ({ ...f, actionType: e.target.value })); setPage(0); }}>
+                <option value="">All actions</option>
+                {ACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <input type="date" className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+                value={filters.startDate}
+                onChange={e => { setFilters(f => ({ ...f, startDate: e.target.value })); setPage(0); }} />
+              <input type="date" className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+                value={filters.endDate}
+                onChange={e => { setFilters(f => ({ ...f, endDate: e.target.value })); setPage(0); }} />
+              <div className="ml-auto flex items-center gap-2">
+                <button type="button" onClick={() => adminService.exportAuditLogs(filters)}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.blue }}>
+                  <Download className="w-3 h-3" /> Export CSV
+                </button>
+                <button type="button" onClick={load}
+                  className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.blue }}>
+                  <RefreshCw className="w-3 h-3" /> Refresh
+                </button>
+              </div>
+            </div>
+          }
+          pageSize={7}
+          selectable
+          selectedIds={selectedLogs}
+          onSelectionChange={setSelectedLogs}
+        />
       </div>
     </>
   );

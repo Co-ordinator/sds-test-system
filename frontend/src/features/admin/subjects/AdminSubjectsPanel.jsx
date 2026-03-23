@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, Search, Upload, Download, Edit2, Trash2, X, FileText } from 'lucide-react';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { useToast, ErrorBanner } from '../../../components/ui/StatusIndicators';
@@ -88,6 +89,7 @@ const AdminSubjectsPanel = () => {
   const [newSubject, setNewSubject] = useState(EMPTY);
   const [isSaving, setIsSaving] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
   const { toast, showToast, Toast: ToastComp } = useToast();
 
   const load = useCallback(async () => {
@@ -170,12 +172,7 @@ const AdminSubjectsPanel = () => {
   const columns = [
     {
       key: 'name', header: 'Subject', sortable: true,
-      render: s => (
-        <div>
-          <span className="text-xs font-medium" style={{ color: GOV.text }}>{s.name}</span>
-          {!s.isActive && <span className="ml-2 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>Inactive</span>}
-        </div>
-      )
+      render: s => <span className="text-xs font-medium" style={{ color: GOV.text }}>{s.name}</span>
     },
     {
       key: 'riasecCodes', header: 'RIASEC', sortable: false,
@@ -193,35 +190,33 @@ const AdminSubjectsPanel = () => {
       key: 'level', header: 'Level', sortable: true,
       render: s => <span className="text-xs capitalize" style={{ color: GOV.textMuted }}>{(s.level || '').replace('_', ' ')}</span>
     },
+    {
+      key: 'isActive', header: 'Status', sortable: true, width: 'w-20',
+      render: s => s.isActive
+        ? <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Active</span>
+        : <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>Inactive</span>
+    },
     { key: 'displayOrder', header: 'Order', sortable: true, width: 'w-16', render: s => <span className="text-xs" style={{ color: GOV.textMuted }}>{s.displayOrder}</span> },
     {
-      key: 'actions', header: 'Actions', stopPropagation: true,
+      key: 'actions', header: '', stopPropagation: true, width: 'w-10', align: 'right',
       render: s => (
-        <div className="flex items-center gap-1">
-          <PermissionGate permission="subjects.update">
-            <button type="button" onClick={() => setEditingSubject({ ...s, riasecCodes: s.riasecCodes || [] })} className="p-1 rounded hover:bg-blue-50">
-              <Edit2 className="w-3 h-3" style={{ color: GOV.blue }} />
-            </button>
-          </PermissionGate>
-          <PermissionGate permission="subjects.delete">
-            <button type="button" onClick={() => handleDelete(s.id)} className="p-1 rounded hover:bg-red-50">
-              <Trash2 className="w-3 h-3 text-red-500" />
-            </button>
-          </PermissionGate>
-        </div>
+        <ActionMenu actions={[
+          { label: 'Edit', Icon: Edit2, onClick: () => setEditingSubject({ ...s, riasecCodes: s.riasecCodes || [] }) },
+          { label: 'Delete', Icon: Trash2, onClick: () => handleDelete(s.id), danger: true },
+        ]} />
       )
     },
   ];
 
   const toolbar = (
     <>
-      <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Subjects ({subjects.length} total)</h3>
-      <div className="relative ml-2">
+      <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
         <input className="form-control-with-icon pl-7 text-xs w-44"
           style={{ borderBottomColor: GOV.border, color: GOV.text }}
           placeholder="Search subjects…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>{subjects.length} total</span>
       <div className="ml-auto flex gap-2">
         <PermissionGate permission="subjects.import">
           <button type="button" onClick={downloadTemplate}
@@ -240,6 +235,13 @@ const AdminSubjectsPanel = () => {
             className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold"
             style={{ borderColor: GOV.border, color: GOV.blue }}>
             <Download className="w-3 h-3" /> Export
+          </button>
+        </PermissionGate>
+        <PermissionGate permission="subjects.create">
+          <button type="button" onClick={() => setShowCreateDialog(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white"
+            style={{ backgroundColor: GOV.blue }}>
+            <Plus className="w-3.5 h-3.5" /> Add Subject
           </button>
         </PermissionGate>
       </div>
@@ -264,22 +266,34 @@ const AdminSubjectsPanel = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
-          <DataTable columns={columns} rows={filtered} rowKey="id" loading={loading}
-            emptyTitle="No subjects found" toolbar={toolbar} pageSize={25} stickyHeader />
-        </div>
-
-        <PermissionGate permission="subjects.create">
-        <div className="bg-white rounded-md border p-5" style={{ borderColor: GOV.border }}>
-          <h4 className={`${TYPO.cardTitle} mb-4 flex items-center gap-2`} style={{ color: GOV.text }}>
-            <Plus className="w-4 h-4" /> Add Subject
-          </h4>
-          <SubjectForm value={newSubject} onChange={setNewSubject} onSubmit={handleCreate}
-            submitLabel="Add Subject" saving={isSaving} />
-        </div>
-        </PermissionGate>
+      <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+        <DataTable columns={columns} rows={filtered} rowKey="id" loading={loading}
+          emptyTitle="No subjects found" toolbar={toolbar} pageSize={7} stickyHeader />
       </div>
+
+      {/* ── Add Subject Dialog ── */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-md shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: GOV.border }}>
+              <div>
+                <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Add Subject</h3>
+                <p className="text-xs mt-0.5" style={{ color: GOV.textMuted }}>Map a new subject to RIASEC career codes</p>
+              </div>
+              <button type="button" onClick={() => { setShowCreateDialog(false); setNewSubject(EMPTY); }}><X className="w-4 h-4" style={{ color: GOV.textMuted }} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <SubjectForm
+                value={newSubject}
+                onChange={setNewSubject}
+                onSubmit={async (e) => { await handleCreate(e); setShowCreateDialog(false); }}
+                submitLabel="Add Subject"
+                saving={isSaving}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editingSubject && (

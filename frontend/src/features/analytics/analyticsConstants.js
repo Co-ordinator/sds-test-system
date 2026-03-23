@@ -2,7 +2,16 @@ export const RIASEC_COLORS = { R: '#dc2626', I: '#2563eb', A: '#7c3aed', S: '#05
 export const RIASEC_LABELS = { R: 'Realistic', I: 'Investigative', A: 'Artistic', S: 'Social', E: 'Enterprising', C: 'Conventional' };
 export const PIE_COLORS = ['#1e3a5f','#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#65a30d','#be185d','#0d9488'];
 export const REGION_COLORS = { hhohho: '#1e3a5f', manzini: '#2563eb', lubombo: '#7c3aed', shiselweni: '#059669' };
-export const USER_TYPE_LABELS = { school_student: 'High School', university_student: 'University', professional: 'Professional' };
+export const USER_TYPE_LABELS = {
+  'High School Student': 'High School',
+  'University Student': 'University',
+  'Professional': 'Professional',
+  'Test Administrator': 'Test Admin',
+  'System Administrator': 'Sys Admin',
+  school_student: 'High School',
+  university_student: 'University',
+  professional: 'Professional',
+};
 export const REGION_LABELS = { hhohho: 'Hhohho', manzini: 'Manzini', lubombo: 'Lubombo', shiselweni: 'Shiselweni' };
 export const INSTITUTION_TYPE_LABELS = { university: 'University', college: 'College', tvet: 'TVET', school: 'School', vocational: 'Vocational', other: 'Other' };
 export const DEMAND_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };

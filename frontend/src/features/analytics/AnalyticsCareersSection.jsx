@@ -84,9 +84,10 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
       { label: 'RIASEC Types', count: 6, color: '#2563eb' },
       { label: 'Skills', count: (kgData.topSkills || []).length, color: '#7c3aed' },
       { label: 'Careers', count: kgData.summary.totalOccupations || 0, color: '#059669' },
+      { label: 'Career Pathways', count: kgData.summary.totalCareerPathways || 0, color: '#0d9488' },
       { label: 'Courses', count: kgData.summary.totalCourses || 0, color: '#d97706' },
+      { label: 'Programmes', count: kgData.summary.totalCourseLinks || 0, color: '#0891b2' },
       { label: 'Institutions', count: kgData.summary.totalInstitutions || 0, color: '#dc2626' },
-      { label: 'Course Links', count: kgData.summary.totalCourseLinks || 0, color: '#0891b2' },
     ];
   }, [kgData]);
 

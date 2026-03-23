@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, Upload, Download, Edit2, Trash2, X } from 'lucide-react';
+import ActionMenu from '../../../components/ui/ActionMenu';
 import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { useToast, Toast, ErrorBanner } from '../../../components/ui/StatusIndicators';
@@ -16,6 +17,19 @@ const AdminQuestionsPanel = () => {
   const [newQuestion, setNewQuestion] = useState(EMPTY_Q);
   const [isSaving, setIsSaving] = useState(false);
   const { toast, showToast, Toast: ToastComp } = useToast();
+  const [selectedQs, setSelectedQs] = useState(new Set());
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
+  const handleBulkDelete = async () => {
+    if (!selectedQs.size) return;
+    if (!window.confirm(`Delete ${selectedQs.size} question(s) permanently?`)) return;
+    try {
+      await adminService.bulkDeleteQuestions([...selectedQs]);
+      showToast(`${selectedQs.size} question(s) deleted`);
+      setSelectedQs(new Set());
+      load();
+    } catch { showToast('Bulk delete failed', 'error'); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,28 +99,33 @@ const AdminQuestionsPanel = () => {
   };
 
   const columns = [
-    { key: 'order', header: '#', sortable: true, width: 'w-12', render: (q, idx) => <span className="text-xs" style={{ color: GOV.textMuted }}>{q.order ?? '–'}</span> },
-    { key: 'section', header: 'Section', sortable: true, render: (q) => <span className="text-xs capitalize" style={{ color: GOV.textMuted }}>{q.section?.replace('_', ' ')}</span> },
-    { key: 'riasecType', header: 'RIASEC', sortable: true, width: 'w-20', render: (q) => <span className="text-xs font-mono font-bold" style={{ color: GOV.blue }}>{q.riasecType}</span> },
-    { key: 'text', header: 'Text', render: (q) => <span className="text-xs" style={{ color: GOV.text }}>{q.text}</span> },
+    { key: 'order', header: '#', sortable: true, width: 'w-10', render: (q) => <span className="text-xs" style={{ color: GOV.textMuted }}>{q.order ?? '–'}</span> },
     {
-      key: 'actions', header: 'Actions', stopPropagation: true,
+      key: 'text', header: 'Question',
+      render: (q) => <span className="text-xs" style={{ color: GOV.text }}>{q.text}</span>
+    },
+    {
+      key: 'section', header: 'Section', sortable: true,
+      render: (q) => <span className="text-xs capitalize" style={{ color: GOV.textMuted }}>{q.section?.replace('_', ' ')}</span>
+    },
+    {
+      key: 'riasecType', header: 'RIASEC', sortable: true, width: 'w-20',
+      render: (q) => <span className="text-xs font-mono font-bold" style={{ color: GOV.blue }}>{q.riasecType}</span>
+    },
+    {
+      key: 'actions', header: '', stopPropagation: true, width: 'w-10', align: 'right',
       render: (q) => (
-        <div className="flex items-center gap-1">
-          <PermissionGate permission="questions.update">
-            <button type="button" onClick={() => setEditingQuestion({ ...q })} className="p-1 rounded hover:bg-blue-50"><Edit2 className="w-3 h-3" style={{ color: GOV.blue }} /></button>
-          </PermissionGate>
-          <PermissionGate permission="questions.delete">
-            <button type="button" onClick={() => handleDelete(q.id)} className="p-1 rounded hover:bg-red-50"><Trash2 className="w-3 h-3 text-red-500" /></button>
-          </PermissionGate>
-        </div>
+        <ActionMenu actions={[
+          { label: 'Edit', Icon: Edit2, onClick: () => setEditingQuestion({ ...q }) },
+          { label: 'Delete', Icon: Trash2, onClick: () => handleDelete(q.id), danger: true },
+        ]} />
       ),
     },
   ];
 
   const toolbar = (
     <>
-      <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Question Bank ({questions.length} total)</h3>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>{questions.length} questions</span>
       <div className="ml-auto flex items-center gap-2">
         <PermissionGate permission="questions.import">
           <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>
@@ -119,6 +138,11 @@ const AdminQuestionsPanel = () => {
             <Download className="w-3 h-3" /> Export CSV
           </button>
         </PermissionGate>
+        <PermissionGate permission="questions.create">
+          <button type="button" onClick={() => setShowCreateDialog(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white" style={{ backgroundColor: GOV.blue }}>
+            <Plus className="w-3.5 h-3.5" /> Add Question
+          </button>
+        </PermissionGate>
       </div>
     </>
   );
@@ -128,48 +152,68 @@ const AdminQuestionsPanel = () => {
       <ToastComp toast={toast} />
       {error && <ErrorBanner message={error} onRetry={load} className="mb-3" />}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
-          <DataTable columns={columns} rows={questions} rowKey="id" loading={loading} emptyTitle="No questions loaded" toolbar={toolbar} pageSize={30} stickyHeader />
-        </div>
-
-        {/* Add Question Panel */}
-        <PermissionGate permission="questions.create">
-        <div className="bg-white rounded-md border p-5" style={{ borderColor: GOV.border }}>
-          <h4 className={`${TYPO.cardTitle} mb-4 flex items-center gap-2`} style={{ color: GOV.text }}><Plus className="w-4 h-4" /> Add Question</h4>
-          <form className="space-y-3" onSubmit={handleCreate}>
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Question Text *</label>
-              <textarea className="form-control resize-none" rows={3} style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.text} onChange={e => setNewQuestion({ ...newQuestion, text: e.target.value })} required />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Section</label>
-                <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.section} onChange={e => setNewQuestion({ ...newQuestion, section: e.target.value })}>
-                  <option value="activities">Activities</option>
-                  <option value="competencies">Competencies</option>
-                  <option value="occupations">Occupations</option>
-                  <option value="self_estimates">Self Estimates</option>
-                </select>
-              </div>
-              <div>
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>RIASEC Type</label>
-                <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.riasecType} onChange={e => setNewQuestion({ ...newQuestion, riasecType: e.target.value })}>
-                  {['R', 'I', 'A', 'S', 'E', 'C'].map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Order (optional)</label>
-              <input type="number" className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.order} onChange={e => setNewQuestion({ ...newQuestion, order: e.target.value })} placeholder="e.g. 42" />
-            </div>
-            <button type="submit" disabled={isSaving} className="w-full text-white py-2 rounded-md text-sm font-semibold disabled:opacity-50" style={{ backgroundColor: GOV.blue }}>
-              {isSaving ? 'Saving…' : 'Add Question'}
-            </button>
-          </form>
-        </div>
-        </PermissionGate>
+      <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+        <DataTable
+          columns={columns} rows={questions} rowKey="id" loading={loading}
+          emptyTitle="No questions loaded" toolbar={toolbar} pageSize={7} stickyHeader
+          selectable selectedIds={selectedQs} onSelectionChange={setSelectedQs}
+          bulkActions={
+            <PermissionGate permission="questions.delete">
+              <button type="button" onClick={handleBulkDelete} className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-semibold text-white bg-red-600">
+                <Trash2 className="w-3 h-3" /> Delete
+              </button>
+            </PermissionGate>
+          }
+        />
       </div>
+
+      {/* ── Add Question Dialog ── */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-md shadow-xl w-full max-w-md flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: GOV.border }}>
+              <div>
+                <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Add Question</h3>
+                <p className="text-xs mt-0.5" style={{ color: GOV.textMuted }}>Add a new question to the assessment bank</p>
+              </div>
+              <button type="button" onClick={() => { setShowCreateDialog(false); setNewQuestion(EMPTY_Q); }}><X className="w-4 h-4" style={{ color: GOV.textMuted }} /></button>
+            </div>
+            <form className="flex-1 overflow-y-auto p-5 space-y-3" onSubmit={async (e) => { await handleCreate(e); setShowCreateDialog(false); }}>
+              <div>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Question Text *</label>
+                <textarea className="form-control resize-none" rows={3} style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.text} onChange={e => setNewQuestion({ ...newQuestion, text: e.target.value })} required />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Section</label>
+                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.section} onChange={e => setNewQuestion({ ...newQuestion, section: e.target.value })}>
+                    <option value="activities">Activities</option>
+                    <option value="competencies">Competencies</option>
+                    <option value="occupations">Occupations</option>
+                    <option value="self_estimates">Self Estimates</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>RIASEC Type</label>
+                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.riasecType} onChange={e => setNewQuestion({ ...newQuestion, riasecType: e.target.value })}>
+                    {['R', 'I', 'A', 'S', 'E', 'C'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Order (optional)</label>
+                <input type="number" className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.order} onChange={e => setNewQuestion({ ...newQuestion, order: e.target.value })} placeholder="e.g. 42" />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="button" onClick={() => { setShowCreateDialog(false); setNewQuestion(EMPTY_Q); }} className="flex-1 border rounded-md py-2 text-xs" style={{ borderColor: GOV.border, color: GOV.textMuted }}>Cancel</button>
+                <button type="submit" disabled={isSaving} className="flex-1 text-white py-2 rounded-md text-xs font-semibold disabled:opacity-50" style={{ backgroundColor: GOV.blue }}>
+                  {isSaving ? 'Saving…' : 'Add Question'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editingQuestion && (

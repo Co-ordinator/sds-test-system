@@ -64,16 +64,16 @@ const Login = () => {
         >
           <div className="px-6 pt-6 pb-1">
             <h1 className={`${TYPO.pageTitle} text-center`} style={{ color: GOV.text }}>
-              Welcome Back
+              Login to the SDS Assessment System
             </h1>
             <p className={`${TYPO.bodySmall} text-center mt-1`} style={{ color: GOV.textMuted }}>
-              Enter your credentials to access your account
+              Enter your credentials to securely access your account
             </p>
           </div>
 
-          <form className="px-6 pt-4 pb-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
+          <form className="px-6 pt-5 pb-6 space-y-5" onSubmit={handleSubmit(onSubmit)}>
             <div>
-              <label htmlFor="login-identifier" className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email or Code</label>
+              <label htmlFor="login-identifier" className={`block ${TYPO.label} mb-2`} style={{ color: GOV.text }}>Email or Code</label>
               <input
                 id="login-identifier"
                 {...register('email', {
@@ -91,9 +91,9 @@ const Login = () => {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="login-password" className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Password</label>
-                <Link to="/forgot-password" className={`${TYPO.hint} font-medium`} style={{ color: GOV.blue }}>
+              <div className="flex items-center justify-between mb-2">
+                <label htmlFor="login-password" className={`block ${TYPO.label}`} style={{ color: GOV.text }}>Password</label>
+                <Link to="/forgot-password" className={`${TYPO.hint} font-semibold underline hover:no-underline transition-all`} style={{ color: GOV.blue }}>
                   Forgot password?
                 </Link>
               </div>
@@ -125,7 +125,7 @@ const Login = () => {
               className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
               style={{ backgroundColor: GOV.blue }}
             >
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+              {isSubmitting ? 'Logging in…' : 'Login'}
             </button>
           </form>
 

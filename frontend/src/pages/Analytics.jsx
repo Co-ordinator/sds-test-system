@@ -3,6 +3,7 @@ import {
   Filter, RefreshCw, Briefcase, MapPin, TrendingUp, BarChart2, Download
 } from 'lucide-react';
 import api from '../services/api';
+import { analyticsService } from '../services/analyticsService';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import FilterDialog from '../components/ui/FilterDialog';
@@ -46,12 +47,6 @@ const Analytics = () => {
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS });
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const buildParams = () => {
-    const p = new URLSearchParams();
-    Object.entries(filters).forEach(([k, v]) => { if (v) p.set(k, v); });
-    return p.toString();
-  };
 
   const hasActiveFilters = useMemo(
     () => Object.values(filters).some(Boolean),
@@ -103,39 +98,33 @@ const Analytics = () => {
 
   const handleExport = async (format) => {
     try {
-      const qs = buildParams();
-      const res = await api.get(`/api/v1/admin/analytics/export?format=${format}${qs ? `&${qs}` : ''}`, { responseType: 'blob' });
-      const mime = format === 'pdf' ? 'application/pdf' : 'text/csv';
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: mime }));
-      const a = document.createElement('a');
-      a.href = url; a.download = `analytics_report.${format === 'pdf' ? 'pdf' : 'csv'}`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+      await analyticsService.exportReport(format, f);
     } catch {}
   };
 
   useEffect(() => {
     api.get('/api/v1/institutions').then(r => setInstitutions(r.data?.data?.institutions || [])).catch(() => {});
-    api.get('/api/v1/admin/analytics/knowledge-graph').then(r => setKgData(r.data?.data || null)).catch(() => {});
-    api.get('/api/v1/admin/analytics/skills-pipeline').then(r => setPipelineData(r.data?.data || null)).catch(() => {});
+    analyticsService.getKnowledgeGraph().then(d => setKgData(d)).catch(() => {});
+    analyticsService.getSkillsPipeline().then(d => setPipelineData(d)).catch(() => {});
   }, []);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const qs = buildParams();
-        const [aRes, hRes, tRes, rRes, sRes] = await Promise.all([
-          api.get(`/api/v1/admin/analytics${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/trend${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/regional${qs ? `?${qs}` : ''}`),
-          api.get(`/api/v1/admin/analytics/segmentation${qs ? `?${qs}` : ''}`),
+        const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+        const [overviewData, hollandData, trendData, regionalData, segmentData] = await Promise.all([
+          analyticsService.getOverview(f),
+          analyticsService.getHollandDistribution(f),
+          analyticsService.getTrend(f),
+          analyticsService.getRegional(f),
+          analyticsService.getSegmentation(f),
         ]);
-        setAnalytics(aRes.data?.data || null);
-        setHollandDist(hRes.data?.data?.distribution || []);
-        setTrend(tRes.data?.data?.trend || []);
-        setRegionalData(rRes.data?.data || null);
-        setSegmentData(sRes.data?.data || null);
+        setAnalytics(overviewData);
+        setHollandDist(hollandData);
+        setTrend(trendData);
+        setRegionalData(regionalData);
+        setSegmentData(segmentData);
       } catch {
         setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setSegmentData(null);
       } finally { setLoading(false); }

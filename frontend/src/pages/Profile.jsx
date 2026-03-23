@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
+import OccupationSearchInput from '../components/ui/OccupationSearchInput';
 
 const inputStyle = {
   border: '0',
@@ -31,6 +32,7 @@ export default function Profile() {
   const [userData, setUserData] = useState(null);
   const [saveStatus, setSaveStatus] = useState(null);
   const [workplace, setWorkplace] = useState({ name: '', institutionId: null });
+  const [occupation, setOccupation] = useState({ name: '', id: null });
 
   // Qualifications state
   const [qualifications, setQualifications] = useState([]);
@@ -78,6 +80,10 @@ export default function Profile() {
           setWorkplace({
             name: user.workplaceName || '',
             institutionId: user.workplaceInstitutionId || null,
+          });
+          setOccupation({
+            name: user.currentOccupation || '',
+            id: null,
           });
         }
       } catch (err) {
@@ -174,6 +180,8 @@ export default function Profile() {
       (userData?.userType === 'professional');
     const payload = {
       ...data,
+      currentOccupation: occupation.name || null,
+      currentOccupationId: occupation.id || null,
       ...(isProfessional ? {
         workplaceName: workplace.name || null,
         workplaceInstitutionId: workplace.institutionId || null,
@@ -426,10 +434,15 @@ export default function Profile() {
 
               <div>
                 <FieldLabel>Current Occupation</FieldLabel>
-                <input
-                  {...register('currentOccupation')}
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.currentOccupation ? errorInputStyle : {}) }}
+                <OccupationSearchInput
+                  value={occupation.name}
+                  occupationId={occupation.id}
+                  onChange={(name, id) => {
+                    setOccupation({ name, id });
+                    setValue('currentOccupation', name);
+                  }}
+                  placeholder="Search for your occupation..."
+                  error={!!errors.currentOccupation}
                 />
                 <FieldError error={errors.currentOccupation} />
               </div>

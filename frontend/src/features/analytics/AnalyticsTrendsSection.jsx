@@ -26,7 +26,15 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
 const Empty = ({ h = 200 }) => <div className="flex items-center justify-center text-xs" style={{ height: h, color: GOV.textHint }}>No data</div>;
 
 const GENDER_COLORS = { female: '#be185d', male: '#2563eb', other: '#6b7280', unknown: '#9ca3af' };
-const USER_TYPE_COLORS = { school_student: '#1e3a5f', university_student: '#2563eb', professional: '#059669' };
+const USER_TYPE_COLORS = {
+  'High School Student': '#1e3a5f',
+  'University Student': '#2563eb',
+  'Professional': '#059669',
+  'Test Administrator': '#7c3aed',
+  school_student: '#1e3a5f',
+  university_student: '#2563eb',
+  professional: '#059669',
+};
 
 const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, segmentData }) => {
   const genderRiasecData = useMemo(() => {
