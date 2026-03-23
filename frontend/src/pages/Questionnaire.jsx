@@ -65,6 +65,7 @@ const Questionnaire = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
+  const [sectionTransition, setSectionTransition] = useState(null);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
@@ -164,8 +165,15 @@ const Questionnaire = () => {
     if (currentQuestionIndex < sectionQuestions.length - 1) {
       setCurrentQuestionIndex((i) => i + 1);
     } else if (currentSectionIndex < totalSections - 1) {
-      setCurrentSectionIndex((i) => i + 1);
+      setSectionTransition({ from: currentSectionIndex, to: currentSectionIndex + 1 });
+    }
+  };
+
+  const proceedToNextSection = () => {
+    if (sectionTransition) {
+      setCurrentSectionIndex(sectionTransition.to);
       setCurrentQuestionIndex(0);
+      setSectionTransition(null);
     }
   };
 
@@ -316,16 +324,13 @@ const Questionnaire = () => {
           )}
           <button
             type="button"
-            onClick={() => {
-              setIsPaused(true);
-              navigate('/dashboard');
-            }}
+            onClick={() => setIsPaused(p => !p)}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-white"
-            style={{ color: GOV.text }}
-            aria-label="Pause assessment and return to dashboard"
-            title="Pause and return to dashboard"
+            style={{ color: isPaused ? '#d97706' : GOV.text }}
+            aria-label={isPaused ? 'Resume assessment' : 'Pause assessment'}
+            title={isPaused ? 'Resume' : 'Pause'}
           >
-            <PauseCircle className="w-4 h-4" /> Pause
+            <PauseCircle className="w-4 h-4" /> {isPaused ? 'Resume' : 'Pause'}
           </button>
           {allAnswered && (
             <button
@@ -348,7 +353,55 @@ const Questionnaire = () => {
         </div>
       )}
 
-      {currentQuestion && (
+      {isPaused && !sectionTransition && (
+        <div className="bg-white rounded-md p-10 text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#fef3c7' }}>
+            <PauseCircle className="w-8 h-8" style={{ color: '#d97706' }} />
+          </div>
+          <h2 className="text-xl font-bold mb-2" style={{ color: GOV.text }}>Assessment Paused</h2>
+          <p className="text-sm mb-6" style={{ color: GOV.textMuted }}>Your progress has been saved. Click Resume when you are ready to continue.</p>
+          <p className="text-xs mb-6" style={{ color: GOV.textHint }}>{answeredCount} of {totalQuestions} questions answered ({progressPercent}%)</p>
+          <button
+            type="button"
+            onClick={() => setIsPaused(false)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-md text-sm font-semibold text-white"
+            style={{ backgroundColor: GOV.blue }}
+          >
+            <ChevronRight className="w-4 h-4" /> Resume Assessment
+          </button>
+        </div>
+      )}
+
+      {sectionTransition && (() => {
+        const completedSection = SECTIONS[sectionTransition.from];
+        const nextSection = SECTIONS[sectionTransition.to];
+        return (
+          <div className="bg-white rounded-md p-8 md:p-12 text-center">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f0fdf4' }}>
+              <CheckCircle2 className="w-9 h-9" style={{ color: '#16a34a' }} />
+            </div>
+            <h2 className="text-2xl font-bold mb-1" style={{ color: GOV.text }}>Section {completedSection.num} Complete!</h2>
+            <p className="text-sm mb-6" style={{ color: GOV.textMuted }}>Well done — you have completed the <strong>{completedSection.label}</strong> section.</p>
+
+            <div className="max-w-md mx-auto rounded-lg p-5 mb-8 text-left" style={{ backgroundColor: GOV.blueLightAlt }}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: GOV.textMuted }}>Up Next · Section {nextSection.num}</p>
+              <p className="text-base font-bold mb-2" style={{ color: GOV.text }}>{nextSection.label}</p>
+              <p className="text-sm" style={{ color: GOV.textMuted }}>{nextSection.description}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={proceedToNextSection}
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-md text-sm font-semibold text-white"
+              style={{ backgroundColor: GOV.blue }}
+            >
+              Start Section {nextSection.num}: {nextSection.label} <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        );
+      })()}
+
+      {!isPaused && !sectionTransition && currentQuestion && (
         <div className="bg-white rounded-md p-6 md:p-8">
           <div className="mb-6">
             <div className="mb-4">
@@ -439,10 +492,6 @@ const Questionnaire = () => {
             <div className="flex items-center justify-between text-xs mb-3" style={{ color: GOV.textHint }}>
               <div className="flex items-center gap-4">
                 <span>{answeredCount} of {totalQuestions} answered</span>
-                <span className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  Time: {formatTime(elapsedTime)}
-                </span>
               </div>
               <span>{progressPercent}% complete</span>
             </div>

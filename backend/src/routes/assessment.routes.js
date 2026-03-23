@@ -7,13 +7,13 @@ const router = express.Router();
 
 router.use(verifyToken);
 
-router.post('/', restrictTo('user'), AssessmentController.startAssessment);
-router.get('/', restrictTo('user'), AssessmentController.listMyAssessments);
-router.get('/questions', restrictTo('user'), AssessmentController.getQuestions);
-router.get('/:assessmentId', restrictTo('user'), AssessmentController.getAssessment);
-router.get('/:assessmentId/progress', restrictTo('user'), AssessmentController.getProgress);
-router.post('/:assessmentId/progress', restrictTo('user'), AssessmentController.saveProgress);
-router.post('/:assessmentId/complete', restrictTo('user'), AssessmentController.submitAssessment);
+router.post('/', restrictTo('Test Taker'), AssessmentController.startAssessment);
+router.get('/', restrictTo('Test Taker'), AssessmentController.listMyAssessments);
+router.get('/questions', restrictTo('Test Taker'), AssessmentController.getQuestions);
+router.get('/:assessmentId', restrictTo('Test Taker'), AssessmentController.getAssessment);
+router.get('/:assessmentId/progress', restrictTo('Test Taker'), AssessmentController.getProgress);
+router.post('/:assessmentId/progress', restrictTo('Test Taker'), AssessmentController.saveProgress);
+router.post('/:assessmentId/complete', restrictTo('Test Taker'), AssessmentController.submitAssessment);
 router.get('/:assessmentId/results', AssessmentController.getResults);
 router.get('/:assessmentId/pdf', AssessmentController.downloadResultsPdf);
 

@@ -146,16 +146,6 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
         <div className={contentClassName}>{children}</div>
       </main>
 
-      <footer
-        className="border-t py-3"
-        style={{ borderColor: GOV.border, backgroundColor: GOV.blueLightAlt }}
-      >
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[11px]" style={{ color: GOV.textMuted }}>
-            © {new Date().getFullYear()} Kingdom of Eswatini · Skills Development System · All rights reserved
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

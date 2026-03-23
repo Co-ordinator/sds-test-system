@@ -20,6 +20,9 @@ const AdminInstitutionsPanel = () => {
   const [importResult, setImportResult] = useState(null);
   const [selectedInsts, setSelectedInsts] = useState(new Set());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [typeFilter, setTypeFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const handleBulkDelete = async () => {
     if (!selectedInsts.size) return;
@@ -106,6 +109,14 @@ const AdminInstitutionsPanel = () => {
 
   const pendingCount = institutions.filter(i => i.status === 'pending_review').length;
 
+  const filteredInstitutions = institutions.filter(i => {
+    if (typeFilter && i.type !== typeFilter) return false;
+    if (regionFilter && i.region !== regionFilter) return false;
+    if (statusFilter === 'pending' && i.status !== 'pending_review') return false;
+    if (statusFilter === 'approved' && i.status === 'pending_review') return false;
+    return true;
+  });
+
   const handleApprove = async (inst) => {
     try {
       await adminService.reviewInstitution(inst.id, { status: 'approved' });
@@ -152,14 +163,35 @@ const AdminInstitutionsPanel = () => {
       <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
         <input
-          className="form-control-with-icon pl-7 text-xs w-44"
+          className="form-control-with-icon pl-7 text-xs w-40"
           style={{ borderBottomColor: GOV.border, color: GOV.text }}
           placeholder="Search…"
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
       </div>
-      <span className="text-xs" style={{ color: GOV.textMuted }}>{institutions.length} total{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}</span>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: typeFilter ? GOV.blue : GOV.textMuted }} value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+        <option value="">All Types</option>
+        <option value="school">School</option>
+        <option value="college">College</option>
+        <option value="tvet">TVET</option>
+        <option value="university">University</option>
+        <option value="vocational">Vocational</option>
+        <option value="other">Other</option>
+      </select>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: regionFilter ? GOV.blue : GOV.textMuted }} value={regionFilter} onChange={e => setRegionFilter(e.target.value)}>
+        <option value="">All Regions</option>
+        <option value="hhohho">Hhohho</option>
+        <option value="manzini">Manzini</option>
+        <option value="lubombo">Lubombo</option>
+        <option value="shiselweni">Shiselweni</option>
+      </select>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: statusFilter ? GOV.blue : GOV.textMuted }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+        <option value="">All Statuses</option>
+        <option value="approved">Approved</option>
+        <option value="pending">Pending</option>
+      </select>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>{filteredInstitutions.length}{filteredInstitutions.length !== institutions.length ? ` / ${institutions.length}` : ''}{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}</span>
       <div className="ml-auto flex gap-2">
         <PermissionGate permission="institutions.import">
           <button type="button" onClick={downloadTemplate}
@@ -212,7 +244,7 @@ const AdminInstitutionsPanel = () => {
       <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
         <DataTable
           columns={columns}
-          rows={institutions}
+          rows={filteredInstitutions}
           rowKey="id"
           loading={loading}
           emptyTitle="No institutions"

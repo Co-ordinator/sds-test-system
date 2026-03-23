@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
 import { GOV } from '../../theme/government';
 
 /**
  * ActionMenu — MoreHorizontal icon that opens a compact dropdown with action items.
+ * Uses a portal + fixed positioning so it is never clipped by overflow-hidden parents.
  *
  * actions: Array<{
  *   label: string,
@@ -16,12 +18,25 @@ import { GOV } from '../../theme/government';
  */
 const ActionMenu = ({ actions = [], align = 'right' }) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+
+  const openMenu = useCallback((e) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: align === 'left' ? rect.left + window.scrollX : rect.right + window.scrollX,
+      });
+    }
+    setOpen(o => !o);
+  }, [open, align]);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -31,22 +46,27 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
   if (visible.length === 0) return null;
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <div className="inline-block">
       <button
+        ref={btnRef}
         type="button"
-        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        onClick={openMenu}
         className="p-1.5 rounded hover:bg-gray-100 transition-colors"
         title="Actions"
       >
         <MoreHorizontal className="w-4 h-4" style={{ color: GOV.textMuted }} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-20" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div
-            className={`absolute top-full mt-1 z-30 min-w-[140px] bg-white border rounded-md shadow-lg py-1 ${align === 'left' ? 'left-0' : 'right-0'}`}
-            style={{ borderColor: GOV.border }}
+            className="fixed z-[9999] min-w-[140px] bg-white border rounded-md shadow-lg py-1"
+            style={{
+              borderColor: GOV.border,
+              top: pos.top,
+              ...(align === 'left' ? { left: pos.left } : { right: `calc(100vw - ${pos.left}px)` }),
+            }}
           >
             {visible.map((action, i) => (
               <button
@@ -66,7 +86,8 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

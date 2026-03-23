@@ -89,10 +89,17 @@ module.exports = {
 
   /* ─── Verify Email ────────────────────────────────────────────────────── */
   verifyEmail: async (tokenParam) => {
-    const user = await User.findOne({
+    let user = await User.findOne({
       where: { emailVerificationToken: tokenParam, emailVerificationExpires: { [Op.gt]: new Date() } }
     });
-    if (!user) throw Object.assign(new Error('Token is invalid or has expired'), { status: 400 });
+
+    if (!user) {
+      const alreadyVerified = await User.findOne({ where: { emailVerificationToken: tokenParam } });
+      if (alreadyVerified?.isEmailVerified) {
+        return { user: alreadyVerified, token: null, refreshToken: null, alreadyVerified: true };
+      }
+      throw Object.assign(new Error('Token is invalid or has expired'), { status: 400 });
+    }
 
     user.isEmailVerified = true;
     user.emailVerificationToken = null;

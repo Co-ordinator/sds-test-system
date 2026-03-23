@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Download, MapPin, Filter, X
+  MapPin, Filter, X, RefreshCw
 } from 'lucide-react';
 import FilterDialog from '../components/ui/FilterDialog';
 import api from '../services/api';
@@ -36,7 +36,7 @@ const AdminDashboard = () => {
   const [trend, setTrend] = useState([]);
   const [assessments, setAssessments] = useState([]);
   const [institutions, setInstitutions] = useState([]);
-  const [exporting, setExporting] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
@@ -88,38 +88,26 @@ const AdminDashboard = () => {
     fetchDashboard();
   }, [filters.region, filters.institutionId, filters.startDate, filters.endDate]);
 
-  const handleExport = async (type) => {
-    setExporting(type);
-    try {
-      const res = await api.get(`/api/v1/admin/export/${type}`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }));
-      const a = document.createElement('a');
-      a.href = url; a.download = `${type}_export.csv`;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a); window.URL.revokeObjectURL(url);
-    } catch { /* silent */ }
-    finally { setExporting(null); }
-  };
-
-  const handleAnalyticsExport = async (format) => {
-    setExporting(`analytics-${format}`);
+  const handleRefresh = async () => {
+    setRefreshing(true);
     try {
       const qs = buildParams();
-      const res = await api.get(`/api/v1/analytics/export?format=${format}${qs ? `&${qs}` : ''}`, { responseType: 'blob' });
-      const mime = format === 'pdf' ? 'application/pdf' : 'text/csv';
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: mime }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `national_dashboard.${format === 'pdf' ? 'pdf' : 'csv'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch {
-      // silent
-    } finally {
-      setExporting(null);
-    }
+      const [aRes, rRes, hRes, tRes, assessmentsRes, institutionsRes] = await Promise.all([
+        api.get(`/api/v1/analytics${qs ? `?${qs}` : ''}`),
+        api.get(`/api/v1/analytics/regional${qs ? `?${qs}` : ''}`),
+        api.get(`/api/v1/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
+        api.get(`/api/v1/analytics/trend${qs ? `?${qs}` : ''}`),
+        adminService.getAssessments(1000),
+        adminService.getInstitutions(),
+      ]);
+      setAnalytics(aRes.data?.data || null);
+      setRegionalData(rRes.data?.data || null);
+      setHollandDist(hRes.data?.data?.distribution || []);
+      setTrend(tRes.data?.data?.trend || []);
+      setAssessments(assessmentsRes || []);
+      setInstitutions(institutionsRes || []);
+    } catch { /* silent */ }
+    finally { setRefreshing(false); }
   };
 
   const completionRate = analytics?.completionRate ?? 0;
@@ -254,32 +242,16 @@ const AdminDashboard = () => {
             <h1 className="text-2xl font-bold" style={{ color: GOV.text }}>Welcome back, {firstName}</h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <PermissionGate permission="users.export">
-              <button type="button" onClick={() => handleExport('users')} disabled={exporting === 'users'}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                style={{ borderColor: GOV.border, color: GOV.blue }}>
-                <Download className="w-3.5 h-3.5" /> {exporting === 'users' ? 'Exporting...' : 'Export Users'}
-              </button>
-            </PermissionGate>
-            <PermissionGate permission="results.export">
-              <button type="button" onClick={() => handleExport('assessments')} disabled={exporting === 'assessments'}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                style={{ borderColor: GOV.border, color: GOV.blue }}>
-                <Download className="w-3.5 h-3.5" /> {exporting === 'assessments' ? 'Exporting...' : 'Export Results'}
-              </button>
-            </PermissionGate>
-            <PermissionGate permission="analytics.export">
-              <button type="button" onClick={() => handleAnalyticsExport('csv')} disabled={exporting === 'analytics-csv'}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                style={{ borderColor: GOV.border, color: GOV.blue }}>
-                <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-csv' ? 'Exporting...' : 'National CSV'}
-              </button>
-              <button type="button" onClick={() => handleAnalyticsExport('pdf')} disabled={exporting === 'analytics-pdf'}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
-                style={{ backgroundColor: GOV.blue }}>
-                <Download className="w-3.5 h-3.5" /> {exporting === 'analytics-pdf' ? 'Exporting...' : 'National PDF'}
-              </button>
-            </PermissionGate>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              style={{ borderColor: GOV.border, color: GOV.blue }}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
           </div>
         </div>
 

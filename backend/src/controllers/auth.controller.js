@@ -49,11 +49,13 @@ const register = async (req, res, next) => {
 
 const verifyEmail = async (req, res, next) => {
   try {
-    const { user, token, refreshToken } = await authService.verifyEmail(req.params.token);
-    logger.info({ actionType: 'VERIFY_EMAIL', message: `Email verified for user: ${user.email}`, req, details: { userId: user.id } });
-    await AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Email verified', details: { resourceType: 'user', resourceId: user.id, requestMethod: 'GET', requestPath: `/api/v1/auth/verify-email/${req.params.token}` }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
+    const { user, token, refreshToken, alreadyVerified } = await authService.verifyEmail(req.params.token);
+    if (!alreadyVerified) {
+      logger.info({ actionType: 'VERIFY_EMAIL', message: `Email verified for user: ${user.email}`, req, details: { userId: user.id } });
+      await AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Email verified', details: { resourceType: 'user', resourceId: user.id, requestMethod: 'GET', requestPath: `/api/v1/auth/verify-email/${req.params.token}` }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
+    }
     if (refreshToken) setRefreshTokenCookie(res, refreshToken);
-    res.status(200).json({ status: 'success', message: token ? 'Email successfully verified!' : 'Email successfully verified. Please log in.', ...(token ? { token } : {}), data: { user: user.toJSON() } });
+    res.status(200).json({ status: 'success', message: alreadyVerified ? 'Your email is already verified. Please log in.' : (token ? 'Email successfully verified!' : 'Email successfully verified. Please log in.'), ...(token ? { token } : {}), data: { user: user.toJSON() } });
   } catch (error) {
     logger.error({ actionType: 'VERIFY_EMAIL_FAILED', message: 'Email verification failed', req, details: { error: error.message, stack: error.stack } });
     if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });

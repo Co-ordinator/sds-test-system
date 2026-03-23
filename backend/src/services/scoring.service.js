@@ -51,54 +51,9 @@ class ScoringService {
         }
       });
 
-      // Calculate Holland code with tie handling (slash format for ties)
+      // Calculate Holland code: sort by score descending, take top 3 letters
       const sorted = Object.entries(totals).sort(([, valA], [, valB]) => valB - valA);
-      
-      const hollandParts = [];
-      let currentGroup = [];
-      let currentScore = null;
-      let totalLetters = 0;
-      
-      for (const [letter, score] of sorted) {
-        if (totalLetters >= 6) break;
-        
-        if (currentScore === null || score === currentScore) {
-          currentGroup.push(letter);
-          currentScore = score;
-        } else {
-          if (currentGroup.length > 0) {
-            hollandParts.push(currentGroup.join('/'));
-            totalLetters += currentGroup.length;
-          }
-          if (totalLetters >= 6) break;
-          currentGroup = [letter];
-          currentScore = score;
-        }
-      }
-      
-      if (currentGroup.length > 0 && totalLetters < 6) {
-        const remaining = 6 - totalLetters;
-        if (currentGroup.length <= remaining) {
-          hollandParts.push(currentGroup.join('/'));
-          totalLetters += currentGroup.length;
-        } else {
-          hollandParts.push(currentGroup.slice(0, remaining).join('/'));
-        }
-      }
-      
-      let hollandCode = hollandParts.join('');
-      const letterCount = hollandCode.replace(/\//g, '').length;
-      
-      if (letterCount < 3) {
-        const usedLetters = new Set(hollandCode.replace(/\//g, '').split(''));
-        const additionalLetters = sorted
-          .map(([letter]) => letter)
-          .filter(letter => !usedLetters.has(letter))
-          .slice(0, 3 - letterCount);
-        hollandCode = hollandCode + additionalLetters.join('');
-      }
-      
-      hollandCode = hollandCode || 'RIA';
+      const hollandCode = sorted.slice(0, 3).map(([letter]) => letter).join('') || 'RIA';
 
       await assessment.update({
         scoreR: totals.R,

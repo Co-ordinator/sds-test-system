@@ -84,11 +84,8 @@ const AdminUsersPanel = ({ institutions = [] }) => {
     } catch { showToast('Failed to delete user', 'error'); }
   };
 
-  const handleViewUser = async (u) => {
-    try {
-      const detail = await adminService.getUser(u.id);
-      setViewingUser(detail || u);
-    } catch { setViewingUser(u); }
+  const handleViewUser = (u) => {
+    navigate(`/admin/users/${u.id}`);
   };
 
   const handleSaveUser = async () => {

@@ -39,6 +39,7 @@ const ROLE_COLORS = {
 const BREADCRUMB_MAP = {
   '/admin/dashboard': [{ label: 'Admin' }],
   '/admin/users': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Users' }],
+  '/admin/users/:userId': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Users', to: '/admin/settings?tab=users' }, { label: 'User Details' }],
   '/admin/institutions': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Institutions' }],
   '/admin/occupations': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Occupations' }],
   '/admin/results': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Results' }],
@@ -107,8 +108,6 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
           </p>
         </div>
       </div>
-
-      <div style={{ height: 1, background: 'linear-gradient(90deg, #c8a84b 0%, #e8d48b 50%, #c8a84b 100%)' }} />
 
       {/* ── Primary nav bar ── */}
       <header

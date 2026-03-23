@@ -20,6 +20,9 @@ const AdminOccupationsPanel = () => {
   const { toast, showToast, Toast: ToastComp } = useToast();
   const [selectedOccs, setSelectedOccs] = useState(new Set());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [riasecFilter, setRiasecFilter] = useState('');
+  const [demandFilter, setDemandFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const handleBulkDelete = async () => {
     if (!selectedOccs.size) return;
@@ -53,9 +56,14 @@ const AdminOccupationsPanel = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const filtered = search
-    ? occupations.filter(o => `${o.name} ${o.category || ''}`.toLowerCase().includes(search.toLowerCase()))
-    : occupations;
+  const filtered = occupations.filter(o => {
+    if (search && !`${o.name} ${o.category || ''}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (riasecFilter && o.primaryRiasec !== riasecFilter) return false;
+    if (demandFilter && o.demandLevel !== demandFilter) return false;
+    if (statusFilter === 'pending' && o.status !== 'pending_review') return false;
+    if (statusFilter === 'approved' && o.status === 'pending_review') return false;
+    return true;
+  });
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -145,9 +153,24 @@ const AdminOccupationsPanel = () => {
     <>
       <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
-        <input className="form-control-with-icon pl-7 text-xs w-44" style={{ borderBottomColor: GOV.border, color: GOV.text }} placeholder="Search occupations…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="form-control-with-icon pl-7 text-xs w-40" style={{ borderBottomColor: GOV.border, color: GOV.text }} placeholder="Search occupations…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-      <span className="text-xs" style={{ color: GOV.textMuted }}>{occupations.length} total{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}</span>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: riasecFilter ? GOV.blue : GOV.textMuted }} value={riasecFilter} onChange={e => setRiasecFilter(e.target.value)}>
+        <option value="">All RIASEC</option>
+        {['R','I','A','S','E','C'].map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: demandFilter ? GOV.blue : GOV.textMuted }} value={demandFilter} onChange={e => setDemandFilter(e.target.value)}>
+        <option value="">All Demand</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: statusFilter ? GOV.blue : GOV.textMuted }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+        <option value="">All Statuses</option>
+        <option value="approved">Approved</option>
+        <option value="pending">Pending</option>
+      </select>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>{filtered.length}{filtered.length !== occupations.length ? ` / ${occupations.length}` : ''}{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}</span>
       <div className="ml-auto flex gap-2">
         <PermissionGate permission="occupations.import">
           <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>

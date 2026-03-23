@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, Upload, Download, Edit2, Trash2, X } from 'lucide-react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Plus, Upload, Download, Edit2, Trash2, X, Search } from 'lucide-react';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { GOV, TYPO } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
@@ -19,6 +19,9 @@ const AdminQuestionsPanel = () => {
   const { toast, showToast, Toast: ToastComp } = useToast();
   const [selectedQs, setSelectedQs] = useState(new Set());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [search, setSearch] = useState('');
+  const [sectionFilter, setSectionFilter] = useState('');
+  const [riasecFilter, setRiasecFilter] = useState('');
 
   const handleBulkDelete = async () => {
     if (!selectedQs.size) return;
@@ -123,9 +126,31 @@ const AdminQuestionsPanel = () => {
     },
   ];
 
+  const filtered = useMemo(() => questions.filter(q => {
+    if (search && !q.text.toLowerCase().includes(search.toLowerCase())) return false;
+    if (sectionFilter && q.section !== sectionFilter) return false;
+    if (riasecFilter && q.riasecType !== riasecFilter) return false;
+    return true;
+  }), [questions, search, sectionFilter, riasecFilter]);
+
   const toolbar = (
     <>
-      <span className="text-xs" style={{ color: GOV.textMuted }}>{questions.length} questions</span>
+      <div className="relative">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
+        <input className="pl-7 text-xs border rounded-md px-2 py-1.5 w-44 outline-none" style={{ borderColor: GOV.border, color: GOV.text }} placeholder="Search questions…" value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: sectionFilter ? GOV.blue : GOV.textMuted }} value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}>
+        <option value="">All Sections</option>
+        <option value="activities">Activities</option>
+        <option value="competencies">Competencies</option>
+        <option value="occupations">Occupations</option>
+        <option value="self_estimates">Self Estimates</option>
+      </select>
+      <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: riasecFilter ? GOV.blue : GOV.textMuted }} value={riasecFilter} onChange={e => setRiasecFilter(e.target.value)}>
+        <option value="">All RIASEC</option>
+        {['R','I','A','S','E','C'].map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>{filtered.length}{filtered.length !== questions.length ? ` / ${questions.length}` : ''}</span>
       <div className="ml-auto flex items-center gap-2">
         <PermissionGate permission="questions.import">
           <label className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold cursor-pointer" style={{ borderColor: GOV.border, color: GOV.blue }}>
@@ -154,7 +179,7 @@ const AdminQuestionsPanel = () => {
 
       <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
         <DataTable
-          columns={columns} rows={questions} rowKey="id" loading={loading}
+          columns={columns} rows={filtered} rowKey="id" loading={loading}
           emptyTitle="No questions loaded" toolbar={toolbar} pageSize={7} stickyHeader
           selectable selectedIds={selectedQs} onSelectionChange={setSelectedQs}
           bulkActions={

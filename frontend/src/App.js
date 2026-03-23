@@ -28,6 +28,7 @@ import AdminAuditPage from './pages/admin/AdminAuditPage';
 import AdminSubjectsPage from './pages/admin/AdminSubjectsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import AdminCoursesPage from './pages/admin/AdminCoursesPage';
+import AdminUserDetailPage from './pages/admin/AdminUserDetailPage';
 import AdminEducationLevelsPage from './pages/admin/AdminEducationLevelsPage';
 import AdminCertificatesPage from './pages/admin/AdminCertificatesPage';
 import Notifications from './pages/Notifications';
@@ -114,6 +115,11 @@ function App() {
           <Route path="/admin/users" element={
             <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
               <AdminUsersPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/users/:userId" element={
+            <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
+              <AdminUserDetailPage />
             </ProtectedRoute>
           } />
           <Route path="/admin/users/:userId/permissions" element={
