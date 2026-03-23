@@ -26,6 +26,9 @@ router.get('/knowledge-graph', requirePermission('analytics.view'), AnalyticsCon
 router.get('/segmentation', requirePermission('analytics.view'), AnalyticsController.getSegmentation);
 router.get('/skills-pipeline', requirePermission('analytics.view'), AnalyticsController.getSkillsPipeline);
 
+// ── Government Funding Priority Alignment ───────────────────────────────
+router.get('/funding-alignment', requirePermission('analytics.view'), AnalyticsController.getFundingAlignment);
+
 // ── Export ──────────────────────────────────────────────────────────────────
 router.get('/export', requirePermission('analytics.export'), AnalyticsController.exportAnalytics);
 

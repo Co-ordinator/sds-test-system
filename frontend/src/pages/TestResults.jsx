@@ -512,6 +512,125 @@ const TestResults = () => {
           </div>
         )}
 
+        {/* ── Government Funding Priority Alignment ── */}
+        {recommendations?.fundingAlignment && (
+          <div className="bg-white rounded-md p-6">
+            <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
+              <Award className="w-4 h-4" style={{ color: GOV.blue }} /> Government Funding Priority Alignment
+            </h2>
+            <p className="text-xs mb-4" style={{ color: GOV.textHint }}>
+              How your career interests compare with the Eswatini Government's priority programmes for scholarship funding.
+            </p>
+
+            {/* Overall Alignment Badge */}
+            <div className="flex items-center gap-3 mb-5 p-4 rounded-lg border" style={{
+              borderColor: recommendations.fundingAlignment.overall === 'HIGH' ? '#16a34a' : recommendations.fundingAlignment.overall === 'MEDIUM' ? '#d97706' : '#dc2626',
+              backgroundColor: recommendations.fundingAlignment.overall === 'HIGH' ? '#f0fdf4' : recommendations.fundingAlignment.overall === 'MEDIUM' ? '#fffbeb' : '#fef2f2'
+            }}>
+              <div className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 text-white font-bold text-sm" style={{
+                backgroundColor: recommendations.fundingAlignment.overall === 'HIGH' ? '#16a34a' : recommendations.fundingAlignment.overall === 'MEDIUM' ? '#d97706' : '#dc2626'
+              }}>
+                {recommendations.fundingAlignment.overall}
+              </div>
+              <div>
+                <p className="text-sm font-bold" style={{
+                  color: recommendations.fundingAlignment.overall === 'HIGH' ? '#166534' : recommendations.fundingAlignment.overall === 'MEDIUM' ? '#92400e' : '#991b1b'
+                }}>
+                  Government Funding Alignment: {recommendations.fundingAlignment.overall}
+                </p>
+                <p className="text-xs mt-1" style={{ color: GOV.textMuted }}>
+                  {recommendations.fundingAlignment.highCount} high-priority, {recommendations.fundingAlignment.mediumCount} medium-priority fields match your profile
+                </p>
+              </div>
+            </div>
+
+            {/* Interpretation */}
+            <div className="p-3 rounded-md mb-5" style={{ backgroundColor: '#f8fafc', borderLeft: `3px solid ${GOV.blue}` }}>
+              <p className="text-xs leading-relaxed" style={{ color: GOV.text }}>
+                {recommendations.fundingAlignment.interpretation}
+              </p>
+            </div>
+
+            {/* Field-by-Field Alignment */}
+            {recommendations.fundingAlignment.fields && recommendations.fundingAlignment.fields.length > 0 && (
+              <div className="space-y-2 mb-5">
+                <h3 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: GOV.textMuted }}>Priority Programme Alignment</h3>
+                {recommendations.fundingAlignment.fields.map((f, i) => (
+                  <div key={i} className="p-3 rounded-md border" style={{ borderColor: GOV.borderLight }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-semibold" style={{ color: GOV.text }}>{f.field}</p>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0" style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
+                          {f.courseCount} {f.courseCount === 1 ? 'course' : 'courses'}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0 ml-3" style={{
+                        backgroundColor: f.alignment === 'HIGH' ? '#dcfce7' : '#fef3c7',
+                        color: f.alignment === 'HIGH' ? '#166534' : '#92400e'
+                      }}>
+                        {f.alignment === 'HIGH' ? 'GOVERNMENT FUNDED' : 'PARTIAL ALIGNMENT'}
+                      </span>
+                    </div>
+                    {f.courses && f.courses.length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {f.courses.map((c, ci) => (
+                          <span key={ci} className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#f1f5f9', color: GOV.textMuted }}>
+                            {c.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Application Info */}
+            <div className="p-3 rounded-md mb-3" style={{ backgroundColor: '#fef3c7' }}>
+              <h4 className="text-xs font-semibold mb-2" style={{ color: '#92400e' }}>How to Apply for Government Funding:</h4>
+              <ul className="text-xs space-y-1" style={{ color: '#78350f' }}>
+                <li>• Eswatini National ID (applicant and at least one parent must be a citizen)</li>
+                <li>• University/College acceptance letter from a recognized institution</li>
+                <li>• Certified academic certificates and transcripts</li>
+                <li>• Graded Tax Certificate</li>
+                <li>• Two references (one academic, both Eswatini citizens)</li>
+                <li>• Completed Scholarship Application Form</li>
+              </ul>
+              <p className="text-xs mt-2" style={{ color: '#78350f' }}>
+                <strong>Deadlines:</strong> {recommendations.fundingAlignment.deadlines?.local} (local institutions) · {recommendations.fundingAlignment.deadlines?.southAfrica} (South Africa & Africa)
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-2 mt-4">
+              {recommendations.fundingAlignment.applicationUrl && (
+                <a
+                  href={recommendations.fundingAlignment.applicationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white rounded-md transition-colors hover:opacity-90"
+                  style={{ backgroundColor: GOV.blue }}
+                >
+                  Apply Online at SLAS
+                  <TrendingUp className="w-3.5 h-3.5" />
+                </a>
+              )}
+              {recommendations.fundingAlignment.applicationFormUrl && (
+                <a
+                  href={recommendations.fundingAlignment.applicationFormUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-md border transition-colors hover:bg-gray-50"
+                  style={{ borderColor: GOV.border, color: GOV.text }}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download Application Form
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Footer ── */}
         <p className="text-xs text-center py-4" style={{ color: GOV.textHint }}>
           Kingdom of Eswatini · National Career Guidance Platform · Ministry of Labour and Social Security · {completedDate}

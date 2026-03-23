@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { PermissionProvider } from './context/PermissionContext';
+import { AccessibilityProvider } from './context/AccessibilityContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -16,6 +17,7 @@ import TestCompletion from './pages/TestCompletion';
 import TestResults from './pages/TestResults';
 import TestTakerDashboard from './pages/TestTakerDashboard';
 import Profile from './pages/Profile';
+import AccessibilityPage from './pages/AccessibilityPage';
 import ChangePassword from './pages/ChangePassword';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
@@ -45,6 +47,7 @@ function App() {
     <Router>
       <AuthProvider>
       <PermissionProvider>
+      <AccessibilityProvider>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -98,6 +101,11 @@ function App() {
           <Route path="/profile" element={
             <ProtectedRoute allowedRoles={['Test Taker', 'System Administrator', 'Test Administrator']}>
               <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/accessibility" element={
+            <ProtectedRoute allowedRoles={['Test Taker', 'System Administrator', 'Test Administrator']}>
+              <AccessibilityPage />
             </ProtectedRoute>
           } />
 
@@ -203,6 +211,7 @@ function App() {
           {/* Catch-all Route */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+      </AccessibilityProvider>
       </PermissionProvider>
       </AuthProvider>
     </Router>

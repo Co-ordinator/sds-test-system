@@ -61,6 +61,7 @@ const occupationRoutes = require('./routes/occupation.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const courseRoutes = require('./routes/course.routes');
 const reportRoutes = require('./routes/report.routes');
+const glossaryRoutes = require('./routes/glossary.routes');
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
@@ -73,6 +74,7 @@ app.use('/api/v1/occupations', occupationRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/courses', courseRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1/glossary', glossaryRoutes);
 
 // Error handling
 app.use(errorHandler);

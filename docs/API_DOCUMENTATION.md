@@ -20,6 +20,8 @@ Authorization: Bearer <token>
 - `GET /api/v1/institutions` (public list for registration)
 - `GET /api/v1/institutions/search?q=` (public fuzzy search for institutions)
 - `GET /api/v1/occupations/search?q=` (public fuzzy search for occupations)
+- `GET /api/v1/glossary` (public SDS glossary terms)
+- `GET /api/v1/glossary/:id` (public glossary term details)
 
 ### Role-Based Access Control (RBAC)
 
@@ -802,6 +804,65 @@ POST /attempts/:id/responses
 {
   "status": "error",
   "message": "An internal server error occurred"
+}
+```
+
+---
+
+## Glossary API
+
+### GET /api/v1/glossary
+
+**Description:** Retrieve SDS glossary terms with optional filtering
+
+**Query Parameters:**
+- `section` (optional): Filter by category (`riasec`, `structure`, `actions`, `occupations`)
+- `search` (optional): Search terms, definitions, or examples
+- `difficulty` (optional): Filter by difficulty level (`low`, `medium`, `high`)
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "terms": [
+      {
+        "id": "realistic",
+        "term": "Realistic",
+        "definition": "Hands-on work with tools, machines, or animals.",
+        "example": "Building furniture, fixing cars, farming",
+        "category": "riasec",
+        "section": "personality",
+        "difficulty": "low",
+        "related": ["practical", "hands-on", "mechanical"]
+      }
+    ],
+    "total": 50,
+    "filtered": 12
+  }
+}
+```
+
+### GET /api/v1/glossary/:id
+
+**Description:** Retrieve specific glossary term details
+
+**Response:**
+```json
+{
+  "status": "success",
+  "data": {
+    "term": {
+      "id": "assemble",
+      "term": "Assemble",
+      "definition": "Put parts together to make something complete.",
+      "example": "Building IKEA furniture, model kits",
+      "category": "actions",
+      "section": "activities",
+      "difficulty": "low",
+      "related": ["construct", "build", "put together"]
+    }
+  }
 }
 ```
 

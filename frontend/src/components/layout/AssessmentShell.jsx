@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, Home, LogOut, Settings, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import { GOV, TYPO } from '../../theme/government';
 
 export default function AssessmentShell({ title, subtitle, contextLabel, actions, children, contentClassName = 'max-w-5xl mx-auto px-6 py-6 space-y-6' }) {
   const { user, logout } = useAuth();
+  const { getAriaLabel, screenReaderMode } = useAccessibility();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const role = user?.role || 'Test Taker';
@@ -19,22 +21,29 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
+      {/* Skip to main content for screen readers */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      
       <div
         className="flex-shrink-0 py-0.5 border-b"
         style={{ backgroundColor: '#f8fafc', borderColor: GOV.borderLight }}
+        role="banner"
       >
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className={TYPO.ministryBanner} style={{ color: GOV.blue }}>
+        <div className="max-w-7xl mx-auto px-6 py-1">
+          <p className="text-[10px] font-medium text-center tracking-wide" style={{ color: '#6b7280' }}>
             Ministry of Labour &amp; Social Security · Kingdom of Eswatini
           </p>
         </div>
       </div>
 
-      <header className="sticky top-0 z-20 border-b bg-white" style={{ borderColor: GOV.borderLight }}>
+      <header className="sticky top-0 z-20 border-b bg-white" style={{ borderColor: GOV.borderLight }} role="navigation" aria-label="Main navigation">
         <div className="relative py-2">
           <div className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-10">
-            <Link to="/" className="flex-shrink-0 flex items-center gap-2">
-              <img src="/siyinqaba.png" alt="Siyinqaba" className="h-8 w-auto object-contain" />
+            <Link to="/" className="flex-shrink-0 flex items-center gap-2" aria-label="Go to home page">
+              <img src="/siyinqaba.png" alt="Siyinqaba - Government of Eswatini" className="h-8 w-auto object-contain" />
+              <span className="sr-only">Home</span>
             </Link>
           </div>
 
@@ -42,12 +51,16 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
             <div className="relative">
               <button
                 type="button"
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
                 onClick={() => setUserMenuOpen((open) => !open)}
+                aria-label={getAriaLabel(`User menu for ${displayName}`, 'User menu')}
+                aria-expanded={userMenuOpen}
+                aria-haspopup="true"
               >
                 <div
                   className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: GOV.blueLightAlt }}
+                  aria-hidden="true"
                 >
                   <User className="w-4 h-4" style={{ color: GOV.blue }} />
                 </div>
@@ -55,15 +68,17 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                   <p className="text-xs font-semibold leading-none" style={{ color: GOV.text }}>{displayName}</p>
                   <p className="text-[10px] mt-0.5 leading-none" style={{ color: GOV.textMuted }}>{roleLabel}</p>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} />
+                <ChevronDown className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} aria-hidden="true" />
               </button>
 
               {userMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} aria-hidden="true" />
                   <div
                     className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border rounded-md shadow-lg py-1"
                     style={{ borderColor: GOV.border }}
+                    role="menu"
+                    aria-label="User menu"
                   >
                     <div className="px-3 py-2 border-b" style={{ borderColor: GOV.borderLight }}>
                       <p className="text-xs font-semibold" style={{ color: GOV.text }}>{displayName}</p>
@@ -83,8 +98,9 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                       className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
                       style={{ color: GOV.text }}
                       onClick={() => setUserMenuOpen(false)}
+                      role="menuitem"
                     >
-                      <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
+                      <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} aria-hidden="true" /> My Profile
                     </Link>
 
                     {isAdminLike && (
@@ -93,8 +109,9 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                         className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
                         style={{ color: GOV.text }}
                         onClick={() => setUserMenuOpen(false)}
+                        role="menuitem"
                       >
-                        <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Admin Dashboard
+                        <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} aria-hidden="true" /> Admin Dashboard
                       </Link>
                     )}
 
@@ -107,8 +124,9 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                         setUserMenuOpen(false);
                         logout();
                       }}
+                      role="menuitem"
                     >
-                      <LogOut className="w-3.5 h-3.5" /> Sign Out
+                      <LogOut className="w-3.5 h-3.5" aria-hidden="true" /> Sign Out
                     </button>
                   </div>
                 </>
@@ -133,7 +151,7 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
       </header>
 
       {contextLabel ? (
-        <div className="border-b" style={{ borderColor: GOV.borderLight }}>
+        <div className="border-b" style={{ borderColor: GOV.borderLight }} role="status" aria-live="polite">
           <div className="max-w-5xl mx-auto px-6 py-1.5">
             <span className="text-xs font-medium" style={{ color: GOV.textMuted }}>
               {contextLabel}
@@ -142,7 +160,7 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
         </div>
       ) : null}
 
-      <main className="flex-1">
+      <main className="flex-1" id="main-content" role="main">
         <div className={contentClassName}>{children}</div>
       </main>
 

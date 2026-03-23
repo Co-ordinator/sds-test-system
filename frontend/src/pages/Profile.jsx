@@ -10,6 +10,8 @@ import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 import OccupationSearchInput from '../components/ui/OccupationSearchInput';
+import AccessibilityDialog from '../components/ui/AccessibilityDialog';
+import { Monitor } from 'lucide-react';
 
 const inputStyle = {
   border: '0',
@@ -33,6 +35,7 @@ export default function Profile() {
   const [saveStatus, setSaveStatus] = useState(null);
   const [workplace, setWorkplace] = useState({ name: '', institutionId: null });
   const [occupation, setOccupation] = useState({ name: '', id: null });
+  const [showAccessibilityDialog, setShowAccessibilityDialog] = useState(false);
 
   // Qualifications state
   const [qualifications, setQualifications] = useState([]);
@@ -495,6 +498,29 @@ export default function Profile() {
             </div>
           </SectionCard>
 
+          {/* Accessibility Settings Section */}
+          <SectionCard icon={Settings} title="Accessibility Settings">
+            <p className={`${TYPO.bodySmall} mb-4`} style={{ color: GOV.textMuted }}>
+              Customize your experience with accessibility options. These settings are saved locally and will apply across all pages.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAccessibilityDialog(true)}
+              className="flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-colors hover:scale-[1.02] active:scale-[0.98]"
+              style={{
+                borderColor: GOV.border,
+                backgroundColor: 'transparent',
+                color: GOV.text
+              }}
+            >
+              <Monitor className="w-5 h-5" style={{ color: GOV.blue }} />
+              <span className="font-medium">Configure Accessibility Settings</span>
+            </button>
+            <p className={`${TYPO.bodySmall} mt-2`} style={{ color: GOV.textMuted }}>
+              Or visit the dedicated <a href="/accessibility" className="underline" style={{ color: GOV.blue }}>Accessibility page</a> for more options.
+            </p>
+          </SectionCard>
+
           {/* Save button */}
           <div className="flex items-center justify-end gap-3">
             {saveStatus === 'saved' && (
@@ -822,6 +848,12 @@ export default function Profile() {
           </div>
         </div>
       </div>
+      
+      {/* Accessibility Dialog */}
+      <AccessibilityDialog 
+        isOpen={showAccessibilityDialog}
+        onClose={() => setShowAccessibilityDialog(false)}
+      />
     </AppShell>
   );
 }

@@ -49,6 +49,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'field_of_study'
     },
+    fundingPriority: {
+      type: DataTypes.ENUM('high', 'medium', 'none'),
+      allowNull: false,
+      defaultValue: 'none',
+      field: 'funding_priority'
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       allowNull: false,

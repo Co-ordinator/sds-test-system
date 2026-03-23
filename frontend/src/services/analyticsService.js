@@ -42,6 +42,10 @@ export const analyticsService = {
   getInstitutionBreakdown: () =>
     api.get(`${BASE}/institutions`).then(r => r.data?.data || null),
 
+  // ── Government Funding Priority Alignment ───────────────────────────────
+  getFundingAlignment: (filters = {}) =>
+    api.get(`${BASE}/funding-alignment${qs(filters)}`).then(r => r.data?.data || null),
+
   // ── Export (CSV or PDF, filter-aware) ────────────────────────────────
   exportReport: (format = 'csv', filters = {}) => {
     const params = new URLSearchParams({ format });

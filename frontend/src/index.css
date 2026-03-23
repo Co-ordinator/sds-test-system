@@ -79,4 +79,76 @@
   .custom-scrollbar::-webkit-scrollbar-corner {
     background: #f1f5f9;
   }
+
+  /* Accessibility Styles */
+  .font-size-small {
+    font-size: 14px;
+  }
+  
+  .font-size-normal {
+    font-size: 16px;
+  }
+  
+  .font-size-large {
+    font-size: 18px;
+  }
+  
+  .font-size-extra-large {
+    font-size: 20px;
+  }
+
+  .high-contrast {
+    filter: contrast(1.2);
+  }
+  
+  .high-contrast * {
+    border-color: #000000 !important;
+  }
+  
+  .high-contrast .btn-primary {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+  
+  .high-contrast .btn-secondary {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #000000 !important;
+  }
+
+  .screen-reader-mode .sr-only {
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    clip: auto !important;
+    clip-path: none !important;
+  }
+
+  .reduced-motion * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Focus indicators for keyboard navigation */
+  *:focus-visible {
+    outline: 3px solid #1e3a5f;
+    outline-offset: 2px;
+  }
+
+  /* Skip to main content link for screen readers */
+  .skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: #1e3a5f;
+    color: white;
+    padding: 8px;
+    text-decoration: none;
+    z-index: 100;
+  }
+
+  .skip-link:focus {
+    top: 6px;
+  }
 }

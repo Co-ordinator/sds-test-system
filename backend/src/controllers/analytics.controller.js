@@ -100,6 +100,17 @@ const AnalyticsController = {
     }
   },
 
+  /* ── GET /api/v1/analytics/funding-alignment ───────────────────────── */
+  getFundingAlignment: async (req, res, next) => {
+    try {
+      const data = await analyticsService.getFundingAlignmentAnalytics(req.query);
+      res.status(200).json({ status: 'success', data });
+    } catch (error) {
+      logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch funding alignment analytics', req, details: { error: error.message } });
+      next(error);
+    }
+  },
+
   /* ── GET /api/v1/analytics/export?format=csv|pdf ───────────────────────── */
   exportAnalytics: async (req, res, next) => {
     try {

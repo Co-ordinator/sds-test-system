@@ -14,12 +14,14 @@ import AnalyticsOverviewSection from '../features/analytics/AnalyticsOverviewSec
 import AnalyticsCareersSection from '../features/analytics/AnalyticsCareersSection';
 import AnalyticsMapSection from '../features/analytics/AnalyticsMapSection';
 import AnalyticsTrendsSection from '../features/analytics/AnalyticsTrendsSection';
+import AnalyticsFundingAlignmentSection from '../features/analytics/AnalyticsFundingAlignmentSection';
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'career', label: 'Career Intelligence' },
   { key: 'map', label: 'Regional Map' },
   { key: 'trends', label: 'Trends & Segmentation' },
+  { key: 'funding', label: 'Funding Alignment' },
 ];
 
 const EMPTY_FILTERS = {
@@ -43,6 +45,7 @@ const Analytics = () => {
   const [loading, setLoading] = useState(true);
   const [segmentData, setSegmentData] = useState(null);
   const [pipelineData, setPipelineData] = useState(null);
+  const [fundingAlignmentData, setFundingAlignmentData] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS });
@@ -113,20 +116,22 @@ const Analytics = () => {
     const fetchAll = async () => {
       try {
         const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
-        const [overviewData, hollandData, trendData, regionalData, segmentData] = await Promise.all([
+        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData] = await Promise.all([
           analyticsService.getOverview(f),
           analyticsService.getHollandDistribution(f),
           analyticsService.getTrend(f),
           analyticsService.getRegional(f),
           analyticsService.getSegmentation(f),
+          analyticsService.getFundingAlignment(f),
         ]);
         setAnalytics(overviewData);
         setHollandDist(hollandData);
         setTrend(trendData);
         setRegionalData(regionalData);
         setSegmentData(segmentData);
+        setFundingAlignmentData(fundingData);
       } catch {
-        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setSegmentData(null);
+        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setSegmentData(null); setFundingAlignmentData(null);
       } finally { setLoading(false); }
     };
     setLoading(true); fetchAll();
@@ -382,6 +387,9 @@ const Analytics = () => {
             )}
             {activeTab === 'trends' && (
               <AnalyticsTrendsSection trendData={trendData} riasecData={riasecData} hollandDist={hollandDist} kgData={kgData} segmentData={segmentData} />
+            )}
+            {activeTab === 'funding' && (
+              <AnalyticsFundingAlignmentSection data={fundingAlignmentData} isLoading={loading} />
             )}
           </>
         )}

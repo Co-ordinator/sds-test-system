@@ -1,18 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, CheckCircle2, ChevronRight } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronRight, Clock, Users, AlertCircle } from 'lucide-react';
 import AssessmentShell from '../components/layout/AssessmentShell';
+import GlossaryTooltip from '../components/ui/GlossaryTooltip';
 import { GOV, TYPO } from '../theme/government';
 
 const QuestionnaireIntro = () => {
   const navigate = useNavigate();
 
   return (
-    <AssessmentShell
-      title="Self-Directed Search (SDS)"
-      subtitle="Career Interest Assessment"
-    >
-      <div className="max-w-4xl mx-auto space-y-6">
+    <>
+      {/* Skip to main content for screen readers */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      
+      <AssessmentShell
+        title="Self-Directed Search (SDS)"
+        subtitle="Career Interest Assessment"
+      >
+        <div id="main-content" className="max-w-4xl mx-auto space-y-6">
+        {/* Main Orientation Content */}
         <div className="bg-white rounded-md border p-6" style={{ borderColor: GOV.border }}>
           <div className="flex items-start gap-4 mb-4">
             <div
@@ -26,19 +34,21 @@ const QuestionnaireIntro = () => {
                 Purpose of this Questionnaire
               </h2>
               <p className={TYPO.body} style={{ color: GOV.textMuted }}>
-                The purpose of this questionnaire is to determine your interests, as they will be of importance when you make a career decision.
+                The purpose of this <GlossaryTooltip term="Questionnaire">questionnaire</GlossaryTooltip> is to determine your 
+                <GlossaryTooltip term="Career Interest">career interests</GlossaryTooltip>, as they will be of importance when you make a career decision.
               </p>
             </div>
           </div>
 
           <div className="space-y-4 mt-6">
             <div className="p-4 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
-              <p className={`${TYPO.bodySmall} font-semibold mb-2`} style={{ color: GOV.blue }}>
+              <p className={`${TYPO.bodySmall} font-semibold mb-2 flex items-center gap-2`} style={{ color: GOV.blue }}>
+                <AlertCircle className="w-4 h-4" />
                 Important Note
               </p>
               <p className={TYPO.bodySmall} style={{ color: GOV.text }}>
                 This is a questionnaire and not a test. There are therefore <strong>no correct or incorrect answers</strong>. 
-                Your honest responses will help us provide you with the most accurate career guidance.
+                Your honest responses will help us provide you with the most accurate <GlossaryTooltip term="Career Guidance">career guidance</GlossaryTooltip>.
               </p>
             </div>
 
@@ -47,7 +57,10 @@ const QuestionnaireIntro = () => {
                 What This Questionnaire Contains
               </h3>
               <p className={TYPO.body} style={{ color: GOV.textMuted }}>
-                This questionnaire contains a number of questions relating to your activities, competencies, interests in occupations, 
+                This questionnaire contains a number of questions relating to your 
+                <GlossaryTooltip term="Activities">activities</GlossaryTooltip>, 
+                <GlossaryTooltip term="Competencies">competencies</GlossaryTooltip>, 
+                interests in <GlossaryTooltip term="Occupation">occupations</GlossaryTooltip>, 
                 as well as questions in which you are asked to rate your abilities/skills.
               </p>
             </div>
@@ -61,6 +74,18 @@ const QuestionnaireIntro = () => {
                 and then answer the questions that follow. Answer all questions on the questionnaire page by clicking the specific 
                 answer you choose.
               </p>
+              <div className="p-3 rounded-md" style={{ backgroundColor: '#fef3c7' }}>
+                <p className="text-sm font-medium mb-2" style={{ color: '#d97706' }}>
+                  ⚠️ Special Requirements
+                </p>
+                <ul className="text-sm space-y-1" style={{ color: GOV.text }}>
+                  <li>• All questions must be answered</li>
+                  <li>• Each question requires only one response</li>
+                  <li>• Questions should not be skipped</li>
+                  <li>• For Sections I-III: Select YES or NO</li>
+                  <li>• For Section IV: Rate yourself on a scale of 1 to 6</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -130,32 +155,69 @@ const QuestionnaireIntro = () => {
             <CheckCircle2 className="w-5 h-5" style={{ color: '#059669' }} />
             Before You Begin
           </h2>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
-              <span className={TYPO.body} style={{ color: GOV.textMuted }}>
-                Find a quiet place where you can focus without interruptions
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
-              <span className={TYPO.body} style={{ color: GOV.textMuted }}>
-                The questionnaire takes approximately 30-45 minutes to complete
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
-              <span className={TYPO.body} style={{ color: GOV.textMuted }}>
-                You can pause and resume at any time - your progress will be saved
-              </span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
-              <span className={TYPO.body} style={{ color: GOV.textMuted }}>
-                Answer honestly based on your true interests and abilities
-              </span>
-            </li>
-          </ul>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: GOV.text }}>
+                <Clock className="w-4 h-4" style={{ color: GOV.blue }} />
+                Time & Environment
+              </h3>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
+                  <span className={TYPO.body} style={{ color: GOV.textMuted }}>
+                    Find a quiet place where you can focus without interruptions
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
+                  <span className={TYPO.body} style={{ color: GOV.textMuted }}>
+                    The questionnaire takes approximately 30-40 minutes to complete
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
+                  <span className={TYPO.body} style={{ color: GOV.textMuted }}>
+                    You can pause and resume at any time - your progress will be saved
+                  </span>
+                </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: GOV.text }}>
+                <Users className="w-4 h-4" style={{ color: GOV.blue }} />
+                Answering Guidelines
+              </h3>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
+                  <span className={TYPO.body} style={{ color: GOV.textMuted }}>
+                    Answer honestly based on your true interests and abilities
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
+                  <span className={TYPO.body} style={{ color: GOV.textMuted }}>
+                    Don't worry about what others might think - be yourself
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }} />
+                  <span className={TYPO.body} style={{ color: GOV.textMuted }}>
+                    Use the help button (?) if you need clarification on terms
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          
+          {/* Accessibility Notice */}
+          <div className="mt-4 p-3 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
+            <p className="text-sm" style={{ color: GOV.blue }}>
+              ♿ This assessment is designed to be accessible. You can adjust accessibility settings in your Profile page. 
+              Screen reader users can navigate using standard keyboard controls.
+            </p>
+          </div>
         </div>
 
         <div className="flex justify-center pt-4">
@@ -164,13 +226,21 @@ const QuestionnaireIntro = () => {
             onClick={() => navigate('/questionnaire')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-md text-base font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2"
             style={{ backgroundColor: GOV.blue }}
+            aria-label="Begin the Self-Directed Search questionnaire"
           >
             Begin Questionnaire
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
-      </div>
-    </AssessmentShell>
+        </div>
+        
+        {/* Glossary section for screen reader navigation */}
+        <div id="glossary-section" className="sr-only">
+          <h2>Glossary</h2>
+          <p>This assessment includes interactive glossary tooltips. Click on any underlined term with a book icon to see its definition.</p>
+        </div>
+      </AssessmentShell>
+    </>
   );
 };
 

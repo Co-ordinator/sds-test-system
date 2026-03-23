@@ -1,28 +1,31 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle } from 'lucide-react';
 import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
+import { QuestionTextWithGlossary, DescriptionWithGlossary } from '../components/ui/SmartTextHighlighter';
+import GlossaryBottomSheet from '../components/ui/GlossaryBottomSheet';
+import { useAccessibility } from '../context/AccessibilityContext';
 
 const SECTIONS = [
   { 
     id: 'activities', 
     num: 'I', 
     label: 'Activities', 
-    description: 'Click YES for activities you LIKE TO DO or WOULD LIKE TO DO. Click NO for activities you are INDIFFERENT TO, HAVE NEVER DONE, or DO NOT LIKE TO DO.' 
+    description: 'Click Yes for activities you like to do or would like to do. Click No for activities you are indifferent to, have never done, or do not like to do.' 
   },
   { 
     id: 'competencies', 
     num: 'II', 
     label: 'Competencies', 
-    description: 'Click YES for activities you HAVE KNOWLEDGE of or CAN DO WELL or COMPETENTLY. Click NO for activities you HAVE LITTLE or NO KNOWLEDGE of or HAVE NEVER PERFORMED or PERFORM POORLY.' 
+    description: 'Click Yes for activities you have knowledge of or can do well or competently. Click No for activities you have little or no knowledge of, have never performed, or perform poorly.' 
   },
   { 
     id: 'occupations', 
     num: 'III', 
     label: 'Occupations', 
-    description: 'Click YES for occupations/jobs that INTEREST or APPEAL TO you. Click NO for occupations/jobs you DISLIKE or FIND UNINTERESTING.' 
+    description: 'Click Yes for occupations or jobs that interest or appeal to you. Click No for occupations or jobs you dislike or find uninteresting.' 
   },
   { 
     id: 'self_estimates', 
@@ -52,6 +55,7 @@ const RIASEC_NAMES = {
 
 const Questionnaire = () => {
   const navigate = useNavigate();
+  const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [assessment, setAssessment] = useState(null);
@@ -66,6 +70,7 @@ const Questionnaire = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
   const [sectionTransition, setSectionTransition] = useState(null);
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
@@ -311,12 +316,16 @@ const Questionnaire = () => {
       contextLabel={currentSectionMeta ? `Section ${currentSectionMeta.num}: ${currentSectionMeta.label}` : 'Assessment'}
       actions={(
         <>
-          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
-            <Clock className="w-4 h-4" style={{ color: GOV.blue }} />
-            <span className="text-sm font-mono font-semibold" style={{ color: GOV.blue }}>
-              {formatTime(elapsedTime)}
-            </span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setGlossaryOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2"
+            style={{ borderColor: GOV.border, color: GOV.text }}
+            aria-label="Open SDS glossary"
+          >
+            <HelpCircle className="w-4 h-4" />
+            Glossary
+          </button>
           {saving && (
             <div className={`${TYPO.bodySmall} inline-flex items-center gap-1.5 px-3 py-2 rounded-md`} style={{ color: GOV.blue, backgroundColor: GOV.blueLightAlt }}>
               <Cloud className="w-4 h-4" /> Saving...
@@ -404,41 +413,43 @@ const Questionnaire = () => {
       {!isPaused && !sectionTransition && currentQuestion && (
         <div className="bg-white rounded-md p-6 md:p-8">
           <div className="mb-6">
-            <div className="mb-4">
-              <div className="p-3 rounded-md mb-3" style={{ backgroundColor: GOV.blueLightAlt }}>
-                <p className="text-sm font-medium" style={{ color: GOV.blue }}>
-                  {currentSectionMeta?.description}
-                </p>
-              </div>
-              <div className="flex items-center justify-between">
-                <p className="text-sm" style={{ color: GOV.textMuted }}>
-                  Question {currentQuestionIndex + 1} of {sectionQuestions.length}
-                </p>
-                <div className="flex items-center gap-2">
-                {currentQuestion.questionCode && (
-                  <span
-                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono"
-                    style={{
-                      backgroundColor: `${RIASEC_COLORS[currentQuestion.riasecType] || GOV.blue}08`,
-                      color: RIASEC_COLORS[currentQuestion.riasecType] || GOV.blue
-                    }}
-                  >
-                    {currentQuestion.questionCode}
-                  </span>
-                )}
+            <div className="p-3 rounded-md mb-3" style={{ backgroundColor: GOV.blueLightAlt }}>
+              <p className="text-sm font-medium" style={{ color: GOV.blue }}>
+                <DescriptionWithGlossary text={currentSectionMeta?.description} />
+              </p>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm" style={{ color: GOV.textMuted }}>
+                Question {currentQuestionIndex + 1} of {sectionQuestions.length}
+              </p>
+              <div className="flex items-center gap-2">
+              {currentQuestion.questionCode && (
                 <span
-                  className="inline-flex items-center px-2 py-0.5 rounded text-xs"
+                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono"
                   style={{
                     backgroundColor: `${RIASEC_COLORS[currentQuestion.riasecType] || GOV.blue}08`,
                     color: RIASEC_COLORS[currentQuestion.riasecType] || GOV.blue
                   }}
                 >
-                  {RIASEC_NAMES[currentQuestion.riasecType] || currentQuestion.riasecType}
+                  {currentQuestion.questionCode}
                 </span>
-                </div>
+              )}
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs"
+                style={{
+                  backgroundColor: `${RIASEC_COLORS[currentQuestion.riasecType] || GOV.blue}08`,
+                  color: RIASEC_COLORS[currentQuestion.riasecType] || GOV.blue
+                }}
+              >
+                {RIASEC_NAMES[currentQuestion.riasecType] || currentQuestion.riasecType}
+              </span>
               </div>
             </div>
-            <h2 className="text-2xl font-bold leading-relaxed" style={{ color: GOV.text }}>{currentQuestion.text}</h2>
+            <QuestionTextWithGlossary 
+              questionText={currentQuestion.text}
+              riasecType={RIASEC_NAMES[currentQuestion.riasecType] || currentQuestion.riasecType}
+              showRiasecBadge={false}
+            />
           </div>
 
           {isSelfEstimates ? (
@@ -492,6 +503,12 @@ const Questionnaire = () => {
             <div className="flex items-center justify-between text-xs mb-3" style={{ color: GOV.textHint }}>
               <div className="flex items-center gap-4">
                 <span>{answeredCount} of {totalQuestions} answered</span>
+                <div className="inline-flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" style={{ color: GOV.blue }} />
+                  <span className="font-mono font-semibold" style={{ color: GOV.blue }}>
+                    {formatTime(elapsedTime)}
+                  </span>
+                </div>
               </div>
               <span>{progressPercent}% complete</span>
             </div>
@@ -547,6 +564,13 @@ const Questionnaire = () => {
           No questions in this section.
         </div>
       )}
+
+      {/* Glossary Bottom Sheet */}
+      <GlossaryBottomSheet
+        isOpen={glossaryOpen}
+        onClose={() => setGlossaryOpen(false)}
+        initialTerm={currentQuestion ? RIASEC_NAMES[currentQuestion.riasecType] || currentQuestion.riasecType : null}
+      />
     </AssessmentShell>
   );
 };

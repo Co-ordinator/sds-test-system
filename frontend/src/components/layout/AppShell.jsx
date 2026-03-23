@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
-  BarChart2, Settings, Menu, X, Bell, Award, FileText,
+  BarChart2, Settings, Menu, X, Bell, Award, FileText, Monitor,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
@@ -22,6 +22,7 @@ const ADMIN_NAV_LINKS = [
 const TEST_TAKER_NAV = [
   { to: '/dashboard', label: 'Dashboard', Icon: Home },
   { to: '/profile', label: 'Profile', Icon: User },
+  { to: '/accessibility', label: 'Accessibility', Icon: Monitor },
 ];
 
 const ROLE_LABELS = {
@@ -55,6 +56,7 @@ const BREADCRUMB_MAP = {
   '/counselor': [{ label: 'Test Administrator' }],
   '/dashboard': [{ label: 'Dashboard' }],
   '/profile': [{ label: 'Profile' }],
+  '/accessibility': [{ label: 'Accessibility' }],
   '/results': [{ label: 'Dashboard', to: '/dashboard' }, { label: 'Results' }],
 };
 

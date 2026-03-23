@@ -6,6 +6,7 @@ The Online Self-Directed Search (SDS) Test System database is designed to suppor
 
 ### Key Features
 - **RIASEC Model Implementation** - Full support for Realistic, Investigative, Artistic, Social, Enterprising, and Conventional assessment
+- **SDS Glossary System** - Research-backed glossary with 4 core domains for improved test accuracy
 - **Multi-language Support** - English and siSwati
 - **Comprehensive Audit Trail** - Complete logging for compliance
 - **Data Protection Compliant** - Aligned with Eswatini Data Protection Act 2022
@@ -294,6 +295,7 @@ Tertiary education courses/programs (25+ courses seeded)
 - `riasecCodes` (string[], default: []) - Matching RIASEC codes
 - `suggestedSubjects` (string[], default: []) - Recommended subjects
 - `fieldOfStudy` (string, nullable)
+- `fundingPriority` (ENUM, default: `none`) - `high` | `medium` | `none` — Eswatini Government (SLAS) scholarship priority classification
 - `isActive` (boolean, default: true)
 
 **Timestamps:**
@@ -840,6 +842,9 @@ All schema changes are managed through Sequelize migrations in `/backend/migrati
 17. `20260313000001-create-certificates.js` - Certificates table
 18. `20260313100000-add-entity-linking.js` - Add current_occupation_id FK to users, status/submitted_by to occupations & institutions, relax occupation code constraint
 19. `20260313110000-create-occupation-courses.js` - Occupation-course junction (career pathways)
+20. `20260323100000-create-glossary-terms.js` - Glossary terms table
+21. `20260323200000-add-funding-priority-to-courses.js` - Add funding_priority ENUM to courses
+22. `20260323200100-backfill-funding-priority.js` - Backfill funding_priority from SLAS policy
 
 **Migration Commands:**
 ```bash
