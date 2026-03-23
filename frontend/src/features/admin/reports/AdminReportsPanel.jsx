@@ -687,7 +687,7 @@ const AdminReportsPanel = () => {
     <div>
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="text-xl font-bold" style={{ color: GOV.text }}>Reports</h1>
+        <h1 className="text-xl font-bold" style={{ color: GOV.text }}>Report</h1>
       </div>
 
       <div className="flex gap-6">
@@ -851,7 +851,7 @@ const AdminReportsPanel = () => {
         </div>
 
         {/* ── Slide content ── */}
-        <div className="flex-1 flex flex-col overflow-auto px-16 py-10">
+        <div className="flex-1 flex flex-col overflow-auto px-16 py-10 custom-scrollbar">
           {/* Slide title */}
           <div className="flex items-center gap-4 mb-8 flex-shrink-0">
             <h1 className="text-2xl font-bold" style={{ color: GOV.text }}>{reportTitle}</h1>

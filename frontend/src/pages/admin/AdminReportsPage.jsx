@@ -4,7 +4,7 @@ import AdminReportsPanel from '../../features/admin/reports/AdminReportsPanel';
 
 const BREADCRUMBS = [
   { label: 'Admin', to: '/admin/dashboard' },
-  { label: 'Reports' },
+  { label: 'Report' },
 ];
 
 const AdminReportsPage = () => (

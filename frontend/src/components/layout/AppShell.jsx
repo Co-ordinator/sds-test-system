@@ -14,7 +14,7 @@ const ADMIN_NAV_LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: Home, permission: null },
   { to: '/admin/results', label: 'Results', Icon: Award, permission: 'results.view' },
   { to: '/admin/analytics', label: 'Analytics', Icon: BarChart2, permission: 'analytics.view' },
-  { to: '/admin/reports', label: 'Reports', Icon: FileText, permission: 'analytics.view' },
+  { to: '/admin/reports', label: 'Report', Icon: FileText, permission: 'analytics.view' },
   { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true, permission: 'notifications.view' },
   { to: '/admin/settings', label: 'Settings', Icon: Settings, permission: null },
 ];
@@ -43,7 +43,7 @@ const BREADCRUMB_MAP = {
   '/admin/institutions': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Institutions' }],
   '/admin/occupations': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Occupations' }],
   '/admin/results': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Results' }],
-  '/admin/reports': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Reports' }],
+  '/admin/reports': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Report' }],
   '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Audit Log' }],
   '/admin/analytics': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Analytics' }],
   '/admin/notifications': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Notifications' }],
@@ -282,7 +282,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
       )}
 
       {/* ── Page content ── */}
-      <main className="flex-1">
+      <main className="flex-1 overflow-auto custom-scrollbar">
         {children}
       </main>
     </div>

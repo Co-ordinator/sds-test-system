@@ -280,13 +280,13 @@ const analyticsService = {
 
     const institutionCoverage = await CourseInstitution.findAll({
       attributes: [
-        'institutionId',
+        [col('CourseInstitution.institution_id'), 'institutionId'],
         [fn('COUNT', col('CourseInstitution.id')), 'courseCount']
       ],
       where: { isActive: true },
       include: [{ model: Institution, as: 'institution', attributes: ['name', 'type', 'region'] }],
-      group: ['institutionId', 'institution.id'],
-      order: [[literal('"courseCount"'), 'DESC']],
+      group: [col('CourseInstitution.institution_id'), col('institution.id')],
+      order: [[fn('COUNT', col('CourseInstitution.id')), 'DESC']],
       raw: true, nest: true
     });
 
