@@ -17,7 +17,7 @@ module.exports = {
         allowNull: false,
       },
       section: {
-        type: Sequelize.ENUM('activities', 'competencies', 'occupations', 'self_estimates', 'general'),
+        type: Sequelize.ENUM('riasec', 'structure', 'actions', 'occupations', 'activities', 'competencies', 'self_estimates', 'general'),
         allowNull: false,
         defaultValue: 'general',
       },

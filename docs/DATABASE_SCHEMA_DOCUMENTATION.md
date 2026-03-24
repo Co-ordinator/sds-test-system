@@ -846,6 +846,37 @@ All schema changes are managed through Sequelize migrations in `/backend/migrati
 21. `20260323200000-add-funding-priority-to-courses.js` - Add funding_priority ENUM to courses
 22. `20260323200100-backfill-funding-priority.js` - Backfill funding_priority from SLAS policy
 
+### Glossary Terms Table
+
+#### **glossary_terms**
+Stores SDS glossary terms for enhanced user understanding and test accuracy
+
+**Key Fields:**
+- `id` (UUID) - Primary key
+- `term` (string, not null) - The term being defined
+- `definition` (text, not null) - Clear, concise definition (≤12 words)
+- `example` (text, nullable) - Practical example of the term
+- `category` (string, not null) - Category: `riasec`, `structure`, `actions`, `occupations`
+- `section` (string, not null) - Section: `personality`, `assessment`, `activities`, `occupations`
+- `difficulty` (string, not null) - Difficulty level: `low`, `medium`, `high`
+- `related_terms` (json, nullable) - Array of related term IDs
+- `created_at` (timestamp) - Creation timestamp
+- `updated_at` (timestamp) - Last update timestamp
+
+**Indexes:**
+- Primary key on `id`
+- Unique index on `term`
+- Index on `category`
+- Index on `section`
+- Index on `difficulty`
+
+**Validation Notes:**
+- `term` must be unique and not empty
+- `definition` must not exceed 12 words for optimal UX
+- `category` must be one of: `riasec`, `structure`, `actions`, `occupations`
+- `difficulty` must be one of: `low`, `medium`, `high`
+- `related_terms` stores array of term IDs for cross-references
+
 **Migration Commands:**
 ```bash
 # Run all pending migrations
