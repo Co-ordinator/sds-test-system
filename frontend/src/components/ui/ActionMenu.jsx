@@ -22,6 +22,7 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
   const btnRef = useRef(null);
 
   const openMenu = useCallback((e) => {
+    e.preventDefault();
     e.stopPropagation();
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
@@ -36,10 +37,19 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+      // Check if click is outside the menu button and the dropdown
+      if (btnRef.current && !btnRef.current.contains(e.target)) {
+        setOpen(false);
+      }
     };
+    // Use mousedown for immediate response
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    // Also use touchstart for mobile
+    document.addEventListener('touchstart', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchstart', handler);
+    };
   }, [open]);
 
   const visible = actions.filter(a => a && !a.hidden);
@@ -59,7 +69,19 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
 
       {open && createPortal(
         <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          <div 
+            className="fixed inset-0 z-[9998]" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setOpen(false);
+            }}
+          />
           <div
             className="fixed z-[9999] min-w-[140px] bg-white border rounded-md shadow-lg py-1"
             style={{
@@ -72,8 +94,15 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
               <button
                 key={i}
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setOpen(false); action.onClick(); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 text-left transition-colors"
+                onClick={(e) => { 
+                  e.preventDefault(); 
+                  e.stopPropagation(); 
+                  const closeMenu = () => setOpen(false);
+                  closeMenu();
+                  // Use setTimeout to ensure the menu closes before the action executes
+                  setTimeout(() => action.onClick(), 0);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-gray-50 text-left transition-colors cursor-pointer"
                 style={{ color: action.danger ? '#dc2626' : GOV.text }}
               >
                 {action.Icon && (

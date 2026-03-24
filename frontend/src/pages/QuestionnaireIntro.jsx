@@ -18,8 +18,10 @@ const QuestionnaireIntro = () => {
       <AssessmentShell
         title="Self-Directed Search (SDS)"
         subtitle="Career Interest Assessment"
+        contentClassName="max-w-5xl mx-auto px-6 space-y-6"
       >
-        <div id="main-content" className="max-w-4xl mx-auto space-y-6">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 text-left space-y-6 flex-1">
         {/* Main Orientation Content */}
         <div className="bg-white rounded-md border p-6" style={{ borderColor: GOV.border }}>
           <div className="flex items-start gap-4 mb-4">
@@ -232,6 +234,7 @@ const QuestionnaireIntro = () => {
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
+          </div>
         </div>
         
         {/* Glossary section for screen reader navigation */}

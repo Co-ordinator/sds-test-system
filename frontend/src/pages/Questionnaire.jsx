@@ -5,7 +5,6 @@ import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
 import { QuestionTextWithGlossary, DescriptionWithGlossary } from '../components/ui/SmartTextHighlighter';
-import GlossaryBottomSheet from '../components/ui/GlossaryBottomSheet';
 import { useAccessibility } from '../context/AccessibilityContext';
 
 const SECTIONS = [
@@ -70,7 +69,6 @@ const Questionnaire = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
   const [sectionTransition, setSectionTransition] = useState(null);
-  const [glossaryOpen, setGlossaryOpen] = useState(false);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
@@ -318,7 +316,7 @@ const Questionnaire = () => {
         <>
           <button
             type="button"
-            onClick={() => setGlossaryOpen(true)}
+            onClick={() => navigate('/glossary')}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2"
             style={{ borderColor: GOV.border, color: GOV.text }}
             aria-label="Open SDS glossary"
@@ -564,13 +562,6 @@ const Questionnaire = () => {
           No questions in this section.
         </div>
       )}
-
-      {/* Glossary Bottom Sheet */}
-      <GlossaryBottomSheet
-        isOpen={glossaryOpen}
-        onClose={() => setGlossaryOpen(false)}
-        initialTerm={currentQuestion ? RIASEC_NAMES[currentQuestion.riasecType] || currentQuestion.riasecType : null}
-      />
     </AssessmentShell>
   );
 };

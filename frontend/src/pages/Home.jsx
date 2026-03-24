@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { UserPlus, ClipboardList, BarChart3, Sparkles } from 'lucide-react';
+import { UserPlus, ClipboardList, BarChart3, Sparkles, HelpCircle } from 'lucide-react';
 import { GOV, TYPO, LOGO, MINISTRY_NAME, KINGDOM, LOGO_ALT } from '../theme/government';
 
 export default function Home() {
@@ -15,14 +15,14 @@ export default function Home() {
         </p>
       </div>
 
-      <button
-        type="button"
-        className="absolute top-3 right-6 w-8 h-8 rounded-md flex items-center justify-center z-10 border"
+      <Link
+        to="/help"
+        className="absolute top-3 right-6 w-8 h-8 rounded-md flex items-center justify-center z-10 border transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
         style={{ backgroundColor: '#ffffff', borderColor: GOV.border }}
         aria-label="Help"
       >
-        <span className="text-sm font-semibold" style={{ color: GOV.blue }}>?</span>
-      </button>
+        <HelpCircle className="w-4 h-4" style={{ color: GOV.blue }} />
+      </Link>
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 pt-8 pb-8">
         <div className="mb-6">

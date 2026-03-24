@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (credentials) => {
+  const login = useCallback(async (credentials) => {
     try {
       const response = await api.post('/api/v1/auth/login', credentials);
       localStorage.setItem('token', response.data.token);
@@ -47,15 +47,15 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       throw err;
     }
-  };
+  }, []);
 
-  const setSession = (token, userData) => {
+  const setSession = useCallback((token, userData) => {
     if (token) localStorage.setItem('token', token);
     setUser(userData ?? null);
     setIsAuthenticated(!!userData);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await api.post('/api/v1/auth/logout');
       localStorage.removeItem('token');
@@ -65,7 +65,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Logout error:', err);
     }
-  };
+  }, [navigate]);
 
   const value = {
     user,
@@ -94,6 +94,14 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   // Require email verification only when user has an email (phone-only users have no email to verify)
   const needsEmailVerification = user?.email && !user?.isEmailVerified;
   const isOnVerifyPage = window.location.pathname.includes('/verify-email');
+  
+  // Check if user needs onboarding
+  const needsOnboarding = user && (
+    (user.firstName && user.firstName.toLowerCase() === 'pending') ||
+    (user.lastName && user.lastName.toLowerCase() === 'user') ||
+    (!user.firstName || !user.lastName || !user.userType)
+  );
+  const isOnOnboardingPage = window.location.pathname === '/onboarding';
 
   const roleDashboard = (role) => {
     if (role === 'System Administrator') return '/admin';
@@ -105,6 +113,8 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
     if (!loading) {
       if (!isAuthenticated) {
         navigate('/login');
+      } else if (needsOnboarding && !isOnOnboardingPage) {
+        navigate('/onboarding');
       } else if (allowedRoles && !allowedRoles.includes(user?.role)) {
         navigate(roleDashboard(user?.role));
       } else if (needsEmailVerification && !isOnVerifyPage) {
@@ -116,9 +126,9 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
         });
       }
     }
-  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage]);
+  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage, needsOnboarding, isOnOnboardingPage]);
 
-  if (loading || !isAuthenticated || (allowedRoles && !allowedRoles.includes(user?.role)) || (needsEmailVerification && !isOnVerifyPage)) {
+  if (loading || !isAuthenticated || needsOnboarding || (allowedRoles && !allowedRoles.includes(user?.role)) || (needsEmailVerification && !isOnVerifyPage)) {
     return null;
   }
 

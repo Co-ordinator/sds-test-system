@@ -19,7 +19,20 @@ const TestTakerDashboard = () => {
 
   useEffect(() => {
     setProfileUser(user || null);
-  }, [user]);
+  }, [user?.id]);
+
+  // Redirect to onboarding if user has incomplete profile
+  useEffect(() => {
+    if (profileUser && !loading) {
+      const fullName = [profileUser?.firstName, profileUser?.lastName].filter(Boolean).join(' ').trim();
+      const isPendingPlaceholder = fullName.toLowerCase() === 'pending user'
+        || (profileUser?.firstName || '').toLowerCase() === 'pending';
+      
+      if (isPendingPlaceholder || !profileUser?.userType) {
+        navigate('/onboarding');
+      }
+    }
+  }, [profileUser, loading, navigate]);
 
   useEffect(() => {
     const fetchAssessments = async () => {
@@ -45,7 +58,7 @@ const TestTakerDashboard = () => {
       }
     };
     fetchAssessments();
-  }, [setSession]);
+  }, [user?.id]);
 
   const handleDownloadCertificate = async (cert) => {
     setDownloadingCert(cert.assessmentId);

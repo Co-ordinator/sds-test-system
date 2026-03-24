@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
   BarChart2, Settings, Menu, X, Bell, Award, FileText, Monitor,
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
@@ -17,11 +18,13 @@ const ADMIN_NAV_LINKS = [
   { to: '/admin/reports', label: 'Report', Icon: FileText, permission: 'analytics.view' },
   { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true, permission: 'notifications.view' },
   { to: '/admin/settings', label: 'Settings', Icon: Settings, permission: null },
+  { to: '/glossary', label: 'Glossary', Icon: BookOpen, permission: null },
 ];
 
 const TEST_TAKER_NAV = [
   { to: '/dashboard', label: 'Dashboard', Icon: Home },
   { to: '/profile', label: 'Profile', Icon: User },
+  { to: '/glossary', label: 'Glossary', Icon: BookOpen },
   { to: '/accessibility', label: 'Accessibility', Icon: Monitor },
 ];
 
@@ -56,6 +59,7 @@ const BREADCRUMB_MAP = {
   '/counselor': [{ label: 'Test Administrator' }],
   '/dashboard': [{ label: 'Dashboard' }],
   '/profile': [{ label: 'Profile' }],
+  '/glossary': [{ label: 'Glossary' }],
   '/accessibility': [{ label: 'Accessibility' }],
   '/results': [{ label: 'Dashboard', to: '/dashboard' }, { label: 'Results' }],
 };

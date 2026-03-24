@@ -7,7 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.14.2] - 2026-03-24
+
+### Added — Full Glossary Page with Learning Tracking
+
+#### ✨ **New Feature**
+- **Full Glossary Page**: Replaced bottom sheet with comprehensive full-page glossary at `/glossary`
+- **Enhanced UI**: Split-view layout with term list on left, detailed view on right
+- **Learning Progress**: Visual progress tracking showing percentage of terms learned
+- **Advanced Features**:
+  - Category filtering (RIASEC Types, Assessment Terms, Activity Words, Occupations)
+  - Real-time search across terms, definitions, and examples
+  - Text-to-speech functionality for accessibility
+  - Related terms navigation
+  - Difficulty indicators and section badges
+
+#### 🛠 **Technical Improvements**
+- **Performance Fixes**: Eliminated infinite re-render loops in glossary components
+- **Architecture**: Separated pure data access from behavioral tracking in useGlossary hook
+- **Memory Management**: Implemented debounced localStorage saves (300ms)
+- **Immutable Operations**: Fixed array mutation issues that caused render loops
+
+#### 🎨 **UI/UX Enhancements**
+- **Navigation**: Added glossary links to both Test Taker and Admin navigation menus
+- **Responsive Design**: Mobile-friendly layout with proper breakpoints
+- **Accessibility**: Screen reader support, keyboard navigation, high contrast mode
+- **Visual Hierarchy**: Clear typography, consistent spacing, government theme compliance
+
+#### 🗑 **Cleanup**
+- **Removed Components**: Deleted `GlossaryBottomSheet.jsx` and unused `glossaryUtils.js`
+- **Route Management**: Added protected route `/glossary` for all authenticated users
+- **Breadcrumb System**: Added breadcrumb mapping for glossary page
+
+#### 🔧 **Backend Integration**
+- **Hook Refactoring**: Made `getTermDefinition` pure, moved side effects to `handleTermView`
+- **State Management**: Proper separation of data retrieval and user interaction tracking
+- **Performance**: Memoized expensive operations, eliminated circular dependencies
+
+#### 🐛 **Bug Fixes**
+- **Compilation Error**: Fixed module not found error in Questionnaire.jsx by removing GlossaryBottomSheet import and updating navigation to use full glossary page
+- **Navigation**: Updated questionnaire glossary button to navigate to `/glossary` instead of opening bottom sheet
+
+---
+
+## [2.14.1] - 2026-03-24
+
+### Fixed — Email Verification "Invalid Token" UX Issue
+
+#### 🐛 **Bug Fix**
+- **Email Verification Flow**: Fixed issue where clicking an expired/already-used verification link would show "Token is invalid or has expired" error even when the email was already verified
+- **Root Cause**: Backend logic looked for users by `emailVerificationToken` after verification, but tokens are cleared to `null` when verification succeeds
+- **Solution Implemented**:
+  - **Backend (auth.service.js)**: Updated `verifyEmail` method to detect recently verified users (within 1 hour) when token lookup fails
+  - **Frontend (VerifyEmail.jsx)**: Added new `alreadyVerified` status with dedicated UI showing success message and "Go to Login" button
+  - **Better UX**: Users now see appropriate success messaging instead of confusing error messages
+
+#### 🎯 **Impact**
+- **Clear User Experience**: Users with already verified emails see success message instead of error
+- **Proper Navigation**: Directs users to login page when verification is already complete
+- **Consistent Behavior**: Handles edge cases where users click old verification links
+
+### Enhanced — Email Verification Auto-Navigation
+
+#### ✨ **User Experience Improvement**
+- **Unified Flow**: Both successful verification and already verified cases redirect to onboarding
+- **Smart Authentication**: Onboarding page handles unauthenticated users by redirecting to login with context message
+- **Seamless Transition**: After successful email verification, users automatically redirect to onboarding (1.5s delay)
+- **Visual Feedback**: Shows loading spinner and redirect message during transition
+- **No Manual Clicks**: Eliminates need for users to manually click "Continue" buttons
+
+#### 🎯 **Impact**
+- **Consistent Destination**: All verification paths lead to profile completion
+- **Reduced Friction**: Removes unnecessary click steps in the user journey
+- **Professional Feel**: Automatic redirects create a smoother, more polished experience
+- **Clear Context**: Users understand why login is needed when redirected from onboarding
+
+---
+
 ## [2.14.0] - 2026-03-23
+
+### Fixed — ActionMenu Disappearing Actions Bug
+
+#### 🐛 **Critical UI Bug Fix**
+- **ActionMenu Component**: Fixed issue where dropdown actions would disappear without executing when clicked
+- **Root Cause**: Race condition between menu closing and action execution, plus improper event handling
+- **Solution Implemented**:
+  - Added `preventDefault()` and `stopPropagation()` to all click handlers
+  - Used `setTimeout(action.onClick(), 0)` to ensure menu closes before action executes
+  - Enhanced click-outside detection with both `mousedown` and `touchstart` events
+  - Improved overlay click handling with proper event prevention
+  - Added `cursor-pointer` styling for better UX feedback
+
+#### 🎯 **Impact**
+- **All Admin Panels Fixed**: Users, Institutions, Occupations, Questions, Subjects, Audit, Courses, Education Levels, Certificates, Results
+- **Consistent Behavior**: ActionMenu now works reliably across all admin settings pages
+- **Better Mobile Support**: Touch events properly handled for mobile devices
 
 ### Added — Production-Grade SDS Glossary System
 

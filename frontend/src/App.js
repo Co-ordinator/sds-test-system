@@ -40,6 +40,8 @@ import EditUserPermissions from './pages/EditUserPermissions';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
 import Onboarding from './pages/Onboarding';
+import Help from './pages/Help';
+import GlossaryPage from './pages/GlossaryPage';
 import './index.css';
 
 function App() {
@@ -51,6 +53,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/register" element={<Register />} />
           <Route path="/registration-success" element={<RegistrationSuccess />} />
           <Route path="/login" element={<Login />} />
@@ -85,7 +88,7 @@ function App() {
           } />
           <Route path="/test" element={
             <ProtectedRoute allowedRoles={['Test Taker']}>
-              <Questionnaire />
+              <QuestionnaireIntro />
             </ProtectedRoute>
           } />
           <Route path="/test-complete" element={
@@ -101,6 +104,11 @@ function App() {
           <Route path="/profile" element={
             <ProtectedRoute allowedRoles={['Test Taker', 'System Administrator', 'Test Administrator']}>
               <Profile />
+            </ProtectedRoute>
+          } />
+          <Route path="/glossary" element={
+            <ProtectedRoute allowedRoles={['Test Taker', 'System Administrator', 'Test Administrator']}>
+              <GlossaryPage />
             </ProtectedRoute>
           } />
           <Route path="/accessibility" element={

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { glossaryService } from '../services/glossaryService';
 
 /**
@@ -105,22 +105,22 @@ export const useGlossary = () => {
     return viewCount < 3; // Show 3 times, then reduce prominence
   }, [learnedTerms, termInteractions, glossaryTerms]);
 
-  // Get term definition with learning tracking
+  // Get term definition with learning tracking (PURE - no side effects)
   const getTermDefinition = useCallback((termKey) => {
-    const term = glossaryTerms.find(t => t.term.toLowerCase() === termKey.toLowerCase());
-    if (!term) return null;
+    return glossaryTerms.find(
+      t => t.term.toLowerCase() === termKey.toLowerCase()
+    ) || null;
+  }, [glossaryTerms]);
 
-    // Record view interaction
+  // Handle term view tracking (explicit action - call from useEffect or event handlers)
+  const handleTermView = useCallback((termKey) => {
     recordInteraction(termKey, 'view');
 
-    // Auto-mark as learned after multiple views
     const interactions = termInteractions[termKey] || {};
     if (interactions.view >= 3) {
       markTermAsLearned(termKey);
     }
-
-    return term;
-  }, [recordInteraction, markTermAsLearned, termInteractions, glossaryTerms]);
+  }, [recordInteraction, termInteractions, markTermAsLearned]);
 
   // Process text to add glossary markers
   const processTextForGlossary = useCallback((text) => {
@@ -176,19 +176,28 @@ export const useGlossary = () => {
     localStorage.removeItem('sds-glossary-learned');
   }, []);
 
-  // Save progress when learned terms or interactions change
+  // Save progress when learned terms or interactions change (debounced)
   useEffect(() => {
-    saveProgress(learnedTerms, termInteractions);
+    const timeout = setTimeout(() => {
+      saveProgress(learnedTerms, termInteractions);
+    }, 300);
+
+    return () => clearTimeout(timeout);
   }, [learnedTerms, termInteractions, saveProgress]);
 
   // Database-backed glossary utils
-  const dbGlossaryUtils = {
+  const dbGlossaryUtils = useMemo(() => ({
     // Get all terms from database
     getAllTerms: () => glossaryTerms,
     
-    // Get terms by section
+    // Get terms by section (alias for category)
     getTermsBySection: (section) => {
       return glossaryTerms.filter(term => term.section === section);
+    },
+    
+    // Get terms by category (maps to section for compatibility)
+    getTermsByCategory: (category) => {
+      return glossaryTerms.filter(term => term.section === category);
     },
     
     // Search terms
@@ -208,11 +217,9 @@ export const useGlossary = () => {
       return glossaryTerms.find(t => t.term.toLowerCase() === key.toLowerCase());
     },
     
-    // Get terms that should be highlighted
-    getHighlightableTerms: () => {
-      return glossaryTerms.filter(term => shouldHighlight(term.term.toLowerCase()));
-    }
-  };
+    // Get terms that should be highlighted (simplified - just returns all terms)
+    getHighlightableTerms: () => glossaryTerms
+  }), [glossaryTerms]);
 
   return {
     // Data
@@ -225,6 +232,7 @@ export const useGlossary = () => {
     markTermAsLearned,
     recordInteraction,
     getTermDefinition,
+    handleTermView, // NEW: explicit tracking action
     processTextForGlossary,
     shouldHighlight,
     
@@ -236,5 +244,3 @@ export const useGlossary = () => {
     glossaryUtils: dbGlossaryUtils
   };
 };
-
-export default useGlossary;
