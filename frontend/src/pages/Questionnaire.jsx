@@ -52,6 +52,74 @@ const RIASEC_NAMES = {
   R: 'Realistic', I: 'Investigative', A: 'Artistic',
   S: 'Social', E: 'Enterprising', C: 'Conventional'
 };
+const ASSESSMENT_RUNTIME_KEY_PREFIX = 'sds-assessment-runtime-';
+
+const getAssessmentRuntimeKey = (assessmentId) => `${ASSESSMENT_RUNTIME_KEY_PREFIX}${assessmentId}`;
+
+const readAssessmentRuntime = (assessmentId) => {
+  if (!assessmentId) return null;
+  try {
+    const raw = localStorage.getItem(getAssessmentRuntimeKey(assessmentId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeAssessmentRuntime = (assessmentId, runtime) => {
+  if (!assessmentId) return;
+  try {
+    localStorage.setItem(getAssessmentRuntimeKey(assessmentId), JSON.stringify(runtime));
+  } catch {
+    // Ignore storage failures in private mode / quota issues
+  }
+};
+
+const clearAssessmentRuntime = (assessmentId) => {
+  if (!assessmentId) return;
+  try {
+    localStorage.removeItem(getAssessmentRuntimeKey(assessmentId));
+  } catch {
+    // Ignore storage cleanup failures
+  }
+};
+
+const isValidResumePosition = (questionsBySection, sectionIndex, questionIndex) => {
+  if (!Number.isInteger(sectionIndex) || !Number.isInteger(questionIndex)) return false;
+  const section = SECTIONS[sectionIndex];
+  if (!section) return false;
+  const sectionQuestions = questionsBySection[section.id] || [];
+  return questionIndex >= 0 && questionIndex < sectionQuestions.length;
+};
+
+const findFirstUnansweredPosition = (questionsBySection, savedAnswers) => {
+  const answerMap = savedAnswers || {};
+
+  for (let sectionIndex = 0; sectionIndex < SECTIONS.length; sectionIndex += 1) {
+    const sectionId = SECTIONS[sectionIndex].id;
+    const sectionQuestions = questionsBySection[sectionId] || [];
+
+    for (let questionIndex = 0; questionIndex < sectionQuestions.length; questionIndex += 1) {
+      const question = sectionQuestions[questionIndex];
+      const value = answerMap[question.id];
+      if (value === undefined || value === null || value === '') {
+        return { sectionIndex, questionIndex };
+      }
+    }
+  }
+
+  for (let sectionIndex = SECTIONS.length - 1; sectionIndex >= 0; sectionIndex -= 1) {
+    const sectionId = SECTIONS[sectionIndex].id;
+    const sectionQuestions = questionsBySection[sectionId] || [];
+    if (sectionQuestions.length > 0) {
+      return { sectionIndex, questionIndex: sectionQuestions.length - 1 };
+    }
+  }
+
+  return { sectionIndex: 0, questionIndex: 0 };
+};
 
 const Questionnaire = () => {
   const navigate = useNavigate();
@@ -65,7 +133,6 @@ const Questionnaire = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [startTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
@@ -96,8 +163,10 @@ const Questionnaire = () => {
         bySection[s.id] = list.filter((q) => q.section === s.id).sort((a, b) => (a.order || 0) - (b.order || 0));
       });
       setQuestionsBySection(bySection);
+      return bySection;
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to load questions');
+      return {};
     }
   }, []);
 
@@ -105,18 +174,33 @@ const Questionnaire = () => {
     (async () => {
       setLoading(true);
       setError(null);
-      await loadQuestions();
+      const loadedQuestions = await loadQuestions();
       try {
         const res = await api.post('/api/v1/assessments');
         const data = res.data?.data?.assessment;
         if (data) {
           setAssessment(data);
+          setElapsedTime(0);
+          let savedAnswers = {};
           try {
             const progRes = await api.get(`/api/v1/assessments/${data.id}/progress`);
-            const saved = progRes.data?.data?.answers || {};
-            if (Object.keys(saved).length) setAnswers(saved);
+            savedAnswers = progRes.data?.data?.answers || {};
+            if (Object.keys(savedAnswers).length) setAnswers(savedAnswers);
           } catch (_) {
             // non-fatal — start with empty answers
+          }
+          const runtimeState = readAssessmentRuntime(data.id);
+          if (Number.isFinite(runtimeState?.elapsedSeconds) && runtimeState.elapsedSeconds >= 0) {
+            setElapsedTime(Math.floor(runtimeState.elapsedSeconds));
+          }
+
+          if (isValidResumePosition(loadedQuestions, runtimeState?.sectionIndex, runtimeState?.questionIndex)) {
+            setCurrentSectionIndex(runtimeState.sectionIndex);
+            setCurrentQuestionIndex(runtimeState.questionIndex);
+          } else {
+            const resumePosition = findFirstUnansweredPosition(loadedQuestions, savedAnswers);
+            setCurrentSectionIndex(resumePosition.sectionIndex);
+            setCurrentQuestionIndex(resumePosition.questionIndex);
           }
         } else {
           setError('Failed to initialize assessment. Please try again.');
@@ -204,6 +288,7 @@ const Questionnaire = () => {
     setError(null);
     try {
       await api.post(`/api/v1/assessments/${assessment.id}/complete`);
+      clearAssessmentRuntime(assessment.id);
       navigate('/test-complete', { replace: true });
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to submit. You may need to answer all 228 questions.');
@@ -216,16 +301,28 @@ const Questionnaire = () => {
   const isLastQuestion =
     currentSectionIndex === totalSections - 1 && currentQuestionIndex === sectionQuestions.length - 1;
 
-  // Update elapsed time every second when not paused
+  // Update elapsed time every second while assessment is active
   useEffect(() => {
     if (isPaused || !assessment) return;
     
     const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      setElapsedTime((prev) => prev + 1);
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [isPaused, startTime, assessment]);
+  }, [isPaused, assessment]);
+
+  // Persist runtime so "Resume Test" returns to the same timer/question
+  useEffect(() => {
+    if (!assessment?.id) return;
+
+    writeAssessmentRuntime(assessment.id, {
+      elapsedSeconds: elapsedTime,
+      sectionIndex: currentSectionIndex,
+      questionIndex: currentQuestionIndex,
+      updatedAt: Date.now()
+    });
+  }, [assessment?.id, elapsedTime, currentSectionIndex, currentQuestionIndex]);
   
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (credentials) => {
+  const login = useCallback(async (credentials) => {
     try {
       const response = await api.post('/api/v1/auth/login', credentials);
       localStorage.setItem('token', response.data.token);
@@ -47,15 +47,15 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       throw err;
     }
-  };
+  }, []);
 
-  const setSession = (token, userData) => {
+  const setSession = useCallback((token, userData) => {
     if (token) localStorage.setItem('token', token);
     setUser(userData ?? null);
     setIsAuthenticated(!!userData);
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await api.post('/api/v1/auth/logout');
       localStorage.removeItem('token');
@@ -65,16 +65,16 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Logout error:', err);
     }
-  };
+  }, [navigate]);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     isAuthenticated,
     loading,
     login,
     logout,
     setSession
-  };
+  }), [user, isAuthenticated, loading, login, logout, setSession]);
 
   return (
     <AuthContext.Provider value={value}>

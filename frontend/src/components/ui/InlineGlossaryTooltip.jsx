@@ -20,7 +20,7 @@ const InlineGlossaryTooltip = ({
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
-  const { getTermDefinition, markTermAsLearned, shouldHighlight } = useGlossary();
+  const { getTermDefinition, markTermAsLearned, shouldHighlight, recordInteraction, termInteractions } = useGlossary();
   
   const tooltipRef = useRef(null);
   const buttonRef = useRef(null);
@@ -46,14 +46,18 @@ const InlineGlossaryTooltip = ({
   // Handle tooltip toggle with learning tracking
   const handleToggle = useCallback(() => {
     if (!tooltipOpen && termData) {
+      const termKey = term.toLowerCase();
+      recordInteraction(termKey, 'view');
+      const viewCount = (termInteractions[termKey]?.view || 0) + 1;
+
       // Mark as viewed
-      if (termData.difficulty === 'high' || termData.difficulty === 'medium') {
-        markTermAsLearned(term.toLowerCase());
-        onTermLearned?.(term.toLowerCase());
+      if (termData.difficulty === 'high' || termData.difficulty === 'medium' || viewCount >= 3) {
+        markTermAsLearned(termKey);
+        onTermLearned?.(termKey);
       }
     }
     setTooltipOpen(prev => !prev);
-  }, [tooltipOpen, termData, markTermAsLearned, onTermLearned, term]);
+  }, [tooltipOpen, termData, markTermAsLearned, onTermLearned, term, recordInteraction, termInteractions]);
 
   // Close on escape key
   useEffect(() => {

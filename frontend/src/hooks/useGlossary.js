@@ -7,6 +7,24 @@ import { glossaryService } from '../services/glossaryService';
  * Now loads from database instead of static data
  */
 
+const inferDifficultyFromSection = (section = 'general') => {
+  if (section === 'riasec' || section === 'structure') return 'low';
+  if (section === 'actions' || section === 'occupations') return 'medium';
+  return 'medium';
+};
+
+const normalizeGlossaryTerm = (term) => {
+  const normalizedCategory = term.category || term.section || 'general';
+
+  return {
+    ...term,
+    category: normalizedCategory,
+    section: term.section || normalizedCategory,
+    difficulty: term.difficulty || inferDifficultyFromSection(term.section || normalizedCategory),
+    related: Array.isArray(term.related) ? term.related : []
+  };
+};
+
 export const useGlossary = () => {
   const [learnedTerms, setLearnedTerms] = useState(new Set());
   const [termInteractions, setTermInteractions] = useState({});
@@ -20,7 +38,7 @@ export const useGlossary = () => {
       try {
         setLoading(true);
         const terms = await glossaryService.listTerms();
-        setGlossaryTerms(terms);
+        setGlossaryTerms((terms || []).map(normalizeGlossaryTerm));
       } catch (error) {
         console.warn('Failed to load glossary terms from database:', error);
         // Fallback to empty array - will show no glossary terms
@@ -105,22 +123,11 @@ export const useGlossary = () => {
     return viewCount < 3; // Show 3 times, then reduce prominence
   }, [learnedTerms, termInteractions, glossaryTerms]);
 
-  // Get term definition with learning tracking
+  // Get term definition (must stay pure to avoid render loops)
   const getTermDefinition = useCallback((termKey) => {
     const term = glossaryTerms.find(t => t.term.toLowerCase() === termKey.toLowerCase());
-    if (!term) return null;
-
-    // Record view interaction
-    recordInteraction(termKey, 'view');
-
-    // Auto-mark as learned after multiple views
-    const interactions = termInteractions[termKey] || {};
-    if (interactions.view >= 3) {
-      markTermAsLearned(termKey);
-    }
-
-    return term;
-  }, [recordInteraction, markTermAsLearned, termInteractions, glossaryTerms]);
+    return term || null;
+  }, [glossaryTerms]);
 
   // Process text to add glossary markers
   const processTextForGlossary = useCallback((text) => {
@@ -186,9 +193,20 @@ export const useGlossary = () => {
     // Get all terms from database
     getAllTerms: () => glossaryTerms,
     
+    // Backward-compatible category access used by glossary UI
+    getTermsByCategory: (category) => {
+      if (!category || category === 'all') return glossaryTerms;
+      return glossaryTerms.filter(term => term.category === category);
+    },
+
     // Get terms by section
     getTermsBySection: (section) => {
       return glossaryTerms.filter(term => term.section === section);
+    },
+
+    // Backward-compatible difficulty filter
+    getTermsByDifficulty: (difficulty) => {
+      return glossaryTerms.filter(term => term.difficulty === difficulty);
     },
     
     // Search terms
@@ -205,7 +223,19 @@ export const useGlossary = () => {
     
     // Find term by key
     findTerm: (key) => {
+      if (!key) return null;
       return glossaryTerms.find(t => t.term.toLowerCase() === key.toLowerCase());
+    },
+
+    // Backward-compatible related terms accessor
+    getRelatedTerms: (termKey) => {
+      const term = dbGlossaryUtils.findTerm(termKey);
+      if (!term || !Array.isArray(term.related) || term.related.length === 0) {
+        return [];
+      }
+      return term.related
+        .map(relatedKey => dbGlossaryUtils.findTerm(relatedKey))
+        .filter(Boolean);
     },
     
     // Get terms that should be highlighted
