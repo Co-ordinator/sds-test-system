@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
@@ -132,14 +132,6 @@ export default function VerifyEmail() {
                 style={{ backgroundColor: GOV.blue }}
               >
                 Request new link
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                className={`w-full py-2 rounded-md font-semibold ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
-                style={{ borderColor: GOV.border, color: GOV.text }}
-              >
-                Back to Login
               </button>
             </div>
           )}

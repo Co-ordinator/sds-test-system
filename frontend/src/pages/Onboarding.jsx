@@ -4,7 +4,7 @@ import OnboardingLayout from '../components/onboarding/OnboardingLayout';
 import { useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { MapPin, Info, Globe, User, Building2, Pencil, Check, Search, GraduationCap, BookOpen, Briefcase, ChevronLeft } from 'lucide-react';
+import { Globe, User, Building2, Pencil, Check, Search, GraduationCap, BookOpen, Briefcase, ChevronLeft } from 'lucide-react';
 import { GOV, TYPO } from '../theme/government';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 import OccupationSearchInput from '../components/ui/OccupationSearchInput';
@@ -367,7 +367,7 @@ export default function Onboarding() {
             <div className="p-6 space-y-6">
               <div className="mb-2">
                 <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>
-                  Location & Institution
+                  {typeMeta?.step2Label || 'Region and institution'}
                 </h1>
                 <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
                   Please provide your region and current institution.
@@ -375,12 +375,6 @@ export default function Onboarding() {
               </div>
 
           <div className="rounded-md border overflow-hidden bg-white" style={{ borderColor: GOV.borderLight }}>
-            <div className="px-4 py-2.5 border-b flex items-center gap-2" style={{ borderColor: GOV.borderLight }}>
-              <MapPin className="w-4 h-4 flex-shrink-0" style={{ color: GOV.blue }} />
-              <span className={`${TYPO.caption} font-semibold`} style={{ color: GOV.text }}>
-                Location &amp; Institution
-              </span>
-            </div>
             <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Region *</label>
@@ -492,21 +486,8 @@ export default function Onboarding() {
                 </div>
               )}
             </div>
-            <div className="px-4 pb-4">
-              <div className="rounded-md border p-3 flex gap-2.5" style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.blueLight }}>
-                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: GOV.blue }}>
-                  <Info className="w-3 h-3 text-white" />
-                </div>
-                <div>
-                  <p className={`font-semibold ${TYPO.hint} mb-0.5`} style={{ color: GOV.text }}>Why do we need this?</p>
-                  <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-                    {userType === 'professional'
-                      ? 'Your region and workplace help the Ministry map workforce distribution and career trends.'
-                      : 'Your region and institution help the Ministry tailor career guidance and SDS reporting.'}
-                  </p>
-                </div>
-              </div>
-              <p className={`mt-2 flex items-center gap-1.5 ${TYPO.hint}`} style={{ color: GOV.textMuted }}>
+            <div className="px-4 pb-4 pt-1">
+              <p className={`flex items-center gap-1.5 ${TYPO.hint}`} style={{ color: GOV.textMuted }}>
                 <span className="w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0" style={{ borderColor: GOV.border }}>
                   <Check className="w-2.5 h-2.5" style={{ color: GOV.blue }} />
                 </span>
@@ -716,7 +697,7 @@ export default function Onboarding() {
 
             <div className="border-b" style={{ borderColor: GOV.border }}>
               <div className="flex items-center justify-between px-4 py-2.5 bg-white">
-                <h2 className={TYPO.label} style={{ color: GOV.text }}>Location &amp; Institution</h2>
+                <h2 className={TYPO.label} style={{ color: GOV.text }}>{typeMeta?.step2Label || 'Region and institution'}</h2>
                 <button type="button" onClick={() => goToStep(2)} className={`${TYPO.hint} font-medium hover:underline transition-colors duration-150`} style={{ color: GOV.blue }}>
                   Edit
                 </button>
