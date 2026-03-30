@@ -112,6 +112,11 @@ module.exports = {
       userFields.testAdministratorCode = `TA-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     }
 
+    // Admin-created Test Takers already have identity captured; no in-app onboarding wizard required
+    if (assignedRole === 'Test Taker' && firstName && lastName) {
+      userFields.onboardingCompleted = true;
+    }
+
     const newUser = await User.create(userFields);
 
     // Assign permissions

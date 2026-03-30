@@ -16,6 +16,31 @@ const GRADE_TO_EDUCATION_LEVEL = {
   'Postgraduate': 5,
 };
 
+/** All required onboarding fields captured for Test Takers (no placeholder names — use onboarding_completed flag). */
+function computeTestTakerOnboardingComplete(u) {
+  if (!u || u.role !== 'Test Taker') return true;
+  const fn = (u.firstName || '').trim();
+  const ln = (u.lastName || '').trim();
+  if (!fn || !ln) return false;
+  if (!u.userType) return false;
+  if (!u.region) return false;
+  if (!((u.district || '').trim())) return false;
+  if (u.userType === 'Professional') {
+    return !!(((u.workplaceName || '').trim()) || u.workplaceInstitutionId);
+  }
+  if (u.userType === 'High School Student' || u.userType === 'University Student') {
+    return !!(((u.currentInstitution || '').trim()) || u.institutionId);
+  }
+  return true;
+}
+
+async function maybeSetOnboardingCompleted(userId) {
+  const u = await User.findByPk(userId);
+  if (!u || u.role !== 'Test Taker' || u.onboardingCompleted) return;
+  if (!computeTestTakerOnboardingComplete(u)) return;
+  await u.update({ onboardingCompleted: true });
+}
+
 const parseNationalId = (nationalId) => {
   if (!nationalId || nationalId.length !== 13) return { dateOfBirth: null, gender: null };
   const yy = parseInt(nationalId.substring(0, 2));
@@ -66,8 +91,9 @@ module.exports = {
       nationalId: cleanNationalId,
       email: email.trim(),
       password,
-      firstName: 'Pending',
-      lastName: 'Onboarding',
+      firstName: null,
+      lastName: null,
+      onboardingCompleted: false,
       dateOfBirth,
       gender,
       role: 'Test Taker',
@@ -271,6 +297,8 @@ module.exports = {
     }
 
     await user.update(updates);
+    await maybeSetOnboardingCompleted(user.id);
+
     const updated = await User.findByPk(user.id, {
       attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken'] }
     });
@@ -383,5 +411,8 @@ module.exports = {
     user.mustChangePassword = false;
     await user.save();
     return user;
-  }
+  },
+
+  /** Recompute onboarding completion after profile updates (Test Takers only). */
+  maybeSetOnboardingCompleted
 };

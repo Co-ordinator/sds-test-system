@@ -124,7 +124,8 @@ const bulkCreateStudents = async (csvData, institutionId) => {
         consentDate: new Date(),
         isEmailVerified: true,
         createdByCounselor: true,
-        mustChangePassword: true
+        mustChangePassword: true,
+        onboardingCompleted: true
       }, { transaction });
 
       // Create structured SchoolStudent record

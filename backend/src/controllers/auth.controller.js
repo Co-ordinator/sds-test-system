@@ -32,7 +32,7 @@ const register = async (req, res, next) => {
         email: user.email,
         subject: 'Welcome to SDS Test System - Verify Your Email',
         template: 'welcome-verify',
-        context: { firstName: user.firstName, lastName: user.lastName, email: user.email, region: user.region, verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}` }
+        context: { firstName: user.firstName || 'Student', lastName: user.lastName || '', email: user.email, region: user.region, verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}` }
       })
         .then(() => AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Welcome email sent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/register' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }))
         .catch(emailError => {
@@ -112,7 +112,7 @@ const forgotPassword = async (req, res, next) => {
 
     res.status(200).json({ status: 'success', message: 'Token sent to email!' });
 
-    sendEmail({ email: user.email, subject: 'Password Reset Request', template: 'reset-password', context: { firstName: user.firstName, resetUrl: `${process.env.FRONTEND_URL}/reset-password/${resetToken}` } })
+    sendEmail({ email: user.email, subject: 'Password Reset Request', template: 'reset-password', context: { firstName: user.firstName || 'Student', resetUrl: `${process.env.FRONTEND_URL}/reset-password/${resetToken}` } })
       .then(() => AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Password reset email sent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/forgot-password' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }))
       .catch(emailError => {
         logger.error({ actionType: 'EMAIL_FAILED', message: 'Password reset email failed', req, details: { error: emailError.message } });
@@ -196,7 +196,7 @@ const resendVerificationEmail = async (req, res, next) => {
 
     res.status(200).json({ status: 'success', message: 'Verification email sent' });
 
-    sendEmail({ email: user.email, subject: 'Verify Your Email Address', template: 'welcome-verify', context: { firstName: user.firstName, verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}` } })
+    sendEmail({ email: user.email, subject: 'Verify Your Email Address', template: 'welcome-verify', context: { firstName: user.firstName || 'Student', verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}` } })
       .then(() => {
         logger.info({ actionType: 'VERIFICATION_EMAIL_RESENT', message: `Verification email resent to: ${user.email}`, req, details: { userId: user.id } });
         return AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Verification email resent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/resend-verification' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });

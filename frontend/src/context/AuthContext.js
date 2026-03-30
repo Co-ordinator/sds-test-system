@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 
 export const AuthContext = createContext();
 
@@ -95,12 +96,8 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   const needsEmailVerification = user?.email && !user?.isEmailVerified;
   const isOnVerifyPage = window.location.pathname.includes('/verify-email');
   
-  // Check if user needs onboarding
-  const needsOnboarding = user && (
-    (user.firstName && user.firstName.toLowerCase() === 'pending') ||
-    (user.lastName && user.lastName.toLowerCase() === 'user') ||
-    (!user.firstName || !user.lastName || !user.userType)
-  );
+  // Test Takers: server sets onboardingCompleted when required profile data is saved
+  const needsOnboarding = user && profileNeedsOnboarding(user);
   const isOnOnboardingPage = window.location.pathname === '/onboarding';
 
   const roleDashboard = (role) => {

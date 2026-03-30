@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 import { Clock, Loader2, User, LogOut, Eye, X, FileText, Award, Download } from 'lucide-react';
 import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
@@ -21,16 +22,10 @@ const TestTakerDashboard = () => {
     setProfileUser(user || null);
   }, [user?.id]);
 
-  // Redirect to onboarding if user has incomplete profile
+  // Redirect Test Takers who have not completed onboarding (onboardingCompleted flag)
   useEffect(() => {
-    if (profileUser && !loading) {
-      const fullName = [profileUser?.firstName, profileUser?.lastName].filter(Boolean).join(' ').trim();
-      const isPendingPlaceholder = fullName.toLowerCase() === 'pending user'
-        || (profileUser?.firstName || '').toLowerCase() === 'pending';
-      
-      if (isPendingPlaceholder || !profileUser?.userType) {
-        navigate('/onboarding');
-      }
+    if (profileUser && !loading && profileNeedsOnboarding(profileUser)) {
+      navigate('/onboarding');
     }
   }, [profileUser, loading, navigate]);
 
@@ -78,11 +73,7 @@ const TestTakerDashboard = () => {
   const completed = assessments.filter((a) => a.status === 'completed');
   const progressPercent = inProgress ? Math.round(Number(inProgress.progress) || 0) : 0;
   const fullName = [profileUser?.firstName, profileUser?.lastName].filter(Boolean).join(' ').trim();
-  const isPendingPlaceholder = fullName.toLowerCase() === 'pending user'
-    || (profileUser?.firstName || '').toLowerCase() === 'pending';
-  const displayName = (!isPendingPlaceholder && fullName)
-    || profileUser?.firstName
-    || 'Student';
+  const displayName = fullName || profileUser?.studentCode || 'Student';
 
   const viewResults = (assessmentId) => {
     navigate('/results', { state: { assessmentId } });

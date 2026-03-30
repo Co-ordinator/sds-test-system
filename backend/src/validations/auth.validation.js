@@ -91,6 +91,14 @@ const resetPassword = Joi.object({
   })
 });
 
+const USER_TYPE_ENUM = [
+  'High School Student',
+  'University Student',
+  'Professional',
+  'Test Administrator',
+  'System Administrator'
+];
+
 const updateProfile = Joi.object({
   firstName: Joi.string().max(255).allow('', null),
   lastName: Joi.string().max(255).allow('', null),
@@ -107,9 +115,18 @@ const updateProfile = Joi.object({
   gradeLevel: Joi.string().allow('', null),
   employmentStatus: Joi.string().valid('student', 'employed', 'unemployed', 'self_employed', 'other').allow('', null),
   currentOccupation: Joi.string().allow('', null),
+  currentOccupationId: Joi.string().uuid().allow('', null),
   preferredLanguage: Joi.string().valid('en', 'ss').allow('', null),
   requiresAccessibility: Joi.boolean().allow(null),
-  accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).allow(null)
+  accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).allow(null),
+  userType: Joi.string().valid(...USER_TYPE_ENUM).allow('', null),
+  institutionId: Joi.string().uuid().allow('', null),
+  workplaceInstitutionId: Joi.string().uuid().allow('', null),
+  workplaceName: Joi.string().allow('', null),
+  degreeProgram: Joi.string().allow('', null),
+  yearOfStudy: Joi.number().integer().min(0).max(20).allow(null),
+  yearsExperience: Joi.number().integer().min(0).max(80).allow(null),
+  onboardingCompleted: Joi.forbidden()
 }).min(1);
 
 const forgotPasswordBody = Joi.object({

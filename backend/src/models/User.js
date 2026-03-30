@@ -64,15 +64,15 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false
     },
     
-    // Personal Information
+    // Personal Information (null until Test Taker completes onboarding — no placeholder names)
     firstName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       field: 'first_name'
     },
     lastName: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
       field: 'last_name'
     },
     nationalId: {
@@ -320,6 +320,14 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
       allowNull: false,
       field: 'must_change_password'
+    },
+
+    // Test Taker journey: set true only when required profile fields are captured (server-side)
+    onboardingCompleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      field: 'onboarding_completed'
     }
   }, {
     tableName: 'users',
@@ -390,7 +398,8 @@ module.exports = (sequelize, DataTypes) => {
   };
   
   User.prototype.getFullName = function() {
-    return `${this.firstName} ${this.lastName}`;
+    const parts = [this.firstName, this.lastName].filter((p) => p && String(p).trim());
+    return parts.join(' ') || '';
   };
   
   // Associations
