@@ -232,7 +232,7 @@ class ScoringService {
             attributes: ['id', 'name', 'primaryRiasec', 'code', 'demandLevel', 'localDemand', 'category']
           }
         ],
-        order: [['funding_priority', 'ASC'], ['name', 'ASC']],
+        order: [['funding_priority', 'DESC'], ['name', 'ASC']],
         ...opts
       });
     } catch (_err) {
@@ -259,8 +259,7 @@ class ScoringService {
    * Government Funding Priority Alignment
    *
    * Uses courses already matched by RIASEC in getRecommendations().
-   * Each course carries a `fundingPriority` column ('high','medium','none')
-   * set from SLAS policy via database migration.
+   * Each course has `fundingPriority` (boolean): true = SLAS priority programme.
    *
    * Groups matched courses by fieldOfStudy and reports per-field alignment
    * plus an overall funding alignment level.
@@ -269,74 +268,69 @@ class ScoringService {
    */
   computeFundingAlignment(hollandCode, courses = []) {
     if (!hollandCode || courses.length === 0) {
-      return { overall: 'LOW', fields: [], allFields: [], interpretation: '', highCount: 0, mediumCount: 0, lowCount: 0 };
+      return {
+        overall: 'LOW',
+        fields: [],
+        allFields: [],
+        interpretation: '',
+        priorityFieldCount: 0,
+        nonPriorityFieldCount: 0,
+      };
     }
 
-    // Group matched courses by field_of_study, keeping the best priority per field
     const fieldMap = {};
-    const rank = { high: 0, medium: 1, none: 2 };
 
     for (const course of courses) {
       const field = course.fieldOfStudy || 'Other';
-      const priority = course.fundingPriority || 'none';
+      const isPriority = course.fundingPriority === true;
 
       if (!fieldMap[field]) {
-        fieldMap[field] = { field, funding: priority, courses: [] };
+        fieldMap[field] = { field, hasPriorityCourse: false, courses: [] };
       }
 
       fieldMap[field].courses.push({
         id: course.id,
         name: course.name,
         qualificationType: course.qualificationType,
-        fundingPriority: priority,
+        fundingPriority: isPriority,
       });
 
-      // Promote the field to the highest priority found among its courses
-      if (rank[priority] < rank[fieldMap[field].funding]) {
-        fieldMap[field].funding = priority;
-      }
+      if (isPriority) fieldMap[field].hasPriorityCourse = true;
     }
 
-    // Convert to sorted array
     const fields = Object.values(fieldMap)
       .map(f => ({
         field: f.field,
-        alignment: f.funding === 'high' ? 'HIGH' : f.funding === 'medium' ? 'MEDIUM' : 'LOW',
+        alignment: f.hasPriorityCourse ? 'HIGH' : 'LOW',
         courseCount: f.courses.length,
         courses: f.courses.slice(0, 4),
       }))
       .sort((a, b) => {
-        const r = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+        const r = { HIGH: 0, LOW: 1 };
         return r[a.alignment] - r[b.alignment];
       });
 
-    const highCount = fields.filter(f => f.alignment === 'HIGH').length;
-    const mediumCount = fields.filter(f => f.alignment === 'MEDIUM').length;
-    const lowCount = fields.filter(f => f.alignment === 'LOW').length;
+    const priorityFieldCount = fields.filter(f => f.alignment === 'HIGH').length;
+    const nonPriorityFieldCount = fields.filter(f => f.alignment === 'LOW').length;
 
     let overall;
-    if (highCount >= 2) {
+    if (priorityFieldCount >= 2) {
       overall = 'HIGH';
-    } else if (highCount >= 1 || mediumCount >= 2) {
+    } else if (priorityFieldCount >= 1) {
       overall = 'MEDIUM';
     } else {
       overall = 'LOW';
     }
 
-    // Build interpretation from real matched data
-    const topHigh = fields.filter(f => f.alignment === 'HIGH').slice(0, 3);
-    const topMed = fields.filter(f => f.alignment === 'MEDIUM').slice(0, 2);
+    const topPriority = fields.filter(f => f.alignment === 'HIGH').slice(0, 3);
     let interpretation = '';
 
     if (overall === 'HIGH') {
-      const names = topHigh.map(f => f.field).join(', ');
+      const names = topPriority.map(f => f.field).join(', ');
       interpretation = `Your interests strongly align with ${names} \u2014 these are government priority programmes. This significantly increases your chances of receiving funding through the Eswatini Government Scholarship loan. Pursuing courses in these fields is recommended if you intend to apply for government financial support.`;
     } else if (overall === 'MEDIUM') {
-      const highNames = topHigh.map(f => f.field).join(', ');
-      const medNames = topMed.map(f => f.field).join(', ');
-      interpretation = highNames
-        ? `You have some alignment with priority programmes like ${highNames}. ${medNames ? `Fields like ${medNames} show partial alignment.` : ''} Consider focusing your studies on higher-priority areas to improve your chances of receiving government funding.`
-        : `Your interests show partial alignment with priority programmes${medNames ? ` such as ${medNames}` : ''}. Explore how your strengths can be applied to priority areas to improve your funding eligibility.`;
+      const names = topPriority.map(f => f.field).join(', ');
+      interpretation = `You have alignment with at least one priority programme${names ? ` (${names})` : ''}. Consider focusing your studies on priority areas where possible to improve your chances of receiving government funding.`;
     } else {
       interpretation = 'Your current interests do not strongly align with the government\u2019s priority programmes. This does not disqualify you from applying, but your chances of receiving funding may be lower. Consider speaking with a career counsellor about how your skills might apply to priority fields, or explore alternative funding sources.';
     }
@@ -346,9 +340,8 @@ class ScoringService {
       fields: fields.filter(f => f.alignment !== 'LOW').slice(0, 8),
       allFields: fields,
       interpretation,
-      highCount,
-      mediumCount,
-      lowCount,
+      priorityFieldCount,
+      nonPriorityFieldCount,
       applicationUrl: 'https://slas.gov.sz/WelcomeToApplication.aspx',
       applicationFormUrl: 'https://slas.gov.sz/Documents/SCHOLARSHIP%20APPLICATION%20FORM.pdf',
       deadlines: {

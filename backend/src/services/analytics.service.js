@@ -589,16 +589,15 @@ const analyticsService = {
           ))
         },
         attributes: ['fieldOfStudy', 'fundingPriority'],
-        order: [['funding_priority', 'ASC'], ['name', 'ASC']]
+        order: [['funding_priority', 'DESC'], ['name', 'ASC']]
       });
 
       const alignment = scoringService.computeFundingAlignment(assessment.hollandCode, matchedCourses);
       alignmentResults.push({
         hollandCode: assessment.hollandCode,
         overall: alignment.overall,
-        highCount: alignment.highCount,
-        mediumCount: alignment.mediumCount,
-        lowCount: alignment.lowCount,
+        priorityFieldCount: alignment.priorityFieldCount,
+        nonPriorityFieldCount: alignment.nonPriorityFieldCount,
         allFields: alignment.allFields,
         userId: assessment.userId,
         completedAt: assessment.completedAt
@@ -633,22 +632,22 @@ const analyticsService = {
     const fieldMap = {};
     alignmentResults.forEach((result) => {
       (result.allFields || []).forEach((f) => {
-        const alignKey = String(f.alignment || 'LOW').toLowerCase();
-        if (!['high', 'medium', 'low'].includes(alignKey)) return;
+        const isHigh = f.alignment === 'HIGH';
         if (!fieldMap[f.field]) {
-          fieldMap[f.field] = { field: f.field, high: 0, medium: 0, low: 0, total: 0 };
+          fieldMap[f.field] = { field: f.field, priority: 0, other: 0, total: 0 };
         }
-        fieldMap[f.field][alignKey]++;
-        fieldMap[f.field].total++;
+        if (isHigh) fieldMap[f.field].priority += 1;
+        else fieldMap[f.field].other += 1;
+        fieldMap[f.field].total += 1;
       });
     });
 
     const fieldAlignment = Object.values(fieldMap)
       .map(f => ({
         ...f,
-        highPercentage: f.total > 0 ? ((f.high / f.total) * 100).toFixed(1) : 0
+        priorityPercentage: f.total > 0 ? ((f.priority / f.total) * 100).toFixed(1) : 0
       }))
-      .sort((a, b) => b.high - a.high)
+      .sort((a, b) => b.priority - a.priority)
       .slice(0, 10);
 
     // Regional alignment

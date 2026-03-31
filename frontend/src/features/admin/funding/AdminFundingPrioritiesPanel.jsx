@@ -8,11 +8,14 @@ import { usePermissions } from '../../../context/PermissionContext';
 
 const SLAS_INFO_URL = 'https://slas.gov.sz/LoanProcess/ApplicationRequirements.aspx';
 
-const PRIORITY_OPTIONS = [
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'none', label: 'None' },
+const FILTER_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'true', label: 'Priority programme' },
+  { value: 'false', label: 'Not priority' },
 ];
+
+/** API returns boolean; avoid Boolean() on strings (e.g. "false" is truthy). */
+const isPriorityProgramme = (fp) => fp === true || fp === 1;
 
 const AdminFundingPrioritiesPanel = () => {
   const { toast, showToast, Toast: ToastComp } = useToast();
@@ -32,7 +35,7 @@ const AdminFundingPrioritiesPanel = () => {
     try {
       const data = await adminService.getCourses({
         search,
-        fundingPriority: priorityFilter || undefined,
+        fundingPriority: priorityFilter === '' ? undefined : priorityFilter,
         limit: 2000,
       });
       setCourses(data);
@@ -58,6 +61,10 @@ const AdminFundingPrioritiesPanel = () => {
     setSavingId(null);
   };
 
+  const handlePriorityToggle = (courseId, enabled) => {
+    handlePriorityChange(courseId, enabled);
+  };
+
   return (
     <div className="space-y-4">
       <ToastComp toast={toast} />
@@ -74,10 +81,8 @@ const AdminFundingPrioritiesPanel = () => {
               Government funding priority (SLAS)
             </h3>
             <p className="text-xs mt-1 leading-relaxed" style={{ color: GOV.textMuted }}>
-              Each course has a priority level (<strong>high</strong>, <strong>medium</strong>, or <strong>none</strong>)
-              stored on the catalogue. Student results use these values for “Government Funding Priority Alignment”.
-              Initial values were set from the Eswatini SLAS scholarship programme list; you can adjust them here per
-              programme.
+              Each programme has a boolean <strong>SLAS priority</strong> flag. Student results use it for
+              “Government Funding Priority Alignment”. Use the toggle to set priority on or off.
             </p>
             <a
               href={SLAS_INFO_URL}
@@ -125,19 +130,29 @@ const AdminFundingPrioritiesPanel = () => {
               header: 'Funding priority',
               sortable: true,
               render: c => {
-                const v = c.fundingPriority || 'none';
+                const on = isPriorityProgramme(c.fundingPriority);
                 return (
-                  <select
-                    className="form-control text-xs py-1.5 max-w-[220px]"
-                    value={v}
-                    disabled={!canEdit || savingId === c.id}
-                    onChange={e => handlePriorityChange(c.id, e.target.value)}
-                    aria-label={`Funding priority for ${c.name}`}
-                  >
-                    {PRIORITY_OPTIONS.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={!canEdit || savingId === c.id}
+                      onClick={() => handlePriorityToggle(c.id, !on)}
+                      className="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors"
+                      style={{ backgroundColor: on ? GOV.blue : GOV.borderLight }}
+                      role="switch"
+                      aria-checked={on}
+                      aria-label={`SLAS funding priority for ${c.name}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                          on ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-xs ${on ? 'font-medium' : ''}`} style={{ color: on ? GOV.text : GOV.textMuted }}>
+                      {on ? 'Yes' : 'No'}
+                    </span>
+                  </div>
                 );
               },
             },
@@ -169,10 +184,10 @@ const AdminFundingPrioritiesPanel = () => {
                 style={{ borderColor: GOV.border, color: GOV.text }}
                 value={priorityFilter}
                 onChange={e => setPriorityFilter(e.target.value)}
+                aria-label="Filter by funding priority"
               >
-                <option value="">All priorities</option>
-                {PRIORITY_OPTIONS.map(p => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
+                {FILTER_OPTIONS.map(p => (
+                  <option key={p.value || 'all'} value={p.value}>{p.label}</option>
                 ))}
               </select>
               {!canEdit && (

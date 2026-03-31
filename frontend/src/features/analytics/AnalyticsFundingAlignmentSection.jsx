@@ -123,7 +123,7 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
 
       {/* ── Field Alignment ── */}
       <div className="bg-white rounded-lg p-6 border" style={{ borderColor: GOV.border }}>
-        <h3 className="text-sm font-bold mb-4" style={{ color: GOV.text }}>Top Priority Fields by Alignment</h3>
+        <h3 className="text-sm font-bold mb-4" style={{ color: GOV.text }}>Top fields: SLAS priority vs other</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={fieldAlignment} margin={{ top: 20 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
@@ -139,12 +139,11 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
             <Tooltip
               formatter={(value, name) => [
                 `${value} assessment–field pairs`,
-                name === 'high' ? 'High priority' : name === 'medium' ? 'Medium priority' : 'Low / other',
+                name === 'priority' ? 'SLAS priority programme' : 'Not priority',
               ]}
             />
-            <Bar dataKey="high" stackId="alignment" fill={COLORS.high} />
-            <Bar dataKey="medium" stackId="alignment" fill={COLORS.medium} />
-            <Bar dataKey="low" stackId="alignment" fill={COLORS.low} />
+            <Bar dataKey="priority" stackId="alignment" fill={COLORS.high} name="priority" />
+            <Bar dataKey="other" stackId="alignment" fill={COLORS.low} name="other" />
           </BarChart>
         </ResponsiveContainer>
       </div>

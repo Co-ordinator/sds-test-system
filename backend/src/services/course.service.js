@@ -21,7 +21,23 @@ const parseCsv = (csvText) => new Promise((resolve, reject) => {
 });
 
 const QUAL_TYPES = ['certificate','diploma','bachelor','honours','postgrad_diploma','masters','doctorate','short_course','tvet','other'];
-const FUNDING_PRIORITIES = ['high', 'medium', 'none'];
+
+function parseFundingPriorityFilter(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const v = String(raw).toLowerCase();
+  if (v === 'true' || v === '1') return true;
+  if (v === 'false' || v === '0') return false;
+  return null;
+}
+
+function coerceFundingPriority(value) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'boolean') return value;
+  const v = String(value).toLowerCase();
+  if (v === 'true' || v === '1') return true;
+  if (v === 'false' || v === '0') return false;
+  throw new Error('fundingPriority must be a boolean');
+}
 
 /* ─── Service ─────────────────────────────────────────────────────────────── */
 
@@ -33,9 +49,8 @@ module.exports = {
     if (isActive !== undefined) where.isActive = isActive === 'true' || isActive === true;
     if (qualificationType) where.qualificationType = qualificationType;
     if (fieldOfStudy) where.fieldOfStudy = { [Op.iLike]: `%${fieldOfStudy}%` };
-    if (fundingPriority && FUNDING_PRIORITIES.includes(String(fundingPriority).toLowerCase())) {
-      where.fundingPriority = String(fundingPriority).toLowerCase();
-    }
+    const fpFilter = parseFundingPriorityFilter(fundingPriority);
+    if (fpFilter !== null) where.fundingPriority = fpFilter;
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
@@ -100,15 +115,16 @@ module.exports = {
     if (!QUAL_TYPES.includes(qualificationType)) {
       throw new Error(`qualificationType must be one of: ${QUAL_TYPES.join(', ')}`);
     }
-    if (fundingPriority !== undefined && fundingPriority !== null && !FUNDING_PRIORITIES.includes(fundingPriority)) {
-      throw new Error(`fundingPriority must be one of: ${FUNDING_PRIORITIES.join(', ')}`);
+    let fundingP;
+    if (fundingPriority !== undefined && fundingPriority !== null) {
+      fundingP = coerceFundingPriority(fundingPriority);
     }
 
     const course = await Course.create({
       name, nameSwati, qualificationType, durationYears, description,
       riasecCodes: riasecCodes || [], suggestedSubjects: suggestedSubjects || [],
       fieldOfStudy, isActive: isActive !== false,
-      ...(fundingPriority !== undefined && fundingPriority !== null ? { fundingPriority } : {}),
+      ...(fundingP !== undefined ? { fundingPriority: fundingP } : {}),
     });
 
     if (requirements.length > 0) {
@@ -141,8 +157,8 @@ module.exports = {
     const allowed = ['name','nameSwati','qualificationType','durationYears','description','riasecCodes','suggestedSubjects','fieldOfStudy','isActive','fundingPriority'];
     const sanitized = {};
     for (const k of allowed) { if (updates[k] !== undefined) sanitized[k] = updates[k]; }
-    if (sanitized.fundingPriority !== undefined && !FUNDING_PRIORITIES.includes(sanitized.fundingPriority)) {
-      throw new Error(`fundingPriority must be one of: ${FUNDING_PRIORITIES.join(', ')}`);
+    if (sanitized.fundingPriority !== undefined) {
+      sanitized.fundingPriority = coerceFundingPriority(sanitized.fundingPriority);
     }
     await course.update(sanitized);
 
@@ -231,9 +247,10 @@ module.exports = {
       fieldOfStudy: c.field_of_study || c.fieldOfStudy || '',
       riasecCodes: (c.riasec_codes || c.riasecCodes || []).join('|'),
       suggestedSubjects: (c.suggested_subjects || c.suggestedSubjects || []).join(', '),
-      isActive: c.is_active !== undefined ? c.is_active : c.isActive
+      isActive: c.is_active !== undefined ? c.is_active : c.isActive,
+      fundingPriority: Boolean(c.funding_priority !== undefined ? c.funding_priority : c.fundingPriority),
     }));
-    const parser = new Parser({ fields: ['name','nameSwati','qualificationType','durationYears','description','fieldOfStudy','riasecCodes','suggestedSubjects','isActive'] });
+    const parser = new Parser({ fields: ['name','nameSwati','qualificationType','durationYears','description','fieldOfStudy','riasecCodes','suggestedSubjects','isActive','fundingPriority'] });
     return parser.parse(rows);
   },
 
@@ -256,13 +273,39 @@ module.exports = {
           ? String(row.suggestedSubjects || row.suggested_subjects).split(/[,;|]/).map(s => s.trim()).filter(Boolean)
           : [];
 
+        const fpRaw = row.fundingPriority ?? row.funding_priority;
+        let importFunding;
+        if (fpRaw !== undefined && fpRaw !== null && String(fpRaw).trim() !== '') {
+          const s = String(fpRaw).toLowerCase().trim();
+          importFunding = s === 'true' || s === '1' || s === 'yes';
+        }
+
         const [course, created] = await Course.findOrCreate({
           where: { name },
-          defaults: { qualificationType: qt, nameSwati: row.nameSwati || row.name_swati, durationYears: row.durationYears || row.duration_years || null, description: row.description, fieldOfStudy: row.fieldOfStudy || row.field_of_study, riasecCodes: riasec, suggestedSubjects: subjects, isActive: String(row.isActive ?? row.is_active) !== 'false' }
+          defaults: {
+            qualificationType: qt,
+            nameSwati: row.nameSwati || row.name_swati,
+            durationYears: row.durationYears || row.duration_years || null,
+            description: row.description,
+            fieldOfStudy: row.fieldOfStudy || row.field_of_study,
+            riasecCodes: riasec,
+            suggestedSubjects: subjects,
+            isActive: String(row.isActive ?? row.is_active) !== 'false',
+            ...(importFunding !== undefined ? { fundingPriority: importFunding } : {}),
+          }
         });
 
         if (!created) {
-          await course.update({ qualificationType: qt, nameSwati: row.nameSwati || row.name_swati || course.nameSwati, durationYears: row.durationYears || row.duration_years || course.durationYears, description: row.description || course.description, fieldOfStudy: row.fieldOfStudy || row.field_of_study || course.fieldOfStudy, riasecCodes: riasec.length ? riasec : course.riasecCodes, suggestedSubjects: subjects.length ? subjects : course.suggestedSubjects });
+          await course.update({
+            qualificationType: qt,
+            nameSwati: row.nameSwati || row.name_swati || course.nameSwati,
+            durationYears: row.durationYears || row.duration_years || course.durationYears,
+            description: row.description || course.description,
+            fieldOfStudy: row.fieldOfStudy || row.field_of_study || course.fieldOfStudy,
+            riasecCodes: riasec.length ? riasec : course.riasecCodes,
+            suggestedSubjects: subjects.length ? subjects : course.suggestedSubjects,
+            ...(importFunding !== undefined ? { fundingPriority: importFunding } : {}),
+          });
           results.updated++;
         } else { results.created++; }
       } catch (err) {

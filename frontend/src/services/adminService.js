@@ -122,7 +122,9 @@ export const adminService = {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
     if (params.qualificationType) q.set('qualificationType', params.qualificationType);
-    if (params.fundingPriority) q.set('fundingPriority', params.fundingPriority);
+    if (params.fundingPriority !== undefined && params.fundingPriority !== null && params.fundingPriority !== '') {
+      q.set('fundingPriority', params.fundingPriority === true ? 'true' : params.fundingPriority === false ? 'false' : String(params.fundingPriority));
+    }
     if (params.isActive !== undefined) q.set('isActive', params.isActive);
     if (params.limit != null) q.set('limit', String(params.limit));
     if (params.offset != null) q.set('offset', String(params.offset));

@@ -539,7 +539,10 @@ const TestResults = () => {
                   Government Funding Alignment: {recs.fundingAlignment.overall}
                 </p>
                 <p className="text-xs mt-1" style={{ color: GOV.textMuted }}>
-                  {recs.fundingAlignment.highCount} high-priority, {recs.fundingAlignment.mediumCount} medium-priority fields match your profile
+                  {(recs.fundingAlignment.priorityFieldCount ?? 0)} priority programme field{(recs.fundingAlignment.priorityFieldCount ?? 0) === 1 ? '' : 's'} match your profile
+                  {(recs.fundingAlignment.nonPriorityFieldCount ?? 0) > 0
+                    ? ` · ${recs.fundingAlignment.nonPriorityFieldCount ?? 0} other field${(recs.fundingAlignment.nonPriorityFieldCount ?? 0) === 1 ? '' : 's'} (not SLAS priority)`
+                    : ''}
                 </p>
               </div>
             </div>
@@ -565,10 +568,10 @@ const TestResults = () => {
                         </span>
                       </div>
                       <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0 ml-3" style={{
-                        backgroundColor: f.alignment === 'HIGH' ? '#dcfce7' : '#fef3c7',
-                        color: f.alignment === 'HIGH' ? '#166534' : '#92400e'
+                        backgroundColor: f.alignment === 'HIGH' ? '#dcfce7' : '#f1f5f9',
+                        color: f.alignment === 'HIGH' ? '#166534' : '#64748b'
                       }}>
-                        {f.alignment === 'HIGH' ? 'GOVERNMENT FUNDED' : 'PARTIAL ALIGNMENT'}
+                        {f.alignment === 'HIGH' ? 'SLAS PRIORITY' : 'NOT PRIORITY'}
                       </span>
                     </div>
                     {f.courses && f.courses.length > 0 && (
