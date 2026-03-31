@@ -31,7 +31,23 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
     );
   }
 
-  const { summary, alignmentDistribution, fieldAlignment, regionalAlignment, userTypeAlignment } = data;
+  const {
+    summary,
+    alignmentDistribution,
+    fieldAlignment,
+    regionalAlignment,
+    userTypeAlignment,
+    trends = [],
+  } = data;
+
+  const pctLevel = (level) => alignmentDistribution.find((d) => d.level === level)?.percentage ?? '–';
+
+  const trendChartData = (trends || []).map((t) => ({
+    ...t,
+    monthLabel: t.month
+      ? new Date(t.month).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })
+      : '–',
+  }));
 
   return (
     <div className="space-y-6">
@@ -52,7 +68,7 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
             <div>
               <p className="text-xs font-medium" style={{ color: GOV.textMuted }}>High Alignment</p>
               <p className="text-2xl font-bold mt-1" style={{ color: COLORS.high }}>{summary.highAlignment.toLocaleString()}</p>
-              <p className="text-xs" style={{ color: GOV.textHint }}>{alignmentDistribution[0]?.percentage}%</p>
+              <p className="text-xs" style={{ color: GOV.textHint }}>{pctLevel('HIGH')}%</p>
             </div>
             <Award className="w-8 h-8" style={{ color: COLORS.high }} />
           </div>
@@ -63,7 +79,7 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
             <div>
               <p className="text-xs font-medium" style={{ color: GOV.textMuted }}>Medium Alignment</p>
               <p className="text-2xl font-bold mt-1" style={{ color: COLORS.medium }}>{summary.mediumAlignment.toLocaleString()}</p>
-              <p className="text-xs" style={{ color: GOV.textHint }}>{alignmentDistribution[1]?.percentage}%</p>
+              <p className="text-xs" style={{ color: GOV.textHint }}>{pctLevel('MEDIUM')}%</p>
             </div>
             <TrendingUp className="w-8 h-8" style={{ color: COLORS.medium }} />
           </div>
@@ -74,7 +90,7 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
             <div>
               <p className="text-xs font-medium" style={{ color: GOV.textMuted }}>Low Alignment</p>
               <p className="text-2xl font-bold mt-1" style={{ color: COLORS.low }}>{summary.lowAlignment.toLocaleString()}</p>
-              <p className="text-xs" style={{ color: GOV.textHint }}>{alignmentDistribution[2]?.percentage}%</p>
+              <p className="text-xs" style={{ color: GOV.textHint }}>{pctLevel('LOW')}%</p>
             </div>
             <Briefcase className="w-8 h-8" style={{ color: COLORS.low }} />
           </div>
@@ -100,7 +116,7 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
               ))}
             </Pie>
-            <Tooltip formatter={(value, name) => [`${value} students`, name]} />
+            <Tooltip formatter={(value) => [`${value} assessments`, 'Count']} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -120,10 +136,10 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
               stroke={GOV.textMuted}
             />
             <YAxis tick={{ fontSize: 11 }} stroke={GOV.textMuted} />
-            <Tooltip 
+            <Tooltip
               formatter={(value, name) => [
-                name === 'high' ? `${value} students` : `${value} students`,
-                name === 'high' ? 'High Alignment' : name === 'medium' ? 'Medium Alignment' : 'Low Alignment'
+                `${value} assessment–field pairs`,
+                name === 'high' ? 'High priority' : name === 'medium' ? 'Medium priority' : 'Low / other',
               ]}
             />
             <Bar dataKey="high" stackId="alignment" fill={COLORS.high} />
@@ -140,14 +156,14 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
             <MapPin className="w-4 h-4" /> Regional Alignment
           </h3>
           <div className="space-y-2">
-            {regionalAlignment.slice(0, 5).map((region, idx) => (
-              <div key={idx} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: GOV.bgLight }}>
+            {regionalAlignment.slice(0, 5).map((region) => (
+              <div key={region.region} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: GOV.bgLight }}>
                 <div>
                   <p className="text-xs font-medium" style={{ color: GOV.text }}>
                     {REGION_LABELS[region.region] || region.region}
                   </p>
                   <p className="text-xs" style={{ color: GOV.textMuted }}>
-                    {region.total} students
+                    {region.total} assessments
                   </p>
                 </div>
                 <div className="text-right">
@@ -168,14 +184,14 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
             <Users className="w-4 h-4" /> User Type Alignment
           </h3>
           <div className="space-y-2">
-            {userTypeAlignment.map((type, idx) => (
-              <div key={idx} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: GOV.bgLight }}>
+            {userTypeAlignment.map((type) => (
+              <div key={type.userType || 'unknown'} className="flex items-center justify-between p-2 rounded" style={{ backgroundColor: GOV.bgLight }}>
                 <div>
                   <p className="text-xs font-medium" style={{ color: GOV.text }}>
                     {USER_TYPE_LABELS[type.userType] || type.userType}
                   </p>
                   <p className="text-xs" style={{ color: GOV.textMuted }}>
-                    {type.total} students
+                    {type.total} assessments
                   </p>
                 </div>
                 <div className="text-right">
@@ -191,6 +207,31 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
           </div>
         </div>
       </div>
+
+      {trendChartData.length > 0 && (
+        <div className="bg-white rounded-lg p-6 border" style={{ borderColor: GOV.border }}>
+          <h3 className="text-sm font-bold mb-4" style={{ color: GOV.text }}>Funding alignment by completion month</h3>
+          <p className="text-xs mb-3" style={{ color: GOV.textHint }}>
+            Stacked counts of completed assessments by overall alignment (HIGH / MEDIUM / LOW), grouped by UTC month of completion.
+          </p>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={trendChartData} margin={{ top: 8, right: 8, left: 4, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+              <XAxis dataKey="monthLabel" tick={{ fontSize: 10 }} stroke={GOV.textMuted} />
+              <YAxis tick={{ fontSize: 10 }} stroke={GOV.textMuted} allowDecimals={false} />
+              <Tooltip
+                formatter={(value, name) => [
+                  value,
+                  name === 'high' ? 'HIGH' : name === 'medium' ? 'MEDIUM' : 'LOW',
+                ]}
+              />
+              <Bar dataKey="high" stackId="m" name="high" fill={COLORS.high} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="medium" stackId="m" name="medium" fill={COLORS.medium} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="low" stackId="m" name="low" fill={COLORS.low} radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 };

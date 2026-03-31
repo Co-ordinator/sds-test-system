@@ -1,19 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  Users, Building2, Briefcase, HelpCircle, FileText,
-  Shield, BookOpen, Settings, ChevronRight, GraduationCap, Award,
+  Users, Building2, Briefcase, HelpCircle,
+  Shield, BookOpen, Settings, ChevronRight, GraduationCap, Landmark,
 } from 'lucide-react';
 import AppShell from '../../components/layout/AppShell';
 import AdminUsersPanel from '../../features/admin/users/AdminUsersPanel';
 import AdminInstitutionsPanel from '../../features/admin/institutions/AdminInstitutionsPanel';
 import AdminOccupationsPanel from '../../features/admin/occupations/AdminOccupationsPanel';
 import AdminQuestionsPanel from '../../features/admin/questions/AdminQuestionsPanel';
-import AdminAuditPanel from '../../features/admin/audit/AdminAuditPanel';
 import AdminSubjectsPanel from '../../features/admin/subjects/AdminSubjectsPanel';
 import AdminCoursesPanel from '../../features/admin/courses/AdminCoursesPanel';
 import AdminEducationLevelsPanel from '../../features/admin/educationLevels/AdminEducationLevelsPanel';
-import AdminCertificatesPanel from '../../features/admin/certificates/AdminCertificatesPanel';
+import AdminFundingPrioritiesPanel from '../../features/admin/funding/AdminFundingPrioritiesPanel';
 import { useInstitutions } from '../../hooks/useInstitutions';
 import { usePermissions, PermissionGate } from '../../context/PermissionContext';
 import { GOV } from '../../theme/government';
@@ -55,13 +54,6 @@ const SETTINGS_TABS = [
     permission: 'subjects.view',
   },
   {
-    id: 'audit',
-    label: 'Audit Log',
-    Icon: FileText,
-    description: 'System activity and security log',
-    permission: 'audit.view',
-  },
-  {
     id: 'courses',
     label: 'Courses',
     Icon: BookOpen,
@@ -76,11 +68,11 @@ const SETTINGS_TABS = [
     permission: 'courses.view',
   },
   {
-    id: 'certificates',
-    label: 'Certificates',
-    Icon: Award,
-    description: 'Issued assessment certificates',
-    permission: 'certificates.view',
+    id: 'funding-priorities',
+    label: 'Funding priorities',
+    Icon: Landmark,
+    description: 'SLAS scholarship priority per programme',
+    permission: 'courses.view',
   },
 ];
 
@@ -111,11 +103,18 @@ const SystemConfigPanel = () => (
 
 const AdminSettingsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { hasPermission } = usePermissions();
   const { allInstitutions, load: loadInstitutions } = useInstitutions();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const activeTab = searchParams.get('tab') || 'users';
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'audit') {
+      navigate('/admin/audit', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   useEffect(() => { loadInstitutions(); }, [loadInstitutions]);
 
@@ -160,12 +159,6 @@ const AdminSettingsPage = () => {
             <AdminSubjectsPanel />
           </PermissionGate>
         );
-      case 'audit':
-        return (
-          <PermissionGate permission="audit.view" fallback={<AccessDenied />}>
-            <AdminAuditPanel />
-          </PermissionGate>
-        );
       case 'courses':
         return (
           <PermissionGate permission="courses.view" fallback={<AccessDenied />}>
@@ -178,10 +171,10 @@ const AdminSettingsPage = () => {
             <AdminEducationLevelsPanel />
           </PermissionGate>
         );
-      case 'certificates':
+      case 'funding-priorities':
         return (
-          <PermissionGate permission="certificates.view" fallback={<AccessDenied />}>
-            <AdminCertificatesPanel />
+          <PermissionGate permission="courses.view" fallback={<AccessDenied />}>
+            <AdminFundingPrioritiesPanel />
           </PermissionGate>
         );
       default:

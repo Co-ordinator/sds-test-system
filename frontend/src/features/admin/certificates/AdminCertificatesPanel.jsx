@@ -9,7 +9,7 @@ import { adminService } from '../../../services/adminService';
 import { PermissionGate } from '../../../context/PermissionContext';
 
 const AdminCertificatesPanel = () => {
-  const { toast } = useToast();
+  const { toast, showToast, Toast: ToastComp } = useToast();
   const [certs, setCerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,15 +29,15 @@ const AdminCertificatesPanel = () => {
     setGenerating(assessmentId);
     try {
       await adminService.generateCertificate(assessmentId);
-      toast('Certificate generated', 'success');
+      showToast('Certificate generated', 'success');
       load();
-    } catch (err) { toast(err.response?.data?.message || 'Generation failed', 'error'); }
+    } catch (err) { showToast(err.response?.data?.message || 'Generation failed', 'error'); }
     setGenerating(null);
   };
 
   const handleDownload = async (assessmentId, certNumber) => {
     try { await adminService.downloadCertificate(assessmentId, certNumber); }
-    catch { toast('Download failed', 'error'); }
+    catch { showToast('Download failed', 'error'); }
   };
 
   const filtered = certs.filter(c => {
@@ -52,6 +52,7 @@ const AdminCertificatesPanel = () => {
 
   return (
     <>
+      <ToastComp toast={toast} />
       {error && <ErrorBanner message={error} onRetry={load} className="mb-3" />}
 
       <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>

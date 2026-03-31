@@ -10,6 +10,7 @@ import { GOV, TYPO } from '../../theme/government';
 import { RoleBadge, StatusBadge } from '../../components/ui/StatusIndicators';
 import { adminService } from '../../services/adminService';
 import { PermissionGate } from '../../context/PermissionContext';
+import { adminUserDisplayName, adminUserInitials } from '../../utils/adminUserDisplay';
 
 const Field = ({ label, value, mono = false }) => (
   <div className="py-3 border-b last:border-b-0" style={{ borderColor: GOV.borderLight }}>
@@ -61,7 +62,7 @@ const AdminUserDetailPage = () => {
     { label: 'Admin', to: '/admin/dashboard' },
     { label: 'Settings', to: '/admin/settings' },
     { label: 'Users', to: '/admin/settings?tab=users' },
-    { label: user ? `${user.firstName} ${user.lastName}` : 'User Details' },
+    { label: adminUserDisplayName(user) },
   ];
 
   const completedAssessments = assessments.filter(a => a.status === 'completed');
@@ -103,11 +104,11 @@ const AdminUserDetailPage = () => {
                     className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold"
                     style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
                   >
-                    {(user.firstName?.[0] || '').toUpperCase()}{(user.lastName?.[0] || '').toUpperCase()}
+                    {adminUserInitials(user)}
                   </div>
                   <div>
                     <h1 className="text-xl font-bold" style={{ color: GOV.text }}>
-                      {user.firstName} {user.lastName}
+                      {adminUserDisplayName(user)}
                     </h1>
                     <p className="text-sm mt-0.5" style={{ color: GOV.textMuted }}>{user.email}</p>
                     <div className="flex items-center gap-2 mt-2 flex-wrap">

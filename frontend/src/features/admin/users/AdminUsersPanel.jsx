@@ -9,6 +9,7 @@ import { useAdminUsers } from '../../../hooks/useAdminUsers';
 import { adminService } from '../../../services/adminService';
 import { usePermissions, PermissionGate } from '../../../context/PermissionContext';
 import InstitutionSearchInput from '../../../components/ui/InstitutionSearchInput';
+import { adminUserDisplayName, adminUserInitials } from '../../../utils/adminUserDisplay';
 
 const AdminUsersPanel = ({ institutions = [] }) => {
   const navigate = useNavigate();
@@ -136,7 +137,7 @@ const AdminUsersPanel = ({ institutions = [] }) => {
     {
       key: 'name', header: 'Name', sortable: true,
       render: (u) => (
-        <p className="font-medium text-sm" style={{ color: GOV.text }}>{u.firstName} {u.lastName}</p>
+        <p className="font-medium text-sm" style={{ color: GOV.text }}>{adminUserDisplayName(u)}</p>
       ),
     },
     {
@@ -402,7 +403,7 @@ const AdminUsersPanel = ({ institutions = [] }) => {
               <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Edit User</h3>
               <button type="button" onClick={() => setEditingUser(null)}><X className="w-4 h-4" style={{ color: GOV.textMuted }} /></button>
             </div>
-            <p className="text-sm font-medium" style={{ color: GOV.text }}>{editingUser.firstName} {editingUser.lastName}</p>
+            <p className="text-sm font-medium" style={{ color: GOV.text }}>{adminUserDisplayName(editingUser)}</p>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Role</label>
               <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}>
@@ -444,10 +445,10 @@ const AdminUsersPanel = ({ institutions = [] }) => {
             <div className="flex-1 overflow-y-auto p-5 space-y-4">
               <div className="flex items-center gap-3 p-3 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: GOV.blueLight, color: GOV.blue }}>
-                  {(viewingUser.firstName?.[0] || '').toUpperCase()}{(viewingUser.lastName?.[0] || '').toUpperCase()}
+                  {adminUserInitials(viewingUser)}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: GOV.text }}>{viewingUser.firstName} {viewingUser.lastName}</p>
+                  <p className="text-sm font-semibold" style={{ color: GOV.text }}>{adminUserDisplayName(viewingUser)}</p>
                   <p className="text-xs" style={{ color: GOV.textMuted }}>{viewingUser.email || '–'}</p>
                 </div>
                 <RoleBadge role={viewingUser.role} />

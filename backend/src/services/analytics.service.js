@@ -71,7 +71,7 @@ const analyticsService = {
     const completionRate = totalAssessments === 0 ? 0 : (completedAssessments / totalAssessments) * 100;
 
     const averages = await Assessment.findOne({
-      where: assessmentWhere,
+      where: { ...assessmentWhere, status: 'completed' },
       attributes: [
         [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_r')), 'avgR'],
         [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_i')), 'avgI'],
@@ -197,12 +197,17 @@ const analyticsService = {
       const r = (row.region || '').toLowerCase();
       if (regionMap[r]) regionMap[r].totalUsers = parseInt(row.totalUsers, 10) || 0;
     });
+    const pickAvg = (row, l) => {
+      const k = `avg${l}`;
+      const v = row[k] ?? row[k.toLowerCase()];
+      return parseFloat(v ?? 0);
+    };
     completedByRegion.forEach(row => {
       const r = (row.region || '').toLowerCase();
       if (regionMap[r]) {
         regionMap[r].completedAssessments = parseInt(row.completedAssessments, 10) || 0;
-        ['R','I','A','S','E','C'].forEach(l => {
-          regionMap[r][`avg${l}`] = parseFloat(row[`avg${l}`] || 0).toFixed(1);
+        ['R', 'I', 'A', 'S', 'E', 'C'].forEach((l) => {
+          regionMap[r][`avg${l}`] = pickAvg(row, l).toFixed(1);
         });
       }
     });
@@ -506,7 +511,7 @@ const analyticsService = {
           Assessment.count({ where: assessmentWhere, include: assessmentInclude }),
           Assessment.count({ where: { ...assessmentWhere, status: 'completed' }, include: assessmentInclude }),
           Assessment.findOne({
-            where: assessmentWhere,
+            where: { ...assessmentWhere, status: 'completed' },
             attributes: [
               [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_r')), 'avgR'],
               [Assessment.sequelize.fn('AVG', Assessment.sequelize.col('score_i')), 'avgI'],
@@ -565,13 +570,20 @@ const analyticsService = {
     const scoringService = require('./scoring.service');
     const alignmentResults = [];
 
+    const RIASEC_LETTERS = new Set(['R', 'I', 'A', 'S', 'E', 'C']);
+
     for (const assessment of assessmentsWithAlignment) {
-      // Get courses matched to this student's Holland code
-      const codeLetters = assessment.hollandCode.split('');
-      const matchedCourses = await Course.findAll({
+      const codeLetters = [...new Set(
+        String(assessment.hollandCode || '')
+          .replace(/\//g, '')
+          .split('')
+          .filter((c) => RIASEC_LETTERS.has(c.toUpperCase()))
+          .map((c) => c.toUpperCase())
+      )];
+      const matchedCourses = codeLetters.length === 0 ? [] : await Course.findAll({
         where: {
           isActive: true,
-          [Op.or]: codeLetters.map(l => sequelize.where(
+          [Op.or]: codeLetters.map((l) => sequelize.where(
             sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
             { [Op.iLike]: `%${l}%` }
           ))
@@ -587,7 +599,7 @@ const analyticsService = {
         highCount: alignment.highCount,
         mediumCount: alignment.mediumCount,
         lowCount: alignment.lowCount,
-        fields: alignment.fields,
+        allFields: alignment.allFields,
         userId: assessment.userId,
         completedAt: assessment.completedAt
       });
@@ -617,14 +629,16 @@ const analyticsService = {
       { level: 'LOW', count: lowAlignment, percentage: totalAssessments > 0 ? ((lowAlignment / totalAssessments) * 100).toFixed(1) : 0 }
     ];
 
-    // Field-level alignment
+    // Field-level alignment (use allFields so LOW counts are included; alignment.fields omits LOW)
     const fieldMap = {};
-    alignmentResults.forEach(result => {
-      result.fields.forEach(f => {
+    alignmentResults.forEach((result) => {
+      (result.allFields || []).forEach((f) => {
+        const alignKey = String(f.alignment || 'LOW').toLowerCase();
+        if (!['high', 'medium', 'low'].includes(alignKey)) return;
         if (!fieldMap[f.field]) {
           fieldMap[f.field] = { field: f.field, high: 0, medium: 0, low: 0, total: 0 };
         }
-        fieldMap[f.field][f.alignment.toLowerCase()]++;
+        fieldMap[f.field][alignKey]++;
         fieldMap[f.field].total++;
       });
     });

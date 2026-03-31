@@ -21,17 +21,21 @@ const parseCsv = (csvText) => new Promise((resolve, reject) => {
 });
 
 const QUAL_TYPES = ['certificate','diploma','bachelor','honours','postgrad_diploma','masters','doctorate','short_course','tvet','other'];
+const FUNDING_PRIORITIES = ['high', 'medium', 'none'];
 
 /* ─── Service ─────────────────────────────────────────────────────────────── */
 
 module.exports = {
 
   /* List courses with filters and pagination */
-  listCourses: async ({ search, qualificationType, fieldOfStudy, isActive, limit = 100, offset = 0 }) => {
+  listCourses: async ({ search, qualificationType, fieldOfStudy, fundingPriority, isActive, limit = 100, offset = 0 }) => {
     const where = {};
     if (isActive !== undefined) where.isActive = isActive === 'true' || isActive === true;
     if (qualificationType) where.qualificationType = qualificationType;
     if (fieldOfStudy) where.fieldOfStudy = { [Op.iLike]: `%${fieldOfStudy}%` };
+    if (fundingPriority && FUNDING_PRIORITIES.includes(String(fundingPriority).toLowerCase())) {
+      where.fundingPriority = String(fundingPriority).toLowerCase();
+    }
     if (search) {
       where[Op.or] = [
         { name: { [Op.iLike]: `%${search}%` } },
@@ -88,7 +92,7 @@ module.exports = {
   createCourse: async (data) => {
     const {
       name, nameSwati, qualificationType, durationYears, description,
-      riasecCodes, suggestedSubjects, fieldOfStudy, isActive,
+      riasecCodes, suggestedSubjects, fieldOfStudy, isActive, fundingPriority,
       requirements = [], institutions = [], occupations = []
     } = data;
 
@@ -96,11 +100,15 @@ module.exports = {
     if (!QUAL_TYPES.includes(qualificationType)) {
       throw new Error(`qualificationType must be one of: ${QUAL_TYPES.join(', ')}`);
     }
+    if (fundingPriority !== undefined && fundingPriority !== null && !FUNDING_PRIORITIES.includes(fundingPriority)) {
+      throw new Error(`fundingPriority must be one of: ${FUNDING_PRIORITIES.join(', ')}`);
+    }
 
     const course = await Course.create({
       name, nameSwati, qualificationType, durationYears, description,
       riasecCodes: riasecCodes || [], suggestedSubjects: suggestedSubjects || [],
-      fieldOfStudy, isActive: isActive !== false
+      fieldOfStudy, isActive: isActive !== false,
+      ...(fundingPriority !== undefined && fundingPriority !== null ? { fundingPriority } : {}),
     });
 
     if (requirements.length > 0) {
@@ -130,9 +138,12 @@ module.exports = {
     const course = await Course.findByPk(id);
     if (!course) throw new Error('Course not found');
 
-    const allowed = ['name','nameSwati','qualificationType','durationYears','description','riasecCodes','suggestedSubjects','fieldOfStudy','isActive'];
+    const allowed = ['name','nameSwati','qualificationType','durationYears','description','riasecCodes','suggestedSubjects','fieldOfStudy','isActive','fundingPriority'];
     const sanitized = {};
     for (const k of allowed) { if (updates[k] !== undefined) sanitized[k] = updates[k]; }
+    if (sanitized.fundingPriority !== undefined && !FUNDING_PRIORITIES.includes(sanitized.fundingPriority)) {
+      throw new Error(`fundingPriority must be one of: ${FUNDING_PRIORITIES.join(', ')}`);
+    }
     await course.update(sanitized);
 
     return await Course.findByPk(course.id, {
@@ -219,7 +230,7 @@ module.exports = {
       description: c.description || '',
       fieldOfStudy: c.field_of_study || c.fieldOfStudy || '',
       riasecCodes: (c.riasec_codes || c.riasecCodes || []).join('|'),
-      suggestedSubjects: (c.suggested_subjects || c.suggestedSubjects || []).join('|'),
+      suggestedSubjects: (c.suggested_subjects || c.suggestedSubjects || []).join(', '),
       isActive: c.is_active !== undefined ? c.is_active : c.isActive
     }));
     const parser = new Parser({ fields: ['name','nameSwati','qualificationType','durationYears','description','fieldOfStudy','riasecCodes','suggestedSubjects','isActive'] });
@@ -241,7 +252,9 @@ module.exports = {
         if (!QUAL_TYPES.includes(qt)) { results.errors.push(`Row "${name}": invalid qualificationType "${qt}"`); results.skipped++; continue; }
 
         const riasec = row.riasecCodes || row.riasec_codes ? String(row.riasecCodes || row.riasec_codes).split('|').map(s => s.trim()).filter(Boolean) : [];
-        const subjects = row.suggestedSubjects || row.suggested_subjects ? String(row.suggestedSubjects || row.suggested_subjects).split('|').map(s => s.trim()).filter(Boolean) : [];
+        const subjects = row.suggestedSubjects || row.suggested_subjects
+          ? String(row.suggestedSubjects || row.suggested_subjects).split(/[,;|]/).map(s => s.trim()).filter(Boolean)
+          : [];
 
         const [course, created] = await Course.findOrCreate({
           where: { name },

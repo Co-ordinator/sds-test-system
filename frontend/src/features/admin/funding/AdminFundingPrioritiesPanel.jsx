@@ -1,0 +1,191 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { Search, Landmark, ExternalLink } from 'lucide-react';
+import { GOV, TYPO } from '../../../theme/government';
+import DataTable from '../../../components/data/DataTable';
+import { ErrorBanner, useToast } from '../../../components/ui/StatusIndicators';
+import { adminService } from '../../../services/adminService';
+import { usePermissions } from '../../../context/PermissionContext';
+
+const SLAS_INFO_URL = 'https://slas.gov.sz/LoanProcess/ApplicationRequirements.aspx';
+
+const PRIORITY_OPTIONS = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'none', label: 'None' },
+];
+
+const AdminFundingPrioritiesPanel = () => {
+  const { toast, showToast, Toast: ToastComp } = useToast();
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('courses.update');
+
+  const [courses, setCourses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [savingId, setSavingId] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await adminService.getCourses({
+        search,
+        fundingPriority: priorityFilter || undefined,
+        limit: 2000,
+      });
+      setCourses(data);
+    } catch {
+      setError('Failed to load courses');
+    }
+    setLoading(false);
+  }, [search, priorityFilter]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handlePriorityChange = async (courseId, fundingPriority) => {
+    setSavingId(courseId);
+    try {
+      await adminService.updateCourse(courseId, { fundingPriority });
+      showToast('Funding priority updated', 'success');
+      setCourses(prev => prev.map(c => (c.id === courseId ? { ...c, fundingPriority } : c)));
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Update failed', 'error');
+    }
+    setSavingId(null);
+  };
+
+  return (
+    <div className="space-y-4">
+      <ToastComp toast={toast} />
+      <div className="bg-white border rounded-md p-4" style={{ borderColor: GOV.border }}>
+        <div className="flex items-start gap-3">
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: GOV.blueLightAlt }}
+          >
+            <Landmark className="w-5 h-5" style={{ color: GOV.blue }} />
+          </div>
+          <div className="min-w-0">
+            <h3 className={`${TYPO.sectionTitle} text-sm`} style={{ color: GOV.text }}>
+              Government funding priority (SLAS)
+            </h3>
+            <p className="text-xs mt-1 leading-relaxed" style={{ color: GOV.textMuted }}>
+              Each course has a priority level (<strong>high</strong>, <strong>medium</strong>, or <strong>none</strong>)
+              stored on the catalogue. Student results use these values for “Government Funding Priority Alignment”.
+              Initial values were set from the Eswatini SLAS scholarship programme list; you can adjust them here per
+              programme.
+            </p>
+            <a
+              href={SLAS_INFO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-semibold mt-2"
+              style={{ color: GOV.blue }}
+            >
+              SLAS application requirements <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {error && <ErrorBanner message={error} onRetry={load} />}
+
+      <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
+        <DataTable
+          columns={[
+            {
+              key: 'name',
+              header: 'Course',
+              sortable: true,
+              render: c => (
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: GOV.text }}>{c.name}</p>
+                  {c.fieldOfStudy && (
+                    <p className="text-[11px]" style={{ color: GOV.textMuted }}>{c.fieldOfStudy}</p>
+                  )}
+                </div>
+              ),
+            },
+            {
+              key: 'fieldOfStudy',
+              header: 'Field of study',
+              sortable: true,
+              render: c => (
+                <span className="text-xs" style={{ color: c.fieldOfStudy ? GOV.text : GOV.textMuted }}>
+                  {c.fieldOfStudy || '—'}
+                </span>
+              ),
+            },
+            {
+              key: 'fundingPriority',
+              header: 'Funding priority',
+              sortable: true,
+              render: c => {
+                const v = c.fundingPriority || 'none';
+                return (
+                  <select
+                    className="form-control text-xs py-1.5 max-w-[220px]"
+                    value={v}
+                    disabled={!canEdit || savingId === c.id}
+                    onChange={e => handlePriorityChange(c.id, e.target.value)}
+                    aria-label={`Funding priority for ${c.name}`}
+                  >
+                    {PRIORITY_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                );
+              },
+            },
+          ]}
+          rows={courses}
+          rowKey="id"
+          loading={loading}
+          emptyTitle="No courses"
+          emptyMessage="Add programmes under Courses, then set their funding priority here."
+          pageSize={15}
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2 w-full">
+              <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Funding priorities</h3>
+              <div className="relative ml-2">
+                <Search
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
+                  style={{ color: GOV.textMuted }}
+                />
+                <input
+                  className="pl-7 pr-3 py-1.5 border rounded-md text-xs"
+                  style={{ borderColor: GOV.border, color: GOV.text, width: 200 }}
+                  placeholder="Search courses…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
+              </div>
+              <select
+                className="px-2 py-1.5 border rounded-md text-xs"
+                style={{ borderColor: GOV.border, color: GOV.text }}
+                value={priorityFilter}
+                onChange={e => setPriorityFilter(e.target.value)}
+              >
+                <option value="">All priorities</option>
+                {PRIORITY_OPTIONS.map(p => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+              {!canEdit && (
+                <p className="text-[11px] ml-auto" style={{ color: GOV.textHint }}>
+                  View only — course update permission required to change priorities.
+                </p>
+              )}
+            </div>
+          }
+        />
+      </div>
+    </div>
+  );
+};
+
+export default AdminFundingPrioritiesPanel;

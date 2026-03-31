@@ -122,7 +122,10 @@ export const adminService = {
     const q = new URLSearchParams();
     if (params.search) q.set('search', params.search);
     if (params.qualificationType) q.set('qualificationType', params.qualificationType);
+    if (params.fundingPriority) q.set('fundingPriority', params.fundingPriority);
     if (params.isActive !== undefined) q.set('isActive', params.isActive);
+    if (params.limit != null) q.set('limit', String(params.limit));
+    if (params.offset != null) q.set('offset', String(params.offset));
     return api.get(`/api/v1/courses?${q}`).then(r => r.data?.data?.courses || []);
   },
   getCourse: (id) => api.get(`/api/v1/courses/${id}`).then(r => r.data?.data?.course),

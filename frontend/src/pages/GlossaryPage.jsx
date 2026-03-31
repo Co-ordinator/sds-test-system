@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Search, Volume2, X, Filter, BookOpen, GraduationCap, Briefcase, Users } from 'lucide-react';
-import { GOV, TYPO } from '../theme/government';
+import { GOV } from '../theme/government';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { useAuth } from '../context/AuthContext';
 import { useGlossary } from '../hooks/useGlossary';
+import AppShell from '../components/layout/AppShell';
 
 /**
  * Full-page glossary with search, filtering, and detailed term views
@@ -15,7 +17,12 @@ const GlossaryPage = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   
   const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
+  const { user } = useAuth();
   const { glossaryUtils, markTermAsLearned, glossaryTerms, handleTermView, getStats } = useGlossary();
+
+  const role = user?.role || 'Test Taker';
+  const backTo =
+    role === 'System Administrator' || role === 'Test Administrator' ? '/admin/dashboard' : '/dashboard';
 
   // Filter terms based on search and category
   const filteredTerms = useMemo(() => {
@@ -81,8 +88,9 @@ const GlossaryPage = () => {
   const stats = getStats();
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ backgroundColor: GOV.background }}>
-      {/* Header */}
+    <AppShell breadcrumbs={[{ label: 'Dashboard', to: backTo }, { label: 'Glossary' }]}>
+    <div style={{ backgroundColor: GOV.background }}>
+      {/* Page title */}
       <div className="bg-white shadow-sm border-b" style={{ borderColor: GOV.borderLight }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -327,6 +335,7 @@ const GlossaryPage = () => {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 };
 

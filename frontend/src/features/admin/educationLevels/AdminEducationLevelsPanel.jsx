@@ -35,7 +35,7 @@ const LevelForm = ({ value, onChange, onSubmit, submitLabel, saving }) => (
 );
 
 const AdminEducationLevelsPanel = () => {
-  const { toast } = useToast();
+  const { toast, showToast, Toast: ToastComp } = useToast();
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -62,24 +62,25 @@ const AdminEducationLevelsPanel = () => {
     try {
       if (editing) {
         await adminService.updateEducationLevel(editing.id, { level: Number(form.level), description: form.description });
-        toast('Education level updated', 'success');
+        showToast('Education level updated', 'success');
       } else {
         await adminService.createEducationLevel({ level: Number(form.level), description: form.description });
-        toast('Education level created', 'success');
+        showToast('Education level created', 'success');
       }
       closeForm(); load();
-    } catch (err) { toast(err.response?.data?.message || 'Save failed', 'error'); }
+    } catch (err) { showToast(err.response?.data?.message || 'Save failed', 'error'); }
     setSaving(false);
   };
 
   const handleDelete = async (id, desc) => {
     if (!window.confirm(`Delete education level "${desc}"? This cannot be undone.`)) return;
-    try { await adminService.deleteEducationLevel(id); toast('Deleted', 'success'); load(); }
-    catch (err) { toast(err.response?.data?.message || 'Delete failed', 'error'); }
+    try { await adminService.deleteEducationLevel(id); showToast('Deleted', 'success'); load(); }
+    catch (err) { showToast(err.response?.data?.message || 'Delete failed', 'error'); }
   };
 
   return (
     <>
+      <ToastComp toast={toast} />
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-md shadow-xl w-full max-w-md">
@@ -112,10 +113,6 @@ const AdminEducationLevelsPanel = () => {
             {
               key: 'description', header: 'Description',
               render: l => <span className="text-xs font-medium" style={{ color: GOV.text }}>{l.description}</span>
-            },
-            {
-              key: 'id', header: 'ID',
-              render: l => <span className="text-[10px] font-mono" style={{ color: GOV.textMuted }}>{l.id?.slice(0, 8)}…</span>
             },
             {
               key: 'actions', header: '', stopPropagation: true, width: 'w-10', align: 'right',

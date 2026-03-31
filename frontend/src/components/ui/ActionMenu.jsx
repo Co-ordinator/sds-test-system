@@ -20,6 +20,7 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef(null);
+  const menuRef = useRef(null);
 
   const openMenu = useCallback((e) => {
     e.preventDefault();
@@ -37,10 +38,10 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      // Check if click is outside the menu button and the dropdown
-      if (btnRef.current && !btnRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+      const t = e.target;
+      if (btnRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     // Use mousedown for immediate response
     document.addEventListener('mousedown', handler);
@@ -83,6 +84,7 @@ const ActionMenu = ({ actions = [], align = 'right' }) => {
             }}
           />
           <div
+            ref={menuRef}
             className="fixed z-[9999] min-w-[140px] bg-white border rounded-md shadow-lg py-1"
             style={{
               borderColor: GOV.border,

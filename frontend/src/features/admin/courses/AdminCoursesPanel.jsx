@@ -27,7 +27,94 @@ const RIASEC = ['R', 'I', 'A', 'S', 'E', 'C'];
 
 const EMPTY_COURSE = {
   name: '', nameSwati: '', qualificationType: 'bachelor', durationYears: '',
-  description: '', riasecCodes: [], suggestedSubjects: '', fieldOfStudy: '', isActive: true
+  description: '', riasecCodes: [], suggestedSubjects: [], suggestedSubjectDraft: '',
+  fieldOfStudy: '', isActive: true
+};
+
+const parseSubjectTokens = (raw) =>
+  String(raw || '')
+    .split(/[,;|]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+const normalizeSuggestedSubjects = (v) => {
+  if (Array.isArray(v)) return v.map((s) => String(s).trim()).filter(Boolean);
+  if (typeof v === 'string' && v.trim()) return parseSubjectTokens(v);
+  return [];
+};
+
+const mergeSuggestedSubjects = (items, draft) => {
+  const base = normalizeSuggestedSubjects(items);
+  const fromDraft = parseSubjectTokens(draft);
+  if (!fromDraft.length) return base;
+  const next = [...base];
+  for (const p of fromDraft) {
+    if (!next.some((x) => x.toLowerCase() === p.toLowerCase())) next.push(p);
+  }
+  return next;
+};
+
+const SubjectChips = ({ items, draft, onItemsChange, onDraftChange }) => {
+  const list = normalizeSuggestedSubjects(items);
+
+  const commitDraft = () => {
+    const trimmed = (draft || '').trim();
+    if (!trimmed) return;
+    const parts = parseSubjectTokens(trimmed);
+    if (!parts.length) return;
+    let next = [...list];
+    for (const p of parts) {
+      if (!next.some((x) => x.toLowerCase() === p.toLowerCase())) next.push(p);
+    }
+    onItemsChange(next);
+    onDraftChange('');
+  };
+
+  const removeAt = (i) => onItemsChange(list.filter((_, j) => j !== i));
+
+  return (
+    <div
+      className="flex flex-wrap gap-1.5 items-center min-h-[42px] px-2 py-1.5 rounded border"
+      style={{ borderColor: GOV.border, backgroundColor: '#fff' }}
+    >
+      {list.map((s, i) => (
+        <span
+          key={`${s}-${i}`}
+          className="inline-flex items-center gap-0.5 pl-2 pr-1 py-0.5 rounded text-xs font-medium max-w-full"
+          style={{ backgroundColor: GOV.surface, color: GOV.text, border: `1px solid ${GOV.border}` }}
+        >
+          <span className="truncate">{s}</span>
+          <button
+            type="button"
+            aria-label={`Remove ${s}`}
+            onClick={() => removeAt(i)}
+            className="p-0.5 rounded shrink-0 hover:opacity-80"
+            style={{ color: GOV.textMuted }}
+          >
+            <X className="w-3 h-3" />
+          </button>
+        </span>
+      ))}
+      <input
+        className="flex-1 min-w-[140px] border-0 outline-none text-sm bg-transparent py-1"
+        style={{ color: GOV.text }}
+        placeholder={list.length ? 'Add another (Enter)' : 'e.g. Mathematics, Physics — press Enter'}
+        value={draft}
+        onChange={(e) => onDraftChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commitDraft();
+          }
+          if (e.key === 'Backspace' && !(draft || '').length && list.length) {
+            e.preventDefault();
+            onItemsChange(list.slice(0, -1));
+          }
+        }}
+        onBlur={commitDraft}
+      />
+    </div>
+  );
 };
 
 const CodePills = ({ codes = [], onChange }) => (
@@ -108,10 +195,14 @@ const CourseForm = ({ value, onChange, onSubmit, submitLabel, saving }) => (
       <p className="text-xs mt-1" style={{ color: GOV.textHint }}>Select which RIASEC types this course suits</p>
     </div>
     <div>
-      <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Suggested Subjects (pipe-separated)</label>
-      <input className="form-control" value={value.suggestedSubjects}
-        onChange={e => onChange({ ...value, suggestedSubjects: e.target.value })}
-        placeholder="e.g. Mathematics|Physics|Computer Studies" />
+      <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Suggested Subjects</label>
+      <SubjectChips
+        items={value.suggestedSubjects}
+        draft={value.suggestedSubjectDraft ?? ''}
+        onItemsChange={(next) => onChange((prev) => ({ ...prev, suggestedSubjects: next }))}
+        onDraftChange={(d) => onChange((prev) => ({ ...prev, suggestedSubjectDraft: d }))}
+      />
+      <p className="text-xs mt-1" style={{ color: GOV.textHint }}>Type subjects separated by commas or press Enter after each</p>
     </div>
     <div className="flex items-center gap-2 pt-1">
       <input type="checkbox" id="isActiveCourse" checked={value.isActive}
@@ -130,7 +221,7 @@ const CourseForm = ({ value, onChange, onSubmit, submitLabel, saving }) => (
 
 /* ── Course Detail Drawer ─────────────────────────────────────────────────── */
 const CourseDetailDrawer = ({ course, onClose, onRefresh }) => {
-  const { toast } = useToast();
+  const { toast, showToast, Toast: ToastComp } = useToast();
   const [tab, setTab] = useState('requirements');
   const [institutions, setInstitutions] = useState([]);
   const [occupations, setOccupations] = useState([]);
@@ -148,50 +239,50 @@ const CourseDetailDrawer = ({ course, onClose, onRefresh }) => {
     try {
       await adminService.addCourseRequirement(course.id, reqForm);
       setReqForm({ subject: '', minimumGrade: '', isMandatory: true });
-      toast('Requirement added', 'success');
+      showToast('Requirement added', 'success');
       onRefresh();
-    } catch { toast('Failed to add requirement', 'error'); }
+    } catch { showToast('Failed to add requirement', 'error'); }
     setSaving(false);
   };
 
   const removeReq = async (reqId) => {
     try {
       await adminService.removeCourseRequirement(course.id, reqId);
-      toast('Requirement removed', 'success');
+      showToast('Requirement removed', 'success');
       onRefresh();
-    } catch { toast('Failed to remove requirement', 'error'); }
+    } catch { showToast('Failed to remove requirement', 'error'); }
   };
 
   const linkInst = async (institutionId) => {
     try {
       await adminService.linkCourseInstitution(course.id, { institutionId });
-      toast('Institution linked', 'success');
+      showToast('Institution linked', 'success');
       onRefresh();
-    } catch { toast('Failed to link institution', 'error'); }
+    } catch { showToast('Failed to link institution', 'error'); }
   };
 
   const unlinkInst = async (institutionId) => {
     try {
       await adminService.unlinkCourseInstitution(course.id, institutionId);
-      toast('Institution unlinked', 'success');
+      showToast('Institution unlinked', 'success');
       onRefresh();
-    } catch { toast('Failed to unlink institution', 'error'); }
+    } catch { showToast('Failed to unlink institution', 'error'); }
   };
 
   const linkOcc = async (occupationId) => {
     try {
       await adminService.linkCourseOccupation(course.id, { occupationId, isPrimaryPathway: false });
-      toast('Occupation linked', 'success');
+      showToast('Occupation linked', 'success');
       onRefresh();
-    } catch { toast('Failed to link occupation', 'error'); }
+    } catch { showToast('Failed to link occupation', 'error'); }
   };
 
   const unlinkOcc = async (occupationId) => {
     try {
       await adminService.unlinkCourseOccupation(course.id, occupationId);
-      toast('Occupation unlinked', 'success');
+      showToast('Occupation unlinked', 'success');
       onRefresh();
-    } catch { toast('Failed to unlink occupation', 'error'); }
+    } catch { showToast('Failed to unlink occupation', 'error'); }
   };
 
   const linkedInstIds = new Set((course.institutions || []).map(i => i.id));
@@ -204,6 +295,7 @@ const CourseDetailDrawer = ({ course, onClose, onRefresh }) => {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-end">
+      <ToastComp toast={toast} />
       <div className="bg-white h-full w-full max-w-xl flex flex-col shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: GOV.border }}>
           <div>
@@ -318,7 +410,7 @@ const CourseDetailDrawer = ({ course, onClose, onRefresh }) => {
 
 /* ── Main Panel ──────────────────────────────────────────────────────────── */
 const AdminCoursesPanel = () => {
-  const { toast } = useToast();
+  const { toast, showToast, Toast: ToastComp } = useToast();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -348,12 +440,17 @@ const AdminCoursesPanel = () => {
     try {
       const c = await adminService.getCourse(id);
       setDrawerCourse(c);
-    } catch { toast('Could not load course details', 'error'); }
+    } catch { showToast('Could not load course details', 'error'); }
   };
 
   const openCreate = () => { setForm(EMPTY_COURSE); setEditingCourse(null); setShowForm(true); };
   const openEdit = (c) => {
-    setForm({ ...c, suggestedSubjects: (c.suggestedSubjects || []).join('|'), durationYears: c.durationYears || '' });
+    setForm({
+      ...c,
+      suggestedSubjects: normalizeSuggestedSubjects(c.suggestedSubjects),
+      suggestedSubjectDraft: '',
+      durationYears: c.durationYears || ''
+    });
     setEditingCourse(c);
     setShowForm(true);
   };
@@ -362,35 +459,34 @@ const AdminCoursesPanel = () => {
   const handleSubmit = async (e) => {
     e.preventDefault(); setSaving(true);
     try {
+      const { suggestedSubjectDraft, ...rest } = form;
       const payload = {
-        ...form,
+        ...rest,
         durationYears: form.durationYears !== '' ? Number(form.durationYears) : null,
-        suggestedSubjects: typeof form.suggestedSubjects === 'string'
-          ? form.suggestedSubjects.split('|').map(s => s.trim()).filter(Boolean)
-          : form.suggestedSubjects
+        suggestedSubjects: mergeSuggestedSubjects(form.suggestedSubjects, suggestedSubjectDraft)
       };
       if (editingCourse) {
         await adminService.updateCourse(editingCourse.id, payload);
-        toast('Course updated', 'success');
+        showToast('Course updated', 'success');
       } else {
         await adminService.createCourse(payload);
-        toast('Course created', 'success');
+        showToast('Course created', 'success');
       }
       closeForm(); load();
-    } catch (err) { toast(err.response?.data?.message || 'Save failed', 'error'); }
+    } catch (err) { showToast(err.response?.data?.message || 'Save failed', 'error'); }
     setSaving(false);
   };
 
   const handleDelete = async (id, name) => {
     if (!window.confirm(`Deactivate "${name}"?`)) return;
-    try { await adminService.deleteCourse(id); toast('Course deactivated', 'success'); load(); }
-    catch { toast('Delete failed', 'error'); }
+    try { await adminService.deleteCourse(id); showToast('Course deactivated', 'success'); load(); }
+    catch { showToast('Delete failed', 'error'); }
   };
 
   const handleBulkDelete = async () => {
     if (!window.confirm(`Deactivate ${selectedIds.size} selected courses?`)) return;
-    try { await adminService.bulkDeleteCourses([...selectedIds]); toast('Deactivated', 'success'); setSelectedIds(new Set()); load(); }
-    catch { toast('Bulk delete failed', 'error'); }
+    try { await adminService.bulkDeleteCourses([...selectedIds]); showToast('Deactivated', 'success'); setSelectedIds(new Set()); load(); }
+    catch { showToast('Bulk delete failed', 'error'); }
   };
 
   const handleImport = async (e) => {
@@ -399,14 +495,15 @@ const AdminCoursesPanel = () => {
     try {
       const text = await file.text();
       const result = await adminService.importCourses(text);
-      toast(`Import done: ${result.data?.created || 0} created, ${result.data?.updated || 0} updated`, 'success');
+      showToast(`Import done: ${result.data?.created || 0} created, ${result.data?.updated || 0} updated`, 'success');
       load();
-    } catch { toast('Import failed', 'error'); }
+    } catch { showToast('Import failed', 'error'); }
     setImporting(false); e.target.value = '';
   };
 
   return (
     <>
+      <ToastComp toast={toast} />
       {showForm && (
         <div className="fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4">
           <div className="bg-white rounded-md shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">

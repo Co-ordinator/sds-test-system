@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard } from 'lucide-react';
 import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
 import { QuestionTextWithGlossary, DescriptionWithGlossary } from '../components/ui/SmartTextHighlighter';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { useAuth } from '../context/AuthContext';
 
 const SECTIONS = [
   { 
@@ -52,9 +53,18 @@ const RIASEC_NAMES = {
   S: 'Social', E: 'Enterprising', C: 'Conventional'
 };
 
+/** AppShell desktop nav: text-only links, no border (admin / test-taker menu). */
+const NAV_TEXT_ACTION =
+  'inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium transition-colors rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent';
+
 const Questionnaire = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
+  const dashboardPath =
+    user?.role === 'System Administrator' || user?.role === 'Test Administrator'
+      ? '/admin/dashboard'
+      : '/dashboard';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [assessment, setAssessment] = useState(null);
@@ -295,14 +305,23 @@ const Questionnaire = () => {
       <div className="min-h-screen bg-white flex items-center justify-center p-4">
         <div className="bg-white rounded-md p-6 max-w-md text-center">
           <p className="mb-4" style={{ color: GOV.error }}>{error}</p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 text-white rounded-md"
-            style={{ backgroundColor: GOV.blue }}
-          >
-            Retry
-          </button>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className={NAV_TEXT_ACTION}
+              style={{ color: GOV.blue, fontWeight: 600 }}
+            >
+              Retry
+            </button>
+            <Link
+              to={dashboardPath}
+              className="text-sm font-medium hover:underline rounded-md px-1 py-0.5"
+              style={{ color: GOV.blue }}
+            >
+              Back to dashboard
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -314,41 +333,50 @@ const Questionnaire = () => {
       contextLabel={currentSectionMeta ? `Section ${currentSectionMeta.num}: ${currentSectionMeta.label}` : 'Assessment'}
       actions={(
         <>
+          <Link
+            to={dashboardPath}
+            className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
+            style={{ color: GOV.textMuted }}
+            aria-label="Go to dashboard"
+          >
+            <LayoutDashboard className="w-4 h-4 shrink-0" aria-hidden />
+            Dashboard
+          </Link>
           <button
             type="button"
             onClick={() => navigate('/glossary')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2"
-            style={{ borderColor: GOV.border, color: GOV.text }}
+            className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
+            style={{ color: GOV.textMuted }}
             aria-label="Open SDS glossary"
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-4 h-4 shrink-0" aria-hidden />
             Glossary
           </button>
           {saving && (
-            <div className={`${TYPO.bodySmall} inline-flex items-center gap-1.5 px-3 py-2 rounded-md`} style={{ color: GOV.blue, backgroundColor: GOV.blueLightAlt }}>
-              <Cloud className="w-4 h-4" /> Saving...
-            </div>
+            <span className={`${NAV_TEXT_ACTION} pointer-events-none whitespace-nowrap`} style={{ color: GOV.blue }}>
+              <Cloud className="w-4 h-4 shrink-0" aria-hidden /> Saving…
+            </span>
           )}
           <button
             type="button"
             onClick={() => setIsPaused(p => !p)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-white"
-            style={{ color: isPaused ? '#d97706' : GOV.text }}
+            className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
+            style={{ color: isPaused ? '#d97706' : GOV.textMuted }}
             aria-label={isPaused ? 'Resume assessment' : 'Pause assessment'}
             title={isPaused ? 'Resume' : 'Pause'}
           >
-            <PauseCircle className="w-4 h-4" /> {isPaused ? 'Resume' : 'Pause'}
+            <PauseCircle className="w-4 h-4 shrink-0" aria-hidden /> {isPaused ? 'Resume' : 'Pause'}
           </button>
           {allAnswered && (
             <button
               type="button"
               onClick={handleComplete}
               disabled={submitting}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: '#16a34a' }}
+              className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
+              style={{ color: '#16a34a', fontWeight: 700 }}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              {submitting ? 'Submitting...' : 'Submit'}
+              <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden />
+              {submitting ? 'Submitting…' : 'Submit'}
             </button>
           )}
         </>
@@ -371,10 +399,10 @@ const Questionnaire = () => {
           <button
             type="button"
             onClick={() => setIsPaused(false)}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-md text-sm font-semibold text-white"
-            style={{ backgroundColor: GOV.blue }}
+            className={`${NAV_TEXT_ACTION} text-base font-semibold`}
+            style={{ color: GOV.blue }}
           >
-            <ChevronRight className="w-4 h-4" /> Resume Assessment
+            <ChevronRight className="w-4 h-4 shrink-0" aria-hidden /> Resume assessment
           </button>
         </div>
       )}
@@ -399,10 +427,10 @@ const Questionnaire = () => {
             <button
               type="button"
               onClick={proceedToNextSection}
-              className="inline-flex items-center gap-2 px-7 py-3 rounded-md text-sm font-semibold text-white"
-              style={{ backgroundColor: GOV.blue }}
+              className={`${NAV_TEXT_ACTION} text-base font-semibold`}
+              style={{ color: GOV.blue }}
             >
-              Start Section {nextSection.num}: {nextSection.label} <ChevronRight className="w-4 h-4" />
+              Start section {nextSection.num}: {nextSection.label} <ChevronRight className="w-4 h-4 shrink-0 inline" aria-hidden />
             </button>
           </div>
         );
@@ -523,22 +551,22 @@ const Questionnaire = () => {
               type="button"
               onClick={goPrev}
               disabled={currentSectionIndex === 0 && currentQuestionIndex === 0}
-              className="inline-flex items-center justify-center gap-1.5 px-5 py-2 rounded-md text-sm font-semibold border bg-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{ borderColor: GOV.border, color: GOV.text }}
+              className={NAV_TEXT_ACTION}
+              style={{ color: GOV.textMuted }}
             >
-              <ChevronLeft className="w-4 h-4" /> Back
+              <ChevronLeft className="w-4 h-4 shrink-0" aria-hidden /> Back
             </button>
 
-            <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2 sm:justify-end">
               {allAnswered && (
                 <button
                   type="button"
                   onClick={handleComplete}
                   disabled={submitting}
-                  className="px-6 py-2 rounded-md text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  style={{ backgroundColor: '#16a34a' }}
+                  className={NAV_TEXT_ACTION}
+                  style={{ color: '#16a34a', fontWeight: 700 }}
                 >
-                  {submitting ? 'Submitting...' : 'Submit test'}
+                  {submitting ? 'Submitting…' : 'Submit test'}
                 </button>
               )}
               {!isLastQuestion && (
@@ -546,10 +574,10 @@ const Questionnaire = () => {
                   type="button"
                   onClick={goNext}
                   disabled={!canAdvance}
-                  className="inline-flex items-center justify-center gap-1.5 px-5 py-2 rounded-md text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  style={{ backgroundColor: GOV.blue }}
+                  className={NAV_TEXT_ACTION}
+                  style={{ color: GOV.blue, fontWeight: 700 }}
                 >
-                  Next <ChevronRight className="w-4 h-4" />
+                  Next <ChevronRight className="w-4 h-4 shrink-0 inline" aria-hidden />
                 </button>
               )}
             </div>

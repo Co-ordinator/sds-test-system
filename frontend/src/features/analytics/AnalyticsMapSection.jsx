@@ -67,16 +67,16 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
     const users = Number(info.totalUsers) || 0;
     const completed = Number(info.completedAssessments) || 0;
     const topCode = info.topCode || '–';
-    const completionPct = users > 0 ? Math.round((completed / users) * 100) : 0;
+    const perTaker = users > 0 ? (completed / users).toFixed(1) : '–';
 
     layer.bindTooltip(
       `<div style="font-family:sans-serif;min-width:140px">
         <div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#111827">${regionName}</div>
         <div style="font-size:11px;color:#374151;line-height:1.7">
-          👥 Users: <strong>${users}</strong><br/>
-          ✅ Completed: <strong>${completed}</strong><br/>
-          📊 Completion: <strong>${completionPct}%</strong><br/>
-          🎯 Top Code: <strong style="color:#F44336">${topCode}</strong>
+          👥 Registered: <strong>${users}</strong><br/>
+          ✅ Completed assessments: <strong>${completed}</strong><br/>
+          📊 Avg per taker: <strong>${perTaker}</strong><br/>
+          🎯 Top code: <strong style="color:#F44336">${topCode}</strong>
         </div>
       </div>`,
       { permanent: false, direction: 'auto', className: 'leaflet-custom-tooltip' }
@@ -144,9 +144,9 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
     }));
   }, [selectedDetail]);
 
-  const completionPct = selectedDetail && selectedDetail.totalUsers > 0
-    ? Math.round((selectedDetail.completedAssessments / selectedDetail.totalUsers) * 100)
-    : 0;
+  const avgPerTaker = selectedDetail && selectedDetail.totalUsers > 0
+    ? (Number(selectedDetail.completedAssessments) / Number(selectedDetail.totalUsers)).toFixed(1)
+    : '–';
 
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white p-6 overflow-auto' : ''}`}>
@@ -230,8 +230,8 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
               </div>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <StatBadge icon={Users} label="Registered" value={selectedDetail.totalUsers} color="#2563eb" />
-                <StatBadge icon={CheckCircle} label="Completed" value={selectedDetail.completedAssessments} color="#059669" />
-                <StatBadge icon={TrendingUp} label="Completion Rate" value={`${completionPct}%`} color="#d97706" />
+                <StatBadge icon={CheckCircle} label="Completed assessments" value={selectedDetail.completedAssessments} color="#059669" />
+                <StatBadge icon={TrendingUp} label="Avg per taker" value={avgPerTaker} color="#d97706" />
                 <StatBadge icon={MapPin} label="Top Code" value={selectedDetail.topCode || '–'} color="#7c3aed" />
               </div>
               <p className="text-xs font-semibold mb-2" style={{ color: GOV.textMuted }}>RIASEC Profile</p>
@@ -303,14 +303,16 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
             <table className="w-full text-left text-xs">
               <thead style={{ backgroundColor: GOV.blueLightAlt }}>
                 <tr>
-                  {['Region','Users','Completed','Rate','Top Code','R','I','A','S','E','C'].map(h => (
+                  {['Region','Users','Completed','Avg / taker','Top code','R','I','A','S','E','C'].map(h => (
                     <th key={h} className="px-4 py-3 text-xs uppercase font-semibold tracking-wide" style={{ color: GOV.textMuted }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {regionalData.regions.map(r => {
-                  const pct = r.totalUsers > 0 ? Math.round((r.completedAssessments / r.totalUsers) * 100) : 0;
+                  const perTaker = r.totalUsers > 0
+                    ? (Number(r.completedAssessments) / Number(r.totalUsers)).toFixed(1)
+                    : '–';
                   const isActive = selectedRegion === r.region;
                   return (
                     <tr
@@ -330,12 +332,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
                       </td>
                       <td className="px-4 py-3 font-semibold">{r.totalUsers}</td>
                       <td className="px-4 py-3">{r.completedAssessments}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{
-                          backgroundColor: pct >= 70 ? '#d1fae5' : pct >= 40 ? '#fef3c7' : '#fee2e2',
-                          color: pct >= 70 ? '#065f46' : pct >= 40 ? '#92400e' : '#991b1b'
-                        }}>{pct}%</span>
-                      </td>
+                      <td className="px-4 py-3 font-mono">{perTaker}</td>
                       <td className="px-4 py-3 font-mono font-bold" style={{ color: GOV.blue }}>{r.topCode || '–'}</td>
                       {['avgR','avgI','avgA','avgS','avgE','avgC'].map((k, idx) => (
                         <td key={k} className="px-4 py-3 font-mono" style={{ color: RIASEC_COLORS[['R','I','A','S','E','C'][idx]] }}>

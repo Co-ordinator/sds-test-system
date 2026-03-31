@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
   BarChart2, Settings, Menu, X, Bell, Award, FileText, Monitor,
-  BookOpen,
+  BookOpen, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
@@ -16,9 +16,9 @@ const ADMIN_NAV_LINKS = [
   { to: '/admin/results', label: 'Results', Icon: Award, permission: 'results.view' },
   { to: '/admin/analytics', label: 'Analytics', Icon: BarChart2, permission: 'analytics.view' },
   { to: '/admin/reports', label: 'Report', Icon: FileText, permission: 'analytics.view' },
+  { to: '/admin/audit', label: 'Audit Log', Icon: ClipboardList, permission: 'audit.view' },
   { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true, permission: 'notifications.view' },
   { to: '/admin/settings', label: 'Settings', Icon: Settings, permission: null },
-  { to: '/glossary', label: 'Glossary', Icon: BookOpen, permission: null },
 ];
 
 const TEST_TAKER_NAV = [
@@ -48,7 +48,7 @@ const BREADCRUMB_MAP = {
   '/admin/occupations': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Occupations' }],
   '/admin/results': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Results' }],
   '/admin/reports': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Report' }],
-  '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Audit Log' }],
+  '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Audit Log' }],
   '/admin/analytics': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Analytics' }],
   '/admin/notifications': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Notifications' }],
   '/admin/settings': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings' }],

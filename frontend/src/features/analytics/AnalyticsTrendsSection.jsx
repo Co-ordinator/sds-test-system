@@ -84,7 +84,8 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
     return segmentData.riasecByUserType.map(ut => ut.userType).filter(Boolean);
   }, [segmentData]);
 
-  const educationLevelData = useMemo(() => {
+  /* Same API slice as User Type × RIASEC radar: riasecByUserType */
+  const careerByUserTypeRows = useMemo(() => {
     if (!segmentData?.riasecByUserType?.length) return [];
     return segmentData.riasecByUserType.map((ut) => ({
       group: USER_TYPE_LABELS[ut.userType] || ut.userType || '–',
@@ -214,10 +215,10 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         ) : <Empty h={240} />}
       </Card>
 
-      <Card title="Career Evolution by User Type" sub="Strongest RIASEC dimension per learner type" className="col-span-12 lg:col-span-6">
-        {educationLevelData.length > 0 ? (
+      <Card title="Career Evolution by User Type" sub="Highest average RIASEC scores per type (top 3 shown)" className="col-span-12 lg:col-span-6">
+        {careerByUserTypeRows.length > 0 ? (
           <div className="space-y-3">
-            {educationLevelData.map(row => {
+            {careerByUserTypeRows.map((row) => {
               const sorted = ['R','I','A','S','E','C']
                 .map(l => ({ key: l, label: RIASEC_LABELS[l], value: row[l] }))
                 .sort((a, b) => b.value - a.value);
@@ -254,7 +255,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
       </Card>
 
       {/* ═══ Row 4: RIASEC Bar + Holland Table ═══ */}
-      <Card title="RIASEC Score Distribution (National)" sub="Average scores across all completed assessments" className="col-span-12 lg:col-span-6">
+      <Card title="RIASEC Score Distribution (National)" sub="Mean RIASEC score per dimension, completed assessments only" className="col-span-12 lg:col-span-6">
         {riasecData.length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={riasecData} barSize={36}>
@@ -263,21 +264,21 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
               <YAxis tick={{ fontSize: 9 }} />
               <Tooltip formatter={(v) => [Number(v).toFixed(1), 'Avg Score']} />
               <Bar dataKey="value" name="Average Score" radius={[3,3,0,0]}>
-                {riasecData.map((d, i) => <Cell key={i} fill={RIASEC_COLORS[d.name]} />)}
+                {riasecData.map((d) => <Cell key={d.name} fill={RIASEC_COLORS[d.name]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : <Empty h={220} />}
       </Card>
 
-      {/* Holland Code Frequency — inline ranked list (same style as skills) */}
-      <Card title="Holland Code Frequency" sub="Top 3-letter codes from completed assessments" className="col-span-12 lg:col-span-6">
+      {/* Holland codes: same data as GET /analytics/holland-distribution (hollandDist) */}
+      <Card title="Holland Code Frequency" sub="Ranked by count · % of completions that have a Holland code (filters apply)" className="col-span-12 lg:col-span-6">
         {hollandDist.length > 0 ? (
           <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
             {hollandDist.map((d, i) => {
               const pct = hollandTotal > 0 ? (Number(d.count) / hollandTotal) * 100 : 0;
               return (
-                <div key={d.hollandCode} className="flex items-center gap-2">
+                <div key={`${d.hollandCode ?? '—'}-${i}`} className="flex items-center gap-2">
                   <span className="w-4 text-xs font-bold text-right" style={{ color: GOV.textHint }}>#{i + 1}</span>
                   <span className="w-12 text-xs font-mono font-bold" style={{ color: GOV.blue }}>{d.hollandCode}</span>
                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
