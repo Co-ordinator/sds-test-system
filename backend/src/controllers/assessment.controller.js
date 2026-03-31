@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const RIASEC_LABELS = { R: 'Realistic', I: 'Investigative', A: 'Artistic', S: 'Social', E: 'Enterprising', C: 'Conventional' };
-const RIASEC_COLORS = { R: '#dc2626', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#1e3a5f' };
+const RIASEC_COLORS = { R: '#F44336', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#2D8BC4' };
 const RIASEC_DESC = {
   R: 'Practical and hands-on. Enjoys working with tools, machines, and physical objects.',
   I: 'Analytical and intellectual. Enjoys research, mathematics, and science.',
@@ -134,8 +134,8 @@ class AssessmentController {
       res.setHeader('Content-Disposition', `attachment; filename="CareerReport_${assessment.id}.pdf"`);
       doc.pipe(res);
 
-      const govBlue = '#1e3a5f';
-      const gold = '#c8a84b';
+      const govBlue = '#2D8BC4';
+      const gold = '#FFEB3B';
       const text = '#111827';
       const muted = '#6b7280';
       const border = '#d1d5db';

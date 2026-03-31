@@ -2,8 +2,8 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { GOV, TYPO } from '../../theme/government';
 
-const RIASEC_COLORS = ['#1e3a5f', '#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626'];
-const PIE_COLORS = ['#1e3a5f', '#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#0891b2', '#65a30d'];
+const RIASEC_COLORS = ['#F44336', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
+const PIE_COLORS = ['#F44336', '#FFEB3B', '#7FBEEB', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
 
 const CounselorAnalyticsPanel = ({ institutionStats, hollandDist }) => {
   const riasecData = institutionStats ? [

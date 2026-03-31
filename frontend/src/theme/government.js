@@ -1,13 +1,38 @@
 /**
  * Government of Eswatini – Ministry of Labor and Social Security
+ * Brand tricolor: red (data/accents), yellow (accent), sky blue (surfaces).
+ * Interactive links and buttons use BRAND_SKY_DEEP (`GOV.blue`).
  * Enterprise-grade design tokens: hierarchy, density, consistency.
  */
+
+/** Official palette — use these hex values across UI, charts, and exports where practical */
+export const BRAND = {
+  red: '#F44336',
+  redHover: '#D32F2F',
+  yellow: '#FFEB3B',
+  skyBlue: '#7FBEEB',
+};
+
+/** Readable blue derived from sky stripe — default for links, buttons, and focus */
+export const BRAND_SKY_DEEP = '#2D8BC4';
+
+/** Darker blue for hover states on filled buttons / links */
+export const BRAND_SKY_DEEP_HOVER = '#256B9A';
+
 export const GOV = {
-  /* Primary: headers, buttons, links */
-  blue: '#1e3a5f',
-  blueHover: '#152a47',
-  blueLight: '#e8eef4',
-  blueLightAlt: '#f0f4f8',
+  ...BRAND,
+  /* Links, text buttons, filled CTAs, nav active state */
+  blue: BRAND_SKY_DEEP,
+  blueHover: BRAND_SKY_DEEP_HOVER,
+  primary: BRAND_SKY_DEEP,
+  /* Sky-blue tints for panels, chips, progress tracks */
+  blueLight: '#D6EBF7',
+  blueLightAlt: '#EDF6FC',
+  /* Accent highlights (badges, callouts — use sparingly) */
+  accentYellow: BRAND.yellow,
+  /* Thin top strip: ministry line (full width above main chrome) */
+  ministryBarBg: BRAND_SKY_DEEP,
+  ministryBarText: '#ffffff',
   /* Text hierarchy – enterprise standard */
   text: '#111827',
   textMuted: '#4b5563',
@@ -16,7 +41,7 @@ export const GOV = {
   /* Borders */
   border: '#e5e7eb',
   borderLight: '#f3f4f6',
-  /* Semantic */
+  /* Semantic — darker than CTA red */
   error: '#b91c1c',
   errorBg: '#fef2f2',
   errorBorder: '#fecaca',

@@ -31,12 +31,12 @@ export const analyticsService = {
     api.get(`${BASE}/segmentation${qs(filters)}`).then(r => r.data?.data || null),
 
   // ── Career Knowledge Graph (occupations, courses, institutions stats) ──
-  getKnowledgeGraph: () =>
-    api.get(`${BASE}/knowledge-graph`).then(r => r.data?.data || null),
+  getKnowledgeGraph: (filters = {}) =>
+    api.get(`${BASE}/knowledge-graph${qs(filters)}`).then(r => r.data?.data || null),
 
   // ── Skills pipeline (30-day Holland momentum + emerging careers) ───────
-  getSkillsPipeline: () =>
-    api.get(`${BASE}/skills-pipeline`).then(r => r.data?.data || null),
+  getSkillsPipeline: (filters = {}) =>
+    api.get(`${BASE}/skills-pipeline${qs(filters)}`).then(r => r.data?.data || null),
 
   // ── Per-institution analytics ─────────────────────────────────────────
   getInstitutionBreakdown: () =>

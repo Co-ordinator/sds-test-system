@@ -52,7 +52,7 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
     const intensity = 0.20 + (users / maxUsers) * 0.68;
     const isSelected = selectedRegion === key;
     return {
-      fillColor: REGION_COLORS[key] || '#1e3a5f',
+      fillColor: REGION_COLORS[key] || '#F44336',
       fillOpacity: intensity,
       color: isSelected ? '#111827' : 'white',
       weight: isSelected ? 3 : 1.5,
@@ -76,7 +76,7 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
           👥 Users: <strong>${users}</strong><br/>
           ✅ Completed: <strong>${completed}</strong><br/>
           📊 Completion: <strong>${completionPct}%</strong><br/>
-          🎯 Top Code: <strong style="color:#1e3a5f">${topCode}</strong>
+          🎯 Top Code: <strong style="color:#F44336">${topCode}</strong>
         </div>
       </div>`,
       { permanent: false, direction: 'auto', className: 'leaflet-custom-tooltip' }

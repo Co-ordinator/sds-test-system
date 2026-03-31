@@ -31,9 +31,9 @@ export default function Help() {
       {/* Government bar – Ministry branding */}
       <div
         className="flex-shrink-0 px-6 py-1.5 border-b text-center"
-        style={{ borderColor: GOV.border, backgroundColor: GOV.blueLightAlt }}
+        style={{ borderColor: GOV.border, backgroundColor: GOV.ministryBarBg }}
       >
-        <p className={TYPO.ministryBanner} style={{ color: GOV.blue }}>
+        <p className={TYPO.ministryBanner} style={{ color: GOV.ministryBarText }}>
           {MINISTRY_NAME} · {KINGDOM}
         </p>
       </div>
@@ -43,7 +43,7 @@ export default function Help() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 text-sm font-medium" style={{ color: GOV.textMuted }}>
+              <Link to="/" className="flex items-center gap-2 text-sm font-medium" style={{ color: GOV.blue }}>
                 <ArrowLeft className="w-4 h-4" />
                 Back to Home
               </Link>
@@ -423,15 +423,15 @@ export default function Help() {
             © {new Date().getFullYear()} {KINGDOM}. {MINISTRY_NAME}.
           </p>
           <div className="flex items-center justify-center gap-4 text-sm">
-            <Link to="/privacy" className="hover:underline" style={{ color: GOV.textMuted }}>
+            <Link to="/privacy" className="hover:underline" style={{ color: GOV.blue }}>
               Privacy Policy
             </Link>
             <span style={{ color: GOV.textMuted }}>•</span>
-            <Link to="/terms" className="hover:underline" style={{ color: GOV.textMuted }}>
+            <Link to="/terms" className="hover:underline" style={{ color: GOV.blue }}>
               Terms of Service
             </Link>
             <span style={{ color: GOV.textMuted }}>•</span>
-            <Link to="/contact" className="hover:underline" style={{ color: GOV.textMuted }}>
+            <Link to="/contact" className="hover:underline" style={{ color: GOV.blue }}>
               Contact Us
             </Link>
           </div>

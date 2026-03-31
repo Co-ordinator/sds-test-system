@@ -44,8 +44,8 @@ const RATING_LABELS = [
 ];
 
 const RIASEC_COLORS = {
-  R: '#dc2626', I: '#2563eb', A: '#7c3aed',
-  S: '#059669', E: '#d97706', C: '#1e3a5f'
+  R: '#F44336', I: '#2563eb', A: '#7c3aed',
+  S: '#059669', E: '#d97706', C: '#2D8BC4'
 };
 const RIASEC_NAMES = {
   R: 'Realistic', I: 'Investigative', A: 'Artistic',

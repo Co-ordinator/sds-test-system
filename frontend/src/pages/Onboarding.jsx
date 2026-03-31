@@ -11,9 +11,9 @@ import OccupationSearchInput from '../components/ui/OccupationSearchInput';
 import InstitutionSearchInput from '../components/ui/InstitutionSearchInput';
 
 const USER_TYPE_META = {
-  school_student: { label: 'High School Student', Icon: GraduationCap, color: '#1e3a5f', step2Label: 'Your School', step3Label: 'Academic Details', description: 'Discover careers and choose the right subjects for your future.' },
-  university_student: { label: 'University Student', Icon: BookOpen, color: '#2563eb', step2Label: 'Your University', step3Label: 'Programme Details', description: 'Explore specialisations and graduate career pathways.' },
-  professional: { label: 'Professional', Icon: Briefcase, color: '#7c3aed', step2Label: 'Your Organisation', step3Label: 'Career Background', description: 'Find new opportunities and plan your career transition.' },
+  school_student: { label: 'High School Student', Icon: GraduationCap, color: '#F44336', step2Label: 'Your School', step3Label: 'Academic Details', description: 'Discover careers and choose the right subjects for your future.' },
+  university_student: { label: 'University Student', Icon: BookOpen, color: '#7FBEEB', iconColor: '#2D8BC4', step2Label: 'Your University', step3Label: 'Programme Details', description: 'Explore specialisations and graduate career pathways.' },
+  professional: { label: 'Professional', Icon: Briefcase, color: '#FFEB3B', iconColor: '#111827', step2Label: 'Your Organisation', step3Label: 'Career Background', description: 'Find new opportunities and plan your career transition.' },
 };
 
 const USER_TYPE_OPTIONS = [
@@ -236,7 +236,7 @@ export default function Onboarding() {
               </div>
 
               <div className="space-y-3">
-                {USER_TYPE_OPTIONS.map(({ id, label, description, Icon, color }) => (
+                {USER_TYPE_OPTIONS.map(({ id, label, description, Icon, color, iconColor }) => (
                   <button
                     key={id}
                     type="button"
@@ -248,7 +248,7 @@ export default function Onboarding() {
                     }}
                   >
                     <div className="w-10 h-10 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: `${color}15` }}>
-                      <Icon className="w-5 h-5" style={{ color }} />
+                      <Icon className="w-5 h-5" style={{ color: iconColor || color }} />
                     </div>
                     <div>
                       <p className="font-semibold text-sm" style={{ color: GOV.text }}>{label}</p>

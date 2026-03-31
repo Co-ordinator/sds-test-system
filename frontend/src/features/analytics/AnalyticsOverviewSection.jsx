@@ -24,7 +24,7 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
   </div>
 );
 
-const RIASEC_PIE_COLORS = { R: '#dc2626', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#1e3a5f' };
+const RIASEC_PIE_COLORS = { R: '#F44336', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#2D8BC4' };
 const GENDER_PIE = ['#2563eb', '#be185d', '#6b7280', '#059669'];
 
 const DonutCenter = ({ cx, cy, total, label }) => (

@@ -106,10 +106,10 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
     <div className="min-h-screen flex flex-col bg-white">
       <div
         className="flex-shrink-0 py-0.5 border-b"
-        style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.border }}
+        style={{ backgroundColor: GOV.ministryBarBg, borderColor: GOV.border }}
       >
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[11px] font-medium tracking-normal" style={{ color: GOV.textHint }}>
+          <p className="text-[11px] font-medium tracking-normal" style={{ color: GOV.ministryBarText }}>
             Ministry of Labour &amp; Social Security · Kingdom of Eswatini
           </p>
         </div>

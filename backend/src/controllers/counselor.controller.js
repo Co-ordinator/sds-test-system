@@ -122,10 +122,10 @@ const generateLoginCards = async (req, res, next) => {
       const className = student.schoolStudent?.className || student.className || '';
 
       // Card border
-      doc.rect(x, y, CARD_W, CARD_H).lineWidth(1).stroke('#1e3a5f');
+      doc.rect(x, y, CARD_W, CARD_H).lineWidth(1).stroke('#2D8BC4');
 
       // Header bar
-      doc.rect(x, y, CARD_W, 28).fillColor('#1e3a5f').fill();
+      doc.rect(x, y, CARD_W, 28).fillColor('#2D8BC4').fill();
       doc.fontSize(7).fillColor('#ffffff').text('ESWATINI CAREER GUIDANCE SYSTEM', x + 5, y + 5, { width: CARD_W - 10, align: 'center' });
       doc.fontSize(6).fillColor('#c7d2fe').text('careers.gov.sz', x + 5, y + 16, { width: CARD_W - 10, align: 'center' });
 

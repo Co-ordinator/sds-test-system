@@ -19,7 +19,7 @@ import AssessmentShell from '../components/layout/AssessmentShell';
    ═══════════════════════════════════════════════════════════════════════════ */
 const RIASEC_META = {
   R: {
-    label: 'Realistic', color: '#dc2626', lightBg: '#fef2f2',
+    label: 'Realistic', color: '#F44336', lightBg: '#ffebee',
     description: 'You are practical and hands-on. You enjoy working with tools, machines, and physical objects. You thrive in environments that involve building, repairing, and working outdoors.',
     traits: ['Practical', 'Mechanical', 'Athletic', 'Hands-on'],
     icon: '🔧'
@@ -49,7 +49,7 @@ const RIASEC_META = {
     icon: '📈'
   },
   C: {
-    label: 'Conventional', color: '#1e3a5f', lightBg: '#f0f4f8',
+    label: 'Conventional', color: '#2D8BC4', lightBg: '#EDF6FC',
     description: 'You are organized and detail-oriented. You enjoy working with data, numbers, and structured processes. You value order, accuracy, and efficiency.',
     traits: ['Organized', 'Detail-oriented', 'Systematic', 'Reliable'],
     icon: '📊'

@@ -102,7 +102,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
 
 /* ── Report colours — neutral formal palette ─────────────────────────────── */
 const C = {
-  NAVY: '#1e3a5f', ICE: '#e8eef6', STRIPE: '#f7f9fc',
+  NAVY: '#2D8BC4', ICE: '#EDF6FC', STRIPE: '#f7f9fc',
   BORDER: '#d1d5db', TEXT: '#111827', MUTED: '#6b7280', WHITE: '#ffffff',
   BAR_TRK: '#e5e7eb',
 };
@@ -148,7 +148,7 @@ const gradeLabel = (rate) => {
 };
 
 /* ── Pie chart palette — distinct professional tones ─────────────────── */
-const PIE_PAL = ['#1e3a5f', '#457b9d', '#2d6a4f', '#6d6875', '#e07a5f', '#3d405b'];
+const PIE_PAL = ['#F44336', '#FFEB3B', '#7FBEEB', '#457b9d', '#2d6a4f', '#6d6875'];
 function polarToCart(cx, cy, r, deg) {
   const rad = ((deg - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };

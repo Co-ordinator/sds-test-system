@@ -1,7 +1,7 @@
-export const RIASEC_COLORS = { R: '#dc2626', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#1e3a5f' };
+export const RIASEC_COLORS = { R: '#F44336', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#2D8BC4' };
 export const RIASEC_LABELS = { R: 'Realistic', I: 'Investigative', A: 'Artistic', S: 'Social', E: 'Enterprising', C: 'Conventional' };
-export const PIE_COLORS = ['#1e3a5f','#2563eb','#7c3aed','#059669','#d97706','#dc2626','#0891b2','#65a30d','#be185d','#0d9488'];
-export const REGION_COLORS = { hhohho: '#1e3a5f', manzini: '#2563eb', lubombo: '#7c3aed', shiselweni: '#059669' };
+export const PIE_COLORS = ['#F44336', '#FFEB3B', '#7FBEEB', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4', '#0891b2', '#65a30d'];
+export const REGION_COLORS = { hhohho: '#F44336', manzini: '#7FBEEB', lubombo: '#FFEB3B', shiselweni: '#2D8BC4' };
 export const USER_TYPE_LABELS = {
   'High School Student': 'High School',
   'University Student': 'University',

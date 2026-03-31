@@ -1,11 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   PieChart, Pie, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts';
-import { MoreHorizontal, TrendingUp, TrendingDown, Minus, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, TrendingUp, TrendingDown, Minus, ChevronRight, Search } from 'lucide-react';
 import { GOV } from '../../theme/government';
+import DataTable from '../../components/data/DataTable';
 import { PIE_COLORS, DEMAND_COLORS, DEMAND_LABELS, RIASEC_COLORS, RIASEC_LABELS, QUAL_LABELS } from './analyticsConstants';
+
+const DEMAND_LEVEL_KEYS = Object.keys(DEMAND_LABELS);
 
 /* ── Shared Card (matches Overview) ── */
 const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' }) => (
@@ -26,6 +29,7 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
 const Empty = ({ h = 200 }) => <div className={`flex items-center justify-center text-xs`} style={{ height: h, color: GOV.textHint }}>No data</div>;
 
 const DEMAND_ORDER = { critical: 0, very_high: 1, high: 2, medium: 3, low: 4 };
+const DEMAND_UNRATED_COLOR = '#94a3b8';
 
 const GrowthBadge = ({ growth }) => {
   if (growth > 0) return (
@@ -54,11 +58,17 @@ const DemandBadge = ({ level }) => {
   );
 };
 
-const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
+const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => {
+  const [careerSearch, setCareerSearch] = useState('');
+  const [careerRiasec, setCareerRiasec] = useState('');
+  const [careerCategory, setCareerCategory] = useState('');
+  const [careerNationalDemand, setCareerNationalDemand] = useState('');
+  const [careerLocalDemand, setCareerLocalDemand] = useState('');
+  /* Same aggregation as GET /analytics/holland-distribution (avoids duplicating query in skills-pipeline) */
   const allTimePipelineBar = useMemo(() => {
-    if (!pipelineData?.allTimeDist?.length) return [];
-    return pipelineData.allTimeDist.slice(0, 12).map(d => ({ code: d.hollandCode, count: Number(d.count) }));
-  }, [pipelineData]);
+    if (!hollandDist?.length) return [];
+    return hollandDist.slice(0, 12).map((d) => ({ code: d.hollandCode, count: Number(d.count) }));
+  }, [hollandDist]);
 
   const sortedEmergingCareers = useMemo(() => {
     if (!pipelineData?.emergingCareers?.length) return [];
@@ -78,6 +88,30 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
     });
   }, [kgData]);
 
+  const nationalDemandBarRows = useMemo(() => {
+    const rows = kgData?.demandDistribution || [];
+    return rows.map((d) => {
+      const unrated = d.demandLevel == null || d.demandLevel === '';
+      return {
+        name: unrated ? 'Not rated' : (DEMAND_LABELS[d.demandLevel] || d.demandLevel),
+        value: Number(d.count),
+        levelKey: unrated ? null : d.demandLevel,
+      };
+    });
+  }, [kgData]);
+
+  const localDemandPieSlices = useMemo(() => {
+    const rows = kgData?.localDemandDist || [];
+    return rows.map((d) => {
+      const unrated = d.localDemand == null || d.localDemand === '';
+      return {
+        name: unrated ? 'Not rated' : (DEMAND_LABELS[d.localDemand] || d.localDemand),
+        value: Number(d.count),
+        levelKey: unrated ? null : d.localDemand,
+      };
+    });
+  }, [kgData]);
+
   const kgLayers = useMemo(() => {
     if (!kgData?.summary) return [];
     return [
@@ -90,6 +124,153 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
       { label: 'Institutions', count: kgData.summary.totalInstitutions || 0, color: '#dc2626' },
     ];
   }, [kgData]);
+
+  const careerKnowledgeRows = useMemo(() => {
+    const list = kgData?.topCareers || [];
+    return list.map((c) => ({
+      ...c,
+      nationalDemandRank: DEMAND_ORDER[c.demandLevel] ?? 99,
+      localDemandRank: DEMAND_ORDER[c.localDemand] ?? 99,
+    }));
+  }, [kgData]);
+
+  const careerCategoryOptions = useMemo(() => {
+    const set = new Set();
+    (kgData?.topCareers || []).forEach((c) => {
+      if (c.category && String(c.category).trim()) set.add(String(c.category).trim());
+    });
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [kgData]);
+
+  const careerKnowledgeFiltered = useMemo(() => {
+    const q = careerSearch.trim().toLowerCase();
+    return careerKnowledgeRows.filter((r) => {
+      if (q) {
+        const hay = `${r.name || ''} ${r.category || ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (careerRiasec && r.primaryRiasec !== careerRiasec) return false;
+      if (careerCategory && (r.category || '') !== careerCategory) return false;
+      if (careerNationalDemand && r.demandLevel !== careerNationalDemand) return false;
+      if (careerLocalDemand && r.localDemand !== careerLocalDemand) return false;
+      return true;
+    });
+  }, [careerKnowledgeRows, careerSearch, careerRiasec, careerCategory, careerNationalDemand, careerLocalDemand]);
+
+  const careerKnowledgeToolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[140px] max-w-xs">
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: GOV.textMuted }} />
+        <input
+          type="search"
+          className="w-full rounded-md border pl-7 pr-2 py-1.5 text-xs"
+          style={{ borderColor: GOV.border, color: GOV.text }}
+          placeholder="Search career or category…"
+          value={careerSearch}
+          onChange={(e) => setCareerSearch(e.target.value)}
+          aria-label="Search careers"
+        />
+      </div>
+      <select
+        className="text-xs border rounded-md px-2 py-1.5 min-w-[7rem]"
+        style={{ borderColor: GOV.border, color: careerRiasec ? GOV.blue : GOV.textMuted }}
+        value={careerRiasec}
+        onChange={(e) => setCareerRiasec(e.target.value)}
+        aria-label="Filter by RIASEC"
+      >
+        <option value="">All RIASEC</option>
+        {['R', 'I', 'A', 'S', 'E', 'C'].map((t) => (
+          <option key={t} value={t}>{t} — {RIASEC_LABELS[t]}</option>
+        ))}
+      </select>
+      <select
+        className="text-xs border rounded-md px-2 py-1.5 min-w-[8rem] max-w-[11rem]"
+        style={{ borderColor: GOV.border, color: careerCategory ? GOV.blue : GOV.textMuted }}
+        value={careerCategory}
+        onChange={(e) => setCareerCategory(e.target.value)}
+        aria-label="Filter by category"
+      >
+        <option value="">All categories</option>
+        {careerCategoryOptions.map((cat) => (
+          <option key={cat} value={cat}>{cat}</option>
+        ))}
+      </select>
+      <select
+        className="text-xs border rounded-md px-2 py-1.5 min-w-[9rem]"
+        style={{ borderColor: GOV.border, color: careerNationalDemand ? GOV.blue : GOV.textMuted }}
+        value={careerNationalDemand}
+        onChange={(e) => setCareerNationalDemand(e.target.value)}
+        aria-label="Filter by national demand"
+      >
+        <option value="">National demand</option>
+        {DEMAND_LEVEL_KEYS.map((k) => (
+          <option key={k} value={k}>{DEMAND_LABELS[k]}</option>
+        ))}
+      </select>
+      <select
+        className="text-xs border rounded-md px-2 py-1.5 min-w-[9rem]"
+        style={{ borderColor: GOV.border, color: careerLocalDemand ? GOV.blue : GOV.textMuted }}
+        value={careerLocalDemand}
+        onChange={(e) => setCareerLocalDemand(e.target.value)}
+        aria-label="Filter by local demand"
+      >
+        <option value="">Local demand</option>
+        {DEMAND_LEVEL_KEYS.map((k) => (
+          <option key={k} value={k}>{DEMAND_LABELS[k]}</option>
+        ))}
+      </select>
+      {(careerSearch || careerRiasec || careerCategory || careerNationalDemand || careerLocalDemand) && (
+        <button
+          type="button"
+          className="text-xs font-semibold px-2 py-1 rounded-md border"
+          style={{ borderColor: GOV.border, color: GOV.blue }}
+          onClick={() => {
+            setCareerSearch('');
+            setCareerRiasec('');
+            setCareerCategory('');
+            setCareerNationalDemand('');
+            setCareerLocalDemand('');
+          }}
+        >
+          Clear filters
+        </button>
+      )}
+      <span className="text-xs ml-auto tabular-nums" style={{ color: GOV.textMuted }}>
+        {careerKnowledgeFiltered.length}
+        {careerKnowledgeFiltered.length !== careerKnowledgeRows.length ? ` / ${careerKnowledgeRows.length}` : ''} careers
+      </span>
+    </div>
+  );
+
+  const careerKnowledgeColumns = useMemo(() => [
+    { key: 'name', header: 'Career', sortable: true },
+    {
+      key: 'primaryRiasec',
+      header: 'RIASEC',
+      sortable: true,
+      width: 'w-24',
+      render: (r) => (
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white" style={{ backgroundColor: RIASEC_COLORS[r.primaryRiasec] || '#6b7280' }}>
+          {r.primaryRiasec || '–'}
+        </span>
+      ),
+    },
+    { key: 'category', header: 'Category', sortable: true, render: (r) => r.category || '–' },
+    {
+      key: 'nationalDemandRank',
+      header: 'National demand',
+      sortable: true,
+      width: 'w-36',
+      render: (r) => <DemandBadge level={r.demandLevel} />,
+    },
+    {
+      key: 'localDemandRank',
+      header: 'Local demand',
+      sortable: true,
+      width: 'w-36',
+      render: (r) => <DemandBadge level={r.localDemand} />,
+    },
+  ], []);
 
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridAutoRows: 'min-content' }}>
@@ -150,7 +331,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
               <YAxis type="category" dataKey="code" tick={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 600 }} width={38} />
               <Tooltip formatter={(v) => [v, 'Assessments']} />
               <Bar dataKey="count" radius={[0, 3, 3, 0]} name="Assessments" maxBarSize={18}>
-                {allTimePipelineBar.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                {allTimePipelineBar.map((row, i) => <Cell key={row.code || i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -193,15 +374,20 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
 
       {/* Career Demand Distribution */}
       <Card title="Career Demand Distribution" sub="National demand levels across all careers" className="col-span-12 md:col-span-6 lg:col-span-4">
-        {(kgData?.demandDistribution || []).length > 0 ? (
+        {nationalDemandBarRows.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={kgData.demandDistribution.map(d => ({ name: DEMAND_LABELS[d.demandLevel] || d.demandLevel, value: Number(d.count) }))} layout="vertical">
+            <BarChart data={nationalDemandBarRows} layout="vertical" margin={{ left: 4, right: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 9 }} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={65} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={72} />
               <Tooltip />
-              <Bar dataKey="value" radius={[0,3,3,0]} name="Careers" maxBarSize={18}>
-                {kgData.demandDistribution.map((d, i) => <Cell key={i} fill={DEMAND_COLORS[d.demandLevel] || '#6b7280'} />)}
+              <Bar dataKey="value" radius={[0, 3, 3, 0]} name="Careers" maxBarSize={18}>
+                {nationalDemandBarRows.map((d, i) => (
+                  <Cell
+                    key={`${d.levelKey ?? 'unrated'}-${i}`}
+                    fill={d.levelKey ? (DEMAND_COLORS[d.levelKey] || '#6b7280') : DEMAND_UNRATED_COLOR}
+                  />
+                ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -210,15 +396,30 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
 
       {/* Local Demand Donut */}
       <Card title="Local Demand (Eswatini)" sub="Career demand in the local market" className="col-span-12 md:col-span-6 lg:col-span-4">
-        {(kgData?.localDemandDist || []).length > 0 ? (
+        {localDemandPieSlices.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
-              <Pie data={kgData.localDemandDist.map(d => ({ name: DEMAND_LABELS[d.localDemand] || d.localDemand, value: Number(d.count) }))}
-                dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3}
-                label={({ percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                {kgData.localDemandDist.map((d, i) => <Cell key={i} fill={DEMAND_COLORS[d.localDemand] || PIE_COLORS[i % PIE_COLORS.length]} />)}
+              <Pie
+                data={localDemandPieSlices}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={40}
+                outerRadius={70}
+                paddingAngle={3}
+                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                labelLine={false}
+              >
+                {localDemandPieSlices.map((d, i) => (
+                  <Cell
+                    key={`${d.levelKey ?? 'unrated'}-${i}`}
+                    fill={d.levelKey ? (DEMAND_COLORS[d.levelKey] || PIE_COLORS[i % PIE_COLORS.length]) : DEMAND_UNRATED_COLOR}
+                  />
+                ))}
               </Pie>
-              <Tooltip /><Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
+              <Tooltip />
+              <Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
             </PieChart>
           </ResponsiveContainer>
         ) : <Empty />}
@@ -257,7 +458,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
       </Card>
 
       {/* RIASEC Course Pathway Coverage */}
-      <Card title="Courses per RIASEC Type" sub="How many course pathways align with each personality" className="col-span-12 lg:col-span-6">
+      <Card title="Courses per RIASEC Type" sub="Active courses whose RIASEC / Holland tags include each letter (from the knowledge-graph API)" className="col-span-12 lg:col-span-6">
         {(kgData?.coursesPerRiasec || []).length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={kgData.coursesPerRiasec.map(d => ({ name: d.letter, label: RIASEC_LABELS[d.letter], value: d.count }))}>
@@ -329,40 +530,33 @@ const AnalyticsCareersSection = ({ kgData, pipelineData }) => {
         </Card>
       )}
 
-      {/* Career Knowledge Base table */}
-      {(kgData?.topCareers || []).length > 0 && (
+      {/* Career Knowledge Base — occupations from DB (knowledge-graph API) */}
+      {kgData && (
         <div className="col-span-12 bg-white rounded-lg border overflow-hidden" style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
           <div className="flex items-start justify-between px-4 pt-4 pb-2">
             <div>
               <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>Career Knowledge Base</p>
-              <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>All careers with demand levels and RIASEC alignment</p>
+              <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>
+                Occupations in the catalog with primary RIASEC and demand levels (live data from the database)
+              </p>
             </div>
-            <button className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }}><MoreHorizontal className="w-4 h-4" /></button>
+            <button type="button" className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }} aria-label="Section menu"><MoreHorizontal className="w-4 h-4" /></button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead style={{ backgroundColor: GOV.blueLightAlt }}>
-                <tr>{['Career','RIASEC','Category','National Demand','Local Demand'].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-xs uppercase font-semibold" style={{ color: GOV.textMuted }}>{h}</th>
-                ))}</tr>
-              </thead>
-              <tbody>
-                {kgData.topCareers.slice(0, 30).map((c, i) => (
-                  <tr key={i} className="border-b" style={{ borderColor: GOV.borderLight }}>
-                    <td className="px-4 py-2 font-medium" style={{ color: GOV.text }}>{c.name}</td>
-                    <td className="px-4 py-2">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white" style={{ backgroundColor: RIASEC_COLORS[c.primaryRiasec] || '#6b7280' }}>
-                        {c.primaryRiasec || '–'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2" style={{ color: GOV.textMuted }}>{c.category || '–'}</td>
-                    <td className="px-4 py-2"><DemandBadge level={c.demandLevel} /></td>
-                    <td className="px-4 py-2"><DemandBadge level={c.localDemand} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={careerKnowledgeColumns}
+            rows={careerKnowledgeFiltered}
+            rowKey={(r) => String(r.id ?? r.name)}
+            loading={false}
+            pageSize={8}
+            stickyHeader
+            toolbar={careerKnowledgeToolbar}
+            emptyTitle="No careers match"
+            emptyMessage={
+              careerKnowledgeRows.length === 0
+                ? 'Add occupations with a primary RIASEC code in Admin → Occupations, or wait for the catalog to load.'
+                : 'Try adjusting search or filters.'
+            }
+          />
         </div>
       )}
     </div>

@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 const LOGO_PATH = path.join(__dirname, '../../../frontend/public/siyinqaba.png');
 
 /* ── Colours — neutral formal palette ───────────────────────────────── */
-const NAVY    = '#1e3a5f';
+const NAVY    = '#2D8BC4';
 const STRIPE  = '#f7f9fc';
 const BORDER  = '#d1d5db';
 const TEXT    = '#111827';
@@ -152,7 +152,7 @@ function drawHBar(doc, x, y, w, h, value, max, barColor) {
 }
 
 /* drawPieChart — SVG-path pie + right-side legend ──────────────────── */
-const PIE_PAL = ['#1e3a5f', '#457b9d', '#2d6a4f', '#6d6875', '#e07a5f', '#3d405b'];
+const PIE_PAL = ['#F44336', '#FFEB3B', '#7FBEEB', '#457b9d', '#2d6a4f', '#6d6875'];
 function drawPieChart(doc, x, y, r, data, labelFn) {
   const total = data.reduce((s, d) => s + Number(d.value), 0) || 1;
   const cx = x + r, cy = y + r;

@@ -25,13 +25,24 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
 
 const Empty = ({ h = 200 }) => <div className="flex items-center justify-center text-xs" style={{ height: h, color: GOV.textHint }}>No data</div>;
 
-const GENDER_COLORS = { female: '#be185d', male: '#2563eb', other: '#6b7280', unknown: '#9ca3af' };
+const GENDER_COLORS = {
+  female: '#be185d', male: '#2563eb', other: '#6b7280', unknown: '#9ca3af', prefer_not_to_say: '#78716c',
+};
+const GENDER_LEGEND_LABELS = {
+  male: 'Male', female: 'Female', other: 'Other', unknown: 'Unknown', prefer_not_to_say: 'Prefer not to say',
+};
+
+const parseSegmentAvg = (v) => {
+  if (v == null || v === '') return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
+};
 const USER_TYPE_COLORS = {
-  'High School Student': '#1e3a5f',
+  'High School Student': '#F44336',
   'University Student': '#2563eb',
   'Professional': '#059669',
   'Test Administrator': '#7c3aed',
-  school_student: '#1e3a5f',
+  school_student: '#F44336',
   university_student: '#2563eb',
   professional: '#059669',
 };
@@ -41,8 +52,11 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
     if (!segmentData?.riasecByGender?.length) return [];
     return ['R','I','A','S','E','C'].map(letter => {
       const entry = { name: RIASEC_LABELS[letter], key: letter };
-      segmentData.riasecByGender.forEach(g => {
-        entry[g.gender || 'unknown'] = Number(g[`avg${letter}`] || 0).toFixed(1) * 1;
+      segmentData.riasecByGender.forEach((row) => {
+        const key = row.gender || 'unknown';
+        const raw = row[`avg${letter}`];
+        const n = raw == null || raw === '' ? 0 : Number(raw);
+        entry[key] = Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
       });
       return entry;
     });
@@ -53,12 +67,13 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
     return [...new Set(segmentData.riasecByGender.map(g => g.gender || 'unknown'))];
   }, [segmentData]);
 
+  /* Backend: riasecByUserType groups by users.user_type (not education_level FK) */
   const userTypeRiasecData = useMemo(() => {
     if (!segmentData?.riasecByUserType?.length) return [];
-    return ['R','I','A','S','E','C'].map(letter => {
+    return ['R', 'I', 'A', 'S', 'E', 'C'].map((letter) => {
       const entry = { name: letter, full: RIASEC_LABELS[letter] };
-      segmentData.riasecByUserType.forEach(ut => {
-        if (ut.userType) entry[ut.userType] = Number(ut[`avg${letter}`] || 0);
+      segmentData.riasecByUserType.forEach((ut) => {
+        if (ut.userType) entry[ut.userType] = parseSegmentAvg(ut[`avg${letter}`]);
       });
       return entry;
     });
@@ -71,11 +86,11 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
 
   const educationLevelData = useMemo(() => {
     if (!segmentData?.riasecByUserType?.length) return [];
-    return segmentData.riasecByUserType.map(ut => ({
+    return segmentData.riasecByUserType.map((ut) => ({
       group: USER_TYPE_LABELS[ut.userType] || ut.userType || '–',
       userType: ut.userType,
-      R: Number(ut.avgR || 0), I: Number(ut.avgI || 0), A: Number(ut.avgA || 0),
-      S: Number(ut.avgS || 0), E: Number(ut.avgE || 0), C: Number(ut.avgC || 0),
+      R: parseSegmentAvg(ut.avgR), I: parseSegmentAvg(ut.avgI), A: parseSegmentAvg(ut.avgA),
+      S: parseSegmentAvg(ut.avgS), E: parseSegmentAvg(ut.avgE), C: parseSegmentAvg(ut.avgC),
     }));
   }, [segmentData]);
 
@@ -102,7 +117,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         ) : <Empty h={220} />}
       </Card>
 
-      <Card title="Completion by Day of Week" sub="Weekday vs weekend engagement" className="col-span-12 lg:col-span-4">
+      <Card title="Completion by Day of Week" sub="Last 90 days of completions, by weekday" className="col-span-12 lg:col-span-4">
         {(kgData?.completionByDow || []).length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={DOW_LABELS.map((label, idx) => {
@@ -131,9 +146,15 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
               <YAxis tick={{ fontSize: 9 }} />
               <Tooltip formatter={(v) => [Number(v).toFixed(1), '']} />
               <Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
-              {genderKeys.map(g => (
-                <Bar key={g} dataKey={g} name={g.charAt(0).toUpperCase() + g.slice(1)}
-                  fill={GENDER_COLORS[g] || '#6b7280'} radius={[2,2,0,0]} maxBarSize={24} />
+              {genderKeys.map((g) => (
+                <Bar
+                  key={g}
+                  dataKey={g}
+                  name={GENDER_LEGEND_LABELS[g] || (g ? `${g.charAt(0).toUpperCase()}${g.slice(1)}` : '—')}
+                  fill={GENDER_COLORS[g] || '#6b7280'}
+                  radius={[2, 2, 0, 0]}
+                  maxBarSize={24}
+                />
               ))}
             </BarChart>
           </ResponsiveContainer>
@@ -154,7 +175,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
                   <div key={g} className="mb-3">
                     <div className="flex items-center gap-2 mb-1.5">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: GENDER_COLORS[g] || '#6b7280' }} />
-                      <span className="text-xs font-bold" style={{ color: GOV.text }}>{g.charAt(0).toUpperCase() + g.slice(1)}</span>
+                      <span className="text-xs font-bold" style={{ color: GOV.text }}>{GENDER_LEGEND_LABELS[g] || (g ? `${g.charAt(0).toUpperCase()}${g.slice(1)}` : '—')}</span>
                     </div>
                     {items.map(d => (
                       <div key={d.hollandCode} className="flex items-center gap-2 mb-1">
@@ -173,8 +194,8 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         ) : <Empty h={240} />}
       </Card>
 
-      {/* ═══ Row 3: Education Level ═══ */}
-      <Card title="Education Level × RIASEC" sub="Career preferences by education stage" className="col-span-12 lg:col-span-6">
+      {/* ═══ Row 3: User type × RIASEC (segmentation API: group by users.user_type) ═══ */}
+      <Card title="User Type × RIASEC" sub="Average RIASEC scores by learner type" className="col-span-12 lg:col-span-6">
         {userTypeRiasecData.length > 0 && userTypeRadarSeries.length > 0 ? (
           <ResponsiveContainer width="100%" height={240}>
             <RadarChart data={userTypeRiasecData} cx="50%" cy="50%" outerRadius="60%">
@@ -193,7 +214,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         ) : <Empty h={240} />}
       </Card>
 
-      <Card title="Career Evolution by Education Level" sub="Top interest area per user group" className="col-span-12 lg:col-span-6">
+      <Card title="Career Evolution by User Type" sub="Strongest RIASEC dimension per learner type" className="col-span-12 lg:col-span-6">
         {educationLevelData.length > 0 ? (
           <div className="space-y-3">
             {educationLevelData.map(row => {

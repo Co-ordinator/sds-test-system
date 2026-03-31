@@ -253,17 +253,22 @@ const analyticsService = {
   },
 
   /* ── 6. Career Knowledge Graph ──────────────────────────────────────────── */
-  getKnowledgeGraph: async () => {
+  getKnowledgeGraph: async (query = {}) => {
+    const { userWhere, assessmentWhere, userInclude, assessmentInclude } = buildFilters(query);
+    /* Include NULL — bulk occupation seed often leaves demand_level unset */
     const demandDistribution = await Occupation.findAll({
       attributes: ['demandLevel', [fn('COUNT', col('id')), 'count']],
-      where: { demandLevel: { [Op.ne]: null } },
-      group: ['demandLevel'], order: [[literal('"count"'), 'DESC']], raw: true
+      group: ['demandLevel'],
+      order: [[literal('"count"'), 'DESC']],
+      raw: true
     });
 
+    /* Include NULL so catalogs seeded without local_demand (common) still show an honest slice */
     const localDemandDist = await Occupation.findAll({
       attributes: ['localDemand', [fn('COUNT', col('id')), 'count']],
-      where: { localDemand: { [Op.ne]: null } },
-      group: ['localDemand'], order: [[literal('"count"'), 'DESC']], raw: true
+      group: ['localDemand'],
+      order: [[literal('"count"'), 'DESC']],
+      raw: true
     });
 
     const riasecCareerFlow = await Occupation.findAll({
@@ -291,7 +296,9 @@ const analyticsService = {
     });
 
     const allOccupations = await Occupation.findAll({
-      attributes: ['skills', 'primaryRiasec', 'name', 'demandLevel', 'localDemand', 'category'], raw: true
+      attributes: ['id', 'skills', 'primaryRiasec', 'name', 'demandLevel', 'localDemand', 'category'],
+      order: [['name', 'ASC']],
+      raw: true
     });
     const skillFreq = {};
     allOccupations.forEach(occ => {
@@ -305,15 +312,20 @@ const analyticsService = {
       .map(([skill, count]) => ({ skill, count }));
 
     const topHollandCareerMatches = await Assessment.findAll({
-      where: { status: 'completed', hollandCode: { [Op.ne]: null } },
+      where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
+      include: assessmentInclude,
       attributes: ['hollandCode', [fn('COUNT', col('Assessment.id')), 'assessmentCount']],
       group: ['hollandCode'], order: [[literal('"assessmentCount"'), 'DESC']],
       limit: 15, raw: true
     });
 
     const genderDist = await Assessment.findAll({
-      where: { status: 'completed' },
-      include: [{ model: User, as: 'user', required: true, attributes: [], where: { gender: { [Op.ne]: null } } }],
+      where: { ...assessmentWhere, status: 'completed' },
+      include: [{
+        model: User, as: 'user', required: true, attributes: [],
+        where: { ...userWhere, gender: { [Op.ne]: null } },
+        include: userInclude
+      }],
       attributes: [[col('user.gender'), 'gender'], [fn('COUNT', col('Assessment.id')), 'count']],
       group: [col('user.gender')], raw: true
     });
@@ -326,8 +338,14 @@ const analyticsService = {
 
     const topCareers = allOccupations
       .filter(o => o.primaryRiasec)
-      .map(o => ({ name: o.name, primaryRiasec: o.primaryRiasec, demandLevel: o.demandLevel, localDemand: o.localDemand, category: o.category }))
-      .slice(0, 50);
+      .map(o => ({
+        id: o.id,
+        name: o.name,
+        primaryRiasec: o.primaryRiasec,
+        demandLevel: o.demandLevel,
+        localDemand: o.localDemand,
+        category: o.category
+      }));
 
     const [totalOccupations, totalCourses, totalInstitutions, totalCourseLinks, totalCareerPathways] = await Promise.all([
       Occupation.count(),
@@ -337,19 +355,36 @@ const analyticsService = {
       OccupationCourse.count()
     ]);
 
-    const coursesPerRiasec = [];
-    for (const letter of ['R','I','A','S','E','C']) {
-      const count = await Course.count({ where: { isActive: true, riasecCodes: { [Op.contains]: [letter] } } });
-      coursesPerRiasec.push({ letter, count });
-    }
+    /* Count active courses that align with each RIASEC letter. Course.riasec_codes may store
+     * single letters (e.g. ['R','I']) or Holland profile strings (e.g. ['IRS','SAE']) from seed/admin.
+     * Op.contains: ['R'] only matches an element exactly 'R', so Holland-style rows were missed. */
+    const sq = Course.sequelize;
+    const coursesPerRiasec = await Promise.all(
+      ['R', 'I', 'A', 'S', 'E', 'C'].map(async (letter) => {
+        const count = await Course.count({
+          where: {
+            [Op.and]: [
+              { isActive: true },
+              sq.where(
+                sq.fn('COALESCE', sq.fn('array_to_string', sq.col('riasec_codes'), ','), ''),
+                { [Op.iLike]: `%${letter}%` }
+              )
+            ]
+          }
+        });
+        return { letter, count };
+      })
+    );
 
+    /* PG: EXTRACT(DOW FROM ts) → 0=Sun … 6=Sat — matches frontend DOW_LABELS */
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const completionByDow = await Assessment.findAll({
-      where: { status: 'completed', completedAt: { [Op.gte]: ninetyDaysAgo } },
+      where: { ...assessmentWhere, status: 'completed', completedAt: { [Op.gte]: ninetyDaysAgo } },
+      include: assessmentInclude,
       attributes: [
         [fn('EXTRACT', literal('DOW FROM completed_at')), 'dow'],
-        [fn('COUNT', col('id')), 'count']
+        [fn('COUNT', col('Assessment.id')), 'count']
       ],
       group: [fn('EXTRACT', literal('DOW FROM completed_at'))],
       order: [[fn('EXTRACT', literal('DOW FROM completed_at')), 'ASC']],
@@ -426,7 +461,7 @@ const analyticsService = {
     const priorStart = new Date(currentStart);
     priorStart.setDate(priorStart.getDate() - 30);
 
-    const [currentDist, priorDist, allTimeDist, emergingCareers] = await Promise.all([
+    const [currentDist, priorDist, emergingCareers] = await Promise.all([
       Assessment.findAll({
         where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null }, completedAt: { [Op.gte]: currentStart } },
         include: assessmentInclude,
@@ -438,14 +473,6 @@ const analyticsService = {
         include: assessmentInclude,
         attributes: ['hollandCode', [fn('COUNT', col('Assessment.id')), 'count']],
         group: ['hollandCode'], raw: true
-      }),
-      Assessment.findAll({
-        where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
-        include: assessmentInclude,
-        attributes: ['hollandCode', [fn('COUNT', col('Assessment.id')), 'count']],
-        group: ['hollandCode'],
-        order: [[fn('COUNT', col('Assessment.id')), 'DESC']],
-        raw: true
       }),
       Occupation.findAll({
         where: { localDemand: { [Op.in]: ['critical', 'high'] } },
@@ -464,7 +491,7 @@ const analyticsService = {
       return { code: d.hollandCode, current, prior, growth };
     }).sort((a, b) => b.growth - a.growth);
 
-    return { hollandPipeline, allTimeDist, emergingCareers };
+    return { hollandPipeline, emergingCareers };
   },
 
   /* ── 9. Export data (raw rows for CSV/PDF generation in controller) ───────── */
@@ -513,12 +540,13 @@ const analyticsService = {
   /* ── 10. Government Funding Priority Alignment Analytics ──────────── */
   getFundingAlignmentAnalytics: async (query = {}) => {
     const { assessmentWhere, assessmentInclude } = buildFilters(query);
+    const sequelize = Assessment.sequelize;
 
     // Get completed assessments with funding alignment data
     const assessmentsWithAlignment = await Assessment.findAll({
       where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
       include: assessmentInclude,
-      attributes: ['id', 'hollandCode', 'userId'],
+      attributes: ['id', 'hollandCode', 'userId', 'completedAt'],
       raw: false
     });
 
@@ -552,7 +580,7 @@ const analyticsService = {
         order: [['funding_priority', 'ASC'], ['name', 'ASC']]
       });
 
-      const alignment = scoringService.computeFundingAlignment(assessment.hollandCode, [], matchedCourses);
+      const alignment = scoringService.computeFundingAlignment(assessment.hollandCode, matchedCourses);
       alignmentResults.push({
         hollandCode: assessment.hollandCode,
         overall: alignment.overall,
@@ -560,7 +588,8 @@ const analyticsService = {
         mediumCount: alignment.mediumCount,
         lowCount: alignment.lowCount,
         fields: alignment.fields,
-        userId: assessment.userId
+        userId: assessment.userId,
+        completedAt: assessment.completedAt
       });
     }
 
@@ -645,53 +674,30 @@ const analyticsService = {
       }))
       .sort((a, b) => b.high - a.high);
 
-    // Monthly trends (last 12 months)
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const monthBucket = (d) => {
+      if (!d) return null;
+      const dt = new Date(d);
+      if (Number.isNaN(dt.getTime())) return null;
+      const y = dt.getUTCFullYear();
+      const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+      return `${y}-${m}`;
+    };
 
-    const trends = await Assessment.findAll({
-      where: {
-        status: 'completed',
-        hollandCode: { [Op.ne]: null },
-        completedAt: { [Op.gte]: twelveMonthsAgo }
-      },
-      include: [{ model: User, as: 'user', required: true, attributes: ['id', 'region', 'userType'] }],
-      attributes: [
-        [fn('DATE_TRUNC', 'month', col('completed_at')), 'month'],
-        [fn('COUNT', col('id')), 'total']
-      ],
-      group: [fn('DATE_TRUNC', 'month', col('completed_at'))],
-      order: [[fn('DATE_TRUNC', 'month', col('completed_at')), 'ASC']],
-      raw: true
+    const byMonth = {};
+    alignmentResults.forEach((r) => {
+      const key = monthBucket(r.completedAt);
+      if (!key) return;
+      if (!byMonth[key]) {
+        byMonth[key] = { month: `${key}-01T00:00:00.000Z`, total: 0, high: 0, medium: 0, low: 0 };
+      }
+      byMonth[key].total += 1;
+      const lvl = String(r.overall || '').toUpperCase();
+      if (lvl === 'HIGH') byMonth[key].high += 1;
+      else if (lvl === 'MEDIUM') byMonth[key].medium += 1;
+      else if (lvl === 'LOW') byMonth[key].low += 1;
     });
 
-    // For each month, compute alignment breakdown
-    const monthlyAlignment = [];
-    for (const trend of trends) {
-      const monthStart = new Date(trend.month);
-      const monthEnd = new Date(trend.month);
-      monthEnd.setMonth(monthEnd.getMonth() + 1);
-
-      const monthAssessments = assessmentsWithAlignment.filter(a => {
-        const completed = new Date(a.completedAt);
-        return completed >= monthStart && completed < monthEnd;
-      });
-
-      const monthHigh = monthAssessments.filter(a => {
-        // Quick approximation based on Holland code patterns
-        const code = a.hollandCode;
-        return (code.includes('S') || code.includes('R') || code.includes('I')) && 
-               (code[0] === 'S' || code[0] === 'R' || code[0] === 'I');
-      }).length;
-
-      monthlyAlignment.push({
-        month: trend.month,
-        total: parseInt(trend.total, 10),
-        high: monthHigh,
-        medium: Math.floor(monthAssessments.length * 0.3), // Approximation
-        low: monthAssessments.length - monthHigh - Math.floor(monthAssessments.length * 0.3)
-      });
-    }
+    const monthlyAlignment = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
 
     return {
       summary: { totalAssessments, highAlignment, mediumAlignment, lowAlignment },

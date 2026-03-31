@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Filter, RefreshCw, Briefcase, MapPin, TrendingUp, BarChart2, Download
 } from 'lucide-react';
@@ -108,21 +108,21 @@ const Analytics = () => {
 
   useEffect(() => {
     api.get('/api/v1/institutions').then(r => setInstitutions(r.data?.data?.institutions || [])).catch(() => {});
-    analyticsService.getKnowledgeGraph().then(d => setKgData(d)).catch(() => {});
-    analyticsService.getSkillsPipeline().then(d => setPipelineData(d)).catch(() => {});
   }, []);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
         const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
-        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData] = await Promise.all([
+        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData, pipeline, kg] = await Promise.all([
           analyticsService.getOverview(f),
           analyticsService.getHollandDistribution(f),
           analyticsService.getTrend(f),
           analyticsService.getRegional(f),
           analyticsService.getSegmentation(f),
           analyticsService.getFundingAlignment(f),
+          analyticsService.getSkillsPipeline(f),
+          analyticsService.getKnowledgeGraph(f),
         ]);
         setAnalytics(overviewData);
         setHollandDist(hollandData);
@@ -130,8 +130,10 @@ const Analytics = () => {
         setRegionalData(regionalData);
         setSegmentData(segmentData);
         setFundingAlignmentData(fundingData);
+        setPipelineData(pipeline);
+        setKgData(kg);
       } catch {
-        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setSegmentData(null); setFundingAlignmentData(null);
+        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setSegmentData(null); setFundingAlignmentData(null); setPipelineData(null); setKgData(null);
       } finally { setLoading(false); }
     };
     setLoading(true); fetchAll();
@@ -378,7 +380,9 @@ const Analytics = () => {
                 completedAssessments={completedAssessments}
               />
             )}
-            {activeTab === 'career' && <AnalyticsCareersSection kgData={kgData} pipelineData={pipelineData} />}
+            {activeTab === 'career' && (
+              <AnalyticsCareersSection kgData={kgData} pipelineData={pipelineData} hollandDist={hollandDist} />
+            )}
             {activeTab === 'map' && (
               <AnalyticsMapSection
                 regionalData={regionalData} regionChartData={regionChartData}

@@ -4,7 +4,7 @@ import { Eye } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { GOV, TYPO } from '../../theme/government';
 
-const RIASEC_COLORS = ['#1e3a5f', '#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626'];
+const RIASEC_COLORS = ['#F44336', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
 
 const SBadge = ({ status }) => {
   const map = {

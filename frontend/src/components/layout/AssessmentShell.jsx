@@ -28,11 +28,11 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
       
       <div
         className="flex-shrink-0 py-0.5 border-b"
-        style={{ backgroundColor: '#f8fafc', borderColor: GOV.borderLight }}
+        style={{ backgroundColor: GOV.ministryBarBg, borderColor: GOV.border }}
         role="banner"
       >
         <div className="max-w-7xl mx-auto px-6 py-1">
-          <p className="text-[10px] font-medium text-center tracking-wide" style={{ color: '#6b7280' }}>
+          <p className="text-[10px] font-medium text-center tracking-wide" style={{ color: GOV.ministryBarText }}>
             Ministry of Labour &amp; Social Security · Kingdom of Eswatini
           </p>
         </div>

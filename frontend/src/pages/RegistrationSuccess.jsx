@@ -18,9 +18,9 @@ export default function RegistrationSuccess() {
 
       <div
         className="flex-shrink-0 px-6 py-1.5 border-b text-center"
-        style={{ borderColor: GOV.border, backgroundColor: GOV.blueLightAlt }}
+        style={{ borderColor: GOV.border, backgroundColor: GOV.ministryBarBg }}
       >
-        <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
+        <p className={TYPO.hint} style={{ color: GOV.ministryBarText }}>
           {MINISTRY_NAME} · {KINGDOM}
         </p>
       </div>

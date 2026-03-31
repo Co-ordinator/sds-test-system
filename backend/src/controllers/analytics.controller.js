@@ -70,7 +70,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/knowledge-graph ─────────────────────────────── */
   getKnowledgeGraph: async (req, res, next) => {
     try {
-      const data = await analyticsService.getKnowledgeGraph();
+      const data = await analyticsService.getKnowledgeGraph(req.query);
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch knowledge graph analytics', req, details: { error: error.message } });
@@ -135,7 +135,7 @@ const AnalyticsController = {
           `End Date: ${formatFilterLabel(filters.endDate, 'Any')}`
         ];
 
-        doc.rect(50, 50, pageWidth, 55).fill('#1e3a5f');
+        doc.rect(50, 50, pageWidth, 55).fill('#2D8BC4');
         doc.fillColor('white').fontSize(16).font('Helvetica-Bold').text('Analytics Report', 65, 68);
         doc.fillColor('#111827').moveDown(3).fontSize(10).font('Helvetica-Bold').text('Applied Filters');
         doc.fontSize(8.5).font('Helvetica').fillColor('#374151').text(filtersSummary.join('  |  '));
