@@ -80,6 +80,25 @@ Create `frontend/.env`:
 REACT_APP_API_URL=http://localhost:5000/api/v1
 ```
 
+### 2.1 Managed Remote PostgreSQL (Optional)
+
+If you are using a hosted PostgreSQL provider (for example Render), use a connection URL and enable TLS:
+
+```env
+# Backend .env (example values)
+DATABASE_URL=postgresql://<db_user>:<db_password>@<db_host>/<db_name>?ssl=true
+TEST_DATABASE_URL=postgresql://<db_user>:<db_password>@<db_host>/<db_name>?ssl=true
+
+# Keep these aligned for sequelize-cli and scripts
+DB_HOST=<db_host>
+DB_PORT=5432
+DB_NAME=<db_name>
+DB_USER=<db_user>
+DB_PASSWORD=<db_password>
+```
+
+For hosted deployment, set `FRONTEND_URL` to your live frontend URL in backend runtime environment variables and restart the Node app after updating values.
+
 ### 3. Install & Setup Backend
 
 ```bash

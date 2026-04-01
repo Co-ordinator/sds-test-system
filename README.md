@@ -2,6 +2,10 @@
 
 Self-Directed Search Career Assessment Tool for the Ministry of Labor and Social Security - Kingdom of Eswatini.
 
+## Branch Notes
+- `SDS-remote-db` branch is configured for a managed remote PostgreSQL database.
+- This version also includes frontend build script updates for environments where `node_modules/.bin/react-scripts` is not executable (for example, some shared hosting build runners).
+
 ## Features
 - **Career Assessment**: Comprehensive SDS test implementation
 - **User Management**: Registration, login, and profile management
@@ -81,6 +85,7 @@ For detailed information about the system:
 - **[Database Schema](docs/DATABASE_SCHEMA_DOCUMENTATION.md)** - Complete database structure and relationships
 - **[API Documentation](docs/API_DOCUMENTATION.md)** - Endpoint specifications and usage examples
 - **[Setup Guide](docs/SETUP_GUIDE.md)** - Installation and configuration instructions
+- **[Remote DB Version Notes](docs/REMOTE_DB_VERSION_NOTES.md)** - Changes introduced in the `SDS-remote-db` deployment variant
 - **[Test Credentials](docs/TEST_CREDENTIALS.md)** - Default login credentials for testing:
   - **Admin**: `admin@labor.gov.sz` / `Admin@123`
   - **Counselors**: `counselor1@labor.gov.sz`, `counselor2@labor.gov.sz`, `counselor3@labor.gov.sz` / `Counselor@123`
