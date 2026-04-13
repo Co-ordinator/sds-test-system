@@ -102,7 +102,7 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
 
   const roleDashboard = (role) => {
     if (role === 'System Administrator') return '/admin';
-    if (role === 'Test Administrator') return '/admin/dashboard';
+    if (role === 'Test Administrator') return '/test-administrator';
     return '/dashboard';
   };
 

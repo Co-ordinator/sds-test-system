@@ -61,9 +61,10 @@ const Questionnaire = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
-  const dashboardPath =
-    user?.role === 'System Administrator' || user?.role === 'Test Administrator'
-      ? '/admin/dashboard'
+  const dashboardPath = user?.role === 'System Administrator'
+    ? '/admin/dashboard'
+    : user?.role === 'Test Administrator'
+      ? '/test-administrator'
       : '/dashboard';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -73,6 +74,7 @@ const Questionnaire = () => {
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [isAdvancing, setIsAdvancing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [startTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -149,6 +151,8 @@ const Questionnaire = () => {
       setSaving(true);
       try {
         await api.post(`/api/v1/assessments/${assessment.id}/progress`, { answers: payload });
+      } catch (err) {
+        throw err;
       } finally {
         setSaving(false);
       }
@@ -156,21 +160,41 @@ const Questionnaire = () => {
     [assessment?.id, questionsBySection]
   );
 
-  const setAnswer = (questionId, value) => {
-    const next = { ...answers, [questionId]: value };
-    setAnswers(next);
-    saveProgress({ [questionId]: value });
-    
-    // Trigger selection animation
+  const setAnswer = async (questionId, value) => {
+    if (saving || isAdvancing || submitting) return;
+
+    const previousValue = answers[questionId];
+    setError(null);
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
     setSelectedAnimation(value);
-    setTimeout(() => setSelectedAnimation(null), 400);
-    
-    // Auto-advance to next question after brief feedback delay
-    const isLast =
-      currentSectionIndex === totalSections - 1 &&
-      currentQuestionIndex === (questionsBySection[sectionId] || []).length - 1;
-    if (!isLast) {
-      setTimeout(() => goNext(), 400);
+    setIsAdvancing(true);
+
+    try {
+      await saveProgress({ [questionId]: value });
+
+      // Only move forward after the response is persisted.
+      const isLast =
+        currentSectionIndex === totalSections - 1 &&
+        currentQuestionIndex === (questionsBySection[sectionId] || []).length - 1;
+      if (!isLast) {
+        setTimeout(() => {
+          goNext();
+        }, 200);
+      }
+    } catch (e) {
+      setAnswers((prev) => {
+        const restored = { ...prev };
+        if (previousValue === undefined) {
+          delete restored[questionId];
+        } else {
+          restored[questionId] = previousValue;
+        }
+        return restored;
+      });
+      setError('Could not save your response. Please try again.');
+    } finally {
+      setTimeout(() => setSelectedAnimation(null), 300);
+      setIsAdvancing(false);
     }
   };
 
@@ -248,6 +272,7 @@ const Questionnaire = () => {
     const handleKeyDown = (e) => {
       // Prevent keyboard nav if user is typing
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (saving || isAdvancing || submitting) return;
 
       // Arrow navigation
       if (e.key === 'ArrowLeft' && currentQuestionIndex > 0) {
@@ -287,7 +312,7 @@ const Questionnaire = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentQuestion, currentQuestionIndex, canAdvance, isLastQuestion, isSelfEstimates, loading]);
+  }, [currentQuestion, currentQuestionIndex, canAdvance, isLastQuestion, isSelfEstimates, loading, saving, isAdvancing, submitting]);
 
   if (loading || (!assessment && !error)) {
     return (
@@ -486,6 +511,7 @@ const Questionnaire = () => {
                   key={value}
                   type="button"
                   onClick={() => setAnswer(currentQuestion.id, value)}
+                  disabled={saving || isAdvancing || submitting}
                   className={`w-full text-left px-5 py-4 rounded-lg border-2 transition-all duration-200 ${
                     currentAnswer === value
                       ? 'font-semibold shadow-sm scale-[0.98]'
@@ -508,6 +534,7 @@ const Questionnaire = () => {
                   key={opt}
                   type="button"
                   onClick={() => setAnswer(currentQuestion.id, opt)}
+                  disabled={saving || isAdvancing || submitting}
                   className={`w-full text-center px-6 py-5 rounded-lg border-2 transition-all duration-200 text-lg font-semibold ${
                     currentAnswer === opt
                       ? 'shadow-sm scale-[0.98]'
@@ -550,7 +577,7 @@ const Questionnaire = () => {
             <button
               type="button"
               onClick={goPrev}
-              disabled={currentSectionIndex === 0 && currentQuestionIndex === 0}
+              disabled={saving || isAdvancing || submitting || (currentSectionIndex === 0 && currentQuestionIndex === 0)}
               className={NAV_TEXT_ACTION}
               style={{ color: GOV.textMuted }}
             >
@@ -573,7 +600,7 @@ const Questionnaire = () => {
                 <button
                   type="button"
                   onClick={goNext}
-                  disabled={!canAdvance}
+                  disabled={!canAdvance || saving || isAdvancing || submitting}
                   className={NAV_TEXT_ACTION}
                   style={{ color: GOV.blue, fontWeight: 700 }}
                 >

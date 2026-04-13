@@ -12,6 +12,7 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const role = user?.role || 'Test Taker';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
+  const adminDashboardPath = role === 'System Administrator' ? '/admin/dashboard' : '/test-administrator';
   const roleLabel = role === 'System Administrator' ? 'System Administrator' : role === 'Test Administrator' ? 'Test Administrator' : 'Test Taker';
   const roleColor = role === 'System Administrator'
     ? { bg: '#ede9fe', text: '#6d28d9' }
@@ -105,7 +106,7 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
 
                     {isAdminLike && (
                       <Link
-                        to="/admin/dashboard"
+                        to={adminDashboardPath}
                         className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
                         style={{ color: GOV.text }}
                         onClick={() => setUserMenuOpen(false)}

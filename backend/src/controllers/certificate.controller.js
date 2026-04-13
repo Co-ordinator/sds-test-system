@@ -7,7 +7,12 @@ const { AuditLog, sequelize } = require('../models');
 const certificateService = require('../services/certificate.service');
 const logger = require('../utils/logger');
 
-const LOGO_PATH = path.join(__dirname, '../../../frontend/public/siyinqaba.png');
+const LOGO_PATHS = [
+  path.join(__dirname, '../../assets/siyinqaba.png'),
+  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
+];
+
+const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
 
 const SECTION_MAP = { activities: 'I', competencies: 'II', occupations: 'III', self_estimates: 'IV' };
 const SECTION_LABELS = { activities: 'Activity', competencies: 'Competence', occupations: 'Occupation', self_estimates: 'Abilities' };
@@ -38,11 +43,12 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   doc.text(rightHeaderText, lm, 48, { width: contentW - 8, align: 'right' });
 
   // Logo in center
-  if (fs.existsSync(LOGO_PATH)) {
+  const logoPath = resolveLogoPath();
+  if (logoPath) {
     try {
       const logoWidth = 78;
       const logoCenterX = (pageW - logoWidth) / 2;
-      doc.image(LOGO_PATH, logoCenterX, 38, { width: logoWidth });
+      doc.image(logoPath, logoCenterX, 38, { width: logoWidth });
     } catch (_) {}
   }
 

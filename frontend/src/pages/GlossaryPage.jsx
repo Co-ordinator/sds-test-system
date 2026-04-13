@@ -21,8 +21,11 @@ const GlossaryPage = () => {
   const { glossaryUtils, markTermAsLearned, glossaryTerms, handleTermView, getStats } = useGlossary();
 
   const role = user?.role || 'Test Taker';
-  const backTo =
-    role === 'System Administrator' || role === 'Test Administrator' ? '/admin/dashboard' : '/dashboard';
+  const backTo = role === 'System Administrator'
+    ? '/admin/dashboard'
+    : role === 'Test Administrator'
+      ? '/test-administrator'
+      : '/dashboard';
 
   // Filter terms based on search and category
   const filteredTerms = useMemo(() => {

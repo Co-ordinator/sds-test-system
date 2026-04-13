@@ -85,26 +85,52 @@ module.exports = {
       if (['yes', 'no'].includes(s.toLowerCase())) return s.toUpperCase();
       return s;
     };
-
+    const questionIds = [...new Set(
+      answers.map((ans) => ans?.questionId).filter(Boolean)
+    )];
+    const questions = await Question.findAll({
+      where: { id: questionIds },
+      attributes: ['id', 'section', 'riasecType']
+    });
+    const questionMap = new Map(questions.map((q) => [q.id, q]));
+    const validRows = [];
     for (const ans of answers) {
-      const value = normalizeValue(ans.value, ans.section);
-      await Answer.upsert({
+      const question = questionMap.get(ans.questionId);
+      if (!question) continue;
+      const value = normalizeValue(ans.value, question.section);
+      validRows.push({
         assessmentId,
-        questionId: ans.questionId,
+        questionId: question.id,
         value,
-        section: ans.section,
-        riasecType: ans.riasecType
+        section: question.section,
+        riasecType: question.riasecType
       });
+    }
+
+    const transaction = await Assessment.sequelize.transaction();
+    try {
+      if (validRows.length > 0) {
+        await Answer.bulkCreate(validRows, {
+          updateOnDuplicate: ['value', 'section', 'riasec_type', 'updated_at'],
+          transaction
+        });
+      }
+
+      const answeredCount = await Answer.count({ where: { assessmentId }, transaction });
+      const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
+
+      await Assessment.update(
+        { progress: Number(progress.toFixed(2)) },
+        { where: { id: assessmentId }, transaction }
+      );
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
     }
 
     const answeredCount = await Answer.count({ where: { assessmentId } });
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-
-    await Assessment.update(
-      { progress: progress.toFixed(2) },
-      { where: { id: assessmentId } }
-    );
-
     return { progress: Number(progress.toFixed(2)), answeredCount };
   },
 
@@ -130,9 +156,11 @@ module.exports = {
     }
 
     const answeredCount = await Answer.count({ where: { assessmentId } });
-    if (answeredCount < 228) {
+    const totalQuestions = await Question.count();
+    if (answeredCount < totalQuestions) {
       const error = new Error('Assessment is incomplete');
       error.answered = answeredCount;
+      error.total = totalQuestions;
       throw error;
     }
 
@@ -153,9 +181,31 @@ module.exports = {
       throw new Error('Not authorized to view these results');
     }
 
+    const { displayCode } = scoringService.buildHollandCodes({
+      R: assessment.scoreR,
+      I: assessment.scoreI,
+      A: assessment.scoreA,
+      S: assessment.scoreS,
+      E: assessment.scoreE,
+      C: assessment.scoreC,
+    }, 0);
+    assessment.setDataValue('hollandCodeDisplay', displayCode);
+
     const recommendations = await scoringService.getRecommendations(
       assessment.hollandCode,
-      assessment.educationLevelAtTest
+      assessment.educationLevelAtTest,
+      null,
+      {
+        scores: {
+          R: assessment.scoreR,
+          I: assessment.scoreI,
+          A: assessment.scoreA,
+          S: assessment.scoreS,
+          E: assessment.scoreE,
+          C: assessment.scoreC,
+        },
+        displayCode,
+      }
     );
 
     return { assessment, recommendations };
@@ -178,10 +228,32 @@ module.exports = {
     }
 
     let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
+    const { displayCode } = scoringService.buildHollandCodes({
+      R: assessment.scoreR,
+      I: assessment.scoreI,
+      A: assessment.scoreA,
+      S: assessment.scoreS,
+      E: assessment.scoreE,
+      C: assessment.scoreC,
+    }, 0);
+    assessment.setDataValue('hollandCodeDisplay', displayCode);
+
     try {
       recommendations = await scoringService.getRecommendations(
         assessment.hollandCode,
-        assessment.educationLevelAtTest
+        assessment.educationLevelAtTest,
+        null,
+        {
+          scores: {
+            R: assessment.scoreR,
+            I: assessment.scoreI,
+            A: assessment.scoreA,
+            S: assessment.scoreS,
+            E: assessment.scoreE,
+            C: assessment.scoreC,
+          },
+          displayCode,
+        }
       );
     } catch (_) {}
 

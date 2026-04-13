@@ -169,7 +169,30 @@ module.exports = {
     let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
     if (completed) {
       try {
-        recommendations = await scoringService.getRecommendations(completed.hollandCode, completed.educationLevelAtTest);
+        const { displayCode } = scoringService.buildHollandCodes({
+          R: completed.scoreR,
+          I: completed.scoreI,
+          A: completed.scoreA,
+          S: completed.scoreS,
+          E: completed.scoreE,
+          C: completed.scoreC,
+        }, 0);
+        recommendations = await scoringService.getRecommendations(
+          completed.hollandCode,
+          completed.educationLevelAtTest,
+          null,
+          {
+            scores: {
+              R: completed.scoreR,
+              I: completed.scoreI,
+              A: completed.scoreA,
+              S: completed.scoreS,
+              E: completed.scoreE,
+              C: completed.scoreC,
+            },
+            displayCode,
+          }
+        );
       } catch (_) {}
     }
 

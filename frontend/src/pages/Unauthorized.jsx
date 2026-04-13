@@ -15,7 +15,7 @@ export default function Unauthorized() {
     if (user?.role === 'System Administrator') {
       navigate('/admin');
     } else if (user?.role === 'Test Administrator') {
-      navigate('/admin/dashboard');
+      navigate('/test-administrator');
     } else {
       navigate('/');
     }

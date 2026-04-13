@@ -359,9 +359,10 @@ module.exports = {
       'SELECT id, name FROM institutions'
     );
 
+    const normalizeName = (name) => String(name || '').trim().toLowerCase();
     const institutionMap = {};
     institutions.forEach(inst => {
-      institutionMap[inst.name] = inst.id;
+      institutionMap[normalizeName(inst.name)] = inst.id;
     });
 
     // Insert courses
@@ -381,10 +382,11 @@ module.exports = {
 
     // Create course-institution mappings
     const courseInstitutionLinks = [];
+    const missingInstitutionNames = new Set();
     courses.forEach(course => {
       if (course.institutions && course.institutions.length > 0) {
         course.institutions.forEach(instName => {
-          const institutionId = institutionMap[instName];
+          const institutionId = institutionMap[normalizeName(instName)];
           if (institutionId) {
             courseInstitutionLinks.push({
               id: uuidv4(),
@@ -393,10 +395,18 @@ module.exports = {
               created_at: now,
               updated_at: now
             });
+          } else {
+            missingInstitutionNames.add(instName);
           }
         });
       }
     });
+
+    if (missingInstitutionNames.size > 0) {
+      throw new Error(
+        `Unmatched course institution names: ${Array.from(missingInstitutionNames).sort().join(', ')}`
+      );
+    }
 
     if (courseInstitutionLinks.length > 0) {
       await queryInterface.bulkInsert('course_institutions', courseInstitutionLinks, { ignoreDuplicates: true });

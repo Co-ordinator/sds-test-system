@@ -62,20 +62,16 @@ const AdminDashboard = () => {
       setLoading(true);
       try {
         const qs = buildParams();
-        const [aRes, rRes, hRes, tRes, assessmentsRes, institutionsRes] = await Promise.all([
+        const [aRes, rRes, hRes, tRes] = await Promise.all([
           api.get(`/api/v1/analytics${qs ? `?${qs}` : ''}`),
           api.get(`/api/v1/analytics/regional${qs ? `?${qs}` : ''}`),
           api.get(`/api/v1/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
           api.get(`/api/v1/analytics/trend${qs ? `?${qs}` : ''}`),
-          adminService.getAssessments(1000),
-          adminService.getInstitutions(),
         ]);
         setAnalytics(aRes.data?.data || null);
         setRegionalData(rRes.data?.data || null);
         setHollandDist(hRes.data?.data?.distribution || []);
         setTrend(tRes.data?.data?.trend || []);
-        setAssessments(assessmentsRes || []);
-        setInstitutions(institutionsRes || []);
       } catch {
         setAnalytics(null);
         setRegionalData(null);
@@ -92,23 +88,36 @@ const AdminDashboard = () => {
     setRefreshing(true);
     try {
       const qs = buildParams();
-      const [aRes, rRes, hRes, tRes, assessmentsRes, institutionsRes] = await Promise.all([
+      const [aRes, rRes, hRes, tRes] = await Promise.all([
         api.get(`/api/v1/analytics${qs ? `?${qs}` : ''}`),
         api.get(`/api/v1/analytics/regional${qs ? `?${qs}` : ''}`),
         api.get(`/api/v1/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
         api.get(`/api/v1/analytics/trend${qs ? `?${qs}` : ''}`),
-        adminService.getAssessments(1000),
-        adminService.getInstitutions(),
       ]);
       setAnalytics(aRes.data?.data || null);
       setRegionalData(rRes.data?.data || null);
       setHollandDist(hRes.data?.data?.distribution || []);
       setTrend(tRes.data?.data?.trend || []);
-      setAssessments(assessmentsRes || []);
-      setInstitutions(institutionsRes || []);
     } catch { /* silent */ }
     finally { setRefreshing(false); }
   };
+
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const [assessmentsRes, institutionsRes] = await Promise.all([
+          adminService.getAssessments(1000),
+          adminService.getInstitutions(),
+        ]);
+        setAssessments(assessmentsRes || []);
+        setInstitutions(institutionsRes || []);
+      } catch {
+        setAssessments([]);
+        setInstitutions([]);
+      }
+    };
+    fetchAdminData();
+  }, []);
 
   const completionRate = analytics?.completionRate ?? 0;
   const totalUsers = analytics?.totals?.users ?? 0;
@@ -147,6 +156,8 @@ const AdminDashboard = () => {
     const parseDate = (v) => (v ? new Date(v) : null);
     const start = parseDate(filters.startDate);
     const end = parseDate(filters.endDate);
+    // Keep date filtering inclusive of the selected "to" date.
+    if (end) end.setHours(23, 59, 59, 999);
 
     assessments.forEach((a) => {
       const inst = a.user?.institution;

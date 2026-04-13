@@ -6,7 +6,12 @@ const fs = require('fs');
 const reportService = require('../services/report.service');
 const logger = require('../utils/logger');
 
-const LOGO_PATH = path.join(__dirname, '../../../frontend/public/siyinqaba.png');
+const LOGO_PATHS = [
+  path.join(__dirname, '../../assets/siyinqaba.png'),
+  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
+];
+
+const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
 
 /* ── Colours — neutral formal palette ───────────────────────────────── */
 const NAVY    = '#2D8BC4';
@@ -48,9 +53,10 @@ function drawPageHeader(doc, reportLabel, dateStr, preparedBy, filterSummary) {
   doc.text('GOVERNMENT', LM + 10, 28);
   doc.text('OF   ESWATINI', LM, 28, { width: CW - 10, align: 'right' });
 
-  if (fs.existsSync(LOGO_PATH)) {
+  const logoPath = resolveLogoPath();
+  if (logoPath) {
     try {
-      doc.image(LOGO_PATH, (PW - 72) / 2, 18, { width: 72 });
+      doc.image(logoPath, (PW - 72) / 2, 18, { width: 72 });
     } catch (_) {}
   }
 

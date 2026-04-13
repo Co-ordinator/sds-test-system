@@ -10,6 +10,9 @@ const pgArray = (arr) => {
   return `{${escaped.join(',')}}`;
 };
 
+const normalizeHollandCode = (code) =>
+  String(code || '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 3);
+
 /**
  * CONSOLIDATED OCCUPATIONS SEEDER
  * Loads all occupations from Holland codes CSV file
@@ -33,14 +36,15 @@ module.exports = {
 
       const [, riasecCategory, hollandCode, occupation, educationLevel] = match;
       
-      if (occupation) {
+      const normalizedCode = normalizeHollandCode(hollandCode);
+      if (occupation && normalizedCode.length === 3) {
         occupations.push({
           id: uuidv4(),
-          code: hollandCode.substring(0, 3),
+          code: normalizedCode,
           name: occupation,
-          holland_codes: pgArray([hollandCode]),
-          primary_riasec: riasecCategory || hollandCode.charAt(0),
-          secondary_riasec: hollandCode.length > 1 ? hollandCode.charAt(1) : null,
+          holland_codes: pgArray([normalizedCode]),
+          primary_riasec: riasecCategory || normalizedCode.charAt(0),
+          secondary_riasec: normalizedCode.length > 1 ? normalizedCode.charAt(1) : null,
           description: null,
           category: riasecCategory,
           education_level: null,

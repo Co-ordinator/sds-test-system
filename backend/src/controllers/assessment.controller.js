@@ -90,7 +90,15 @@ class AssessmentController {
     try {
       const results = await assessmentService.submitAssessment(req.params.assessmentId, req.user.id);
       logger.info({ actionType: 'ASSESSMENT_COMPLETED', message: `Assessment ${req.params.assessmentId} finalized`, req, details: { assessmentId: req.params.assessmentId, hollandCode: results.hollandCode } });
-      return res.status(200).json({ status: 'success', data: { hollandCode: results.hollandCode, scores: results.scores, recommendations: results.recommendations } });
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          hollandCode: results.hollandCode,
+          hollandCodeDisplay: results.hollandCodeDisplay || results.hollandCode,
+          scores: results.scores,
+          recommendations: results.recommendations
+        }
+      });
     } catch (error) {
       if (error.message === 'Assessment not found or not in progress') return res.status(404).json({ status: 'error', message: error.message });
       if (error.message === 'Assessment is incomplete') return res.status(400).json({ status: 'error', message: error.message, answered: error.answered });
@@ -260,24 +268,23 @@ class AssessmentController {
           .text(key, lx - 4, ly - 5, { width: 10 });
       });
 
-      // RIASEC Score Bars (right side)
-      const barsX = leftMargin + 280;
-      const barsY = radarSectionY + 22;
-      const barWidth = 200;
+      // Score Breakdown (text only, no horizontal bars)
+      const breakdownX = leftMargin + 280;
+      const breakdownY = radarSectionY + 22;
+      const breakdownWidth = pageWidth - (breakdownX - leftMargin);
       doc.fillColor(govBlue).fontSize(9).font('Helvetica-Bold')
-        .text('Score Breakdown', barsX, barsY);
+        .text('Score Breakdown', breakdownX, breakdownY, { width: breakdownWidth });
 
       keys.forEach((key, i) => {
-        const rowY = barsY + 18 + i * 24;
+        const rowY = breakdownY + 18 + i * 22;
         const score = scores[key];
-        const pct = (score / maxScore) * barWidth;
-        const color = RIASEC_COLORS[key];
-        doc.rect(barsX, rowY, 16, 16).strokeColor(border).lineWidth(0.6).stroke();
-        doc.fillColor(text).fontSize(8).font('Helvetica-Bold').text(key, barsX + 4, rowY + 3);
-        doc.fillColor('#374151').fontSize(8).font('Helvetica').text(RIASEC_LABELS[key], barsX + 22, rowY + 3);
-        doc.rect(barsX + 90, rowY + 2, barWidth, 10).fill('#f3f4f6');
-        if (pct > 0) doc.rect(barsX + 90, rowY + 2, Math.max(pct, 6), 10).fill(color);
-        doc.fillColor(color).fontSize(8.5).font('Helvetica-Bold').text(`${score}`, barsX + 90 + barWidth + 8, rowY + 2);
+        doc.rect(breakdownX, rowY, 16, 16).strokeColor(border).lineWidth(0.6).stroke();
+        doc.fillColor(text).fontSize(8).font('Helvetica-Bold')
+          .text(key, breakdownX + 4, rowY + 3);
+        doc.fillColor('#374151').fontSize(8).font('Helvetica')
+          .text(RIASEC_LABELS[key], breakdownX + 24, rowY + 3, { width: 86, ellipsis: true });
+        doc.fillColor(RIASEC_COLORS[key]).fontSize(8.5).font('Helvetica-Bold')
+          .text(String(score), breakdownX + 112, rowY + 3, { width: 24, align: 'right' });
       });
 
       // Holland Code Interpretation

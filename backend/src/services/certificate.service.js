@@ -92,7 +92,30 @@ module.exports = {
 
     let occupationNames = [];
     try {
-      const recs = await scoringService.getRecommendations(assessment.hollandCode, assessment.educationLevelAtTest);
+      const { displayCode } = scoringService.buildHollandCodes({
+        R: assessment.scoreR,
+        I: assessment.scoreI,
+        A: assessment.scoreA,
+        S: assessment.scoreS,
+        E: assessment.scoreE,
+        C: assessment.scoreC,
+      }, 0);
+      const recs = await scoringService.getRecommendations(
+        assessment.hollandCode,
+        assessment.educationLevelAtTest,
+        null,
+        {
+          scores: {
+            R: assessment.scoreR,
+            I: assessment.scoreI,
+            A: assessment.scoreA,
+            S: assessment.scoreS,
+            E: assessment.scoreE,
+            C: assessment.scoreC,
+          },
+          displayCode,
+        }
+      );
       occupationNames = (recs.occupations || []).slice(0, 3).map(o => o.name);
     } catch (_) {}
 

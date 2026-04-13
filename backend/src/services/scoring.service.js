@@ -10,12 +10,128 @@ const CAREER_FOCUS = {
   professional: 'Based on your RIASEC profile, here are career transition opportunities and upskilling paths.'
 };
 
+const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
+const BINARY_SECTIONS = new Set(['activities', 'competencies', 'occupations']);
+const VALID_SECTIONS = new Set(['activities', 'competencies', 'occupations', 'self_estimates']);
+const MAX_OCCUPATION_RECOMMENDATIONS = 8;
+const MAX_COURSE_RECOMMENDATIONS = 8;
+
 /**
  * SDS Scoring Service
  * Handles the calculation of RIASEC scores, career matching,
  * and the full careers → courses → institutions recommendation chain.
  */
 class ScoringService {
+  normalizeHollandCode(code) {
+    return String(code || '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 3);
+  }
+
+  buildCodeVariants(code, displayCode = null) {
+    const variants = new Set();
+    const primary = this.normalizeHollandCode(code);
+    if (primary.length === 3) variants.add(primary);
+
+    const raw = String(displayCode || code || '').toUpperCase().trim();
+    const tieMatch = raw.match(/^([RIASEC]{3})\/([RIASEC])$/);
+    if (tieMatch) {
+      variants.add(tieMatch[1]);
+      variants.add(`${tieMatch[1].slice(0, 2)}${tieMatch[2]}`);
+    }
+
+    return Array.from(variants);
+  }
+
+  buildWeightsFromScores(scores = {}) {
+    const values = RIASEC_KEYS.map((k) => Number(scores[k] || 0));
+    const max = Math.max(...values, 0);
+    if (max <= 0) return null;
+
+    const weights = {};
+    RIASEC_KEYS.forEach((k) => {
+      weights[k] = Number(scores[k] || 0) / max;
+    });
+    return weights;
+  }
+
+  buildWeightsFromCodeVariants(code, variants = []) {
+    const weights = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
+    const primary = this.normalizeHollandCode(code);
+    const rankedLetters = primary.split('');
+
+    if (rankedLetters[0]) weights[rankedLetters[0]] = Math.max(weights[rankedLetters[0]], 1.0);
+    if (rankedLetters[1]) weights[rankedLetters[1]] = Math.max(weights[rankedLetters[1]], 0.9);
+    if (rankedLetters[2]) weights[rankedLetters[2]] = Math.max(weights[rankedLetters[2]], 0.75);
+
+    // Preserve tie signal from extended code variants (e.g., RIA/S -> RIS).
+    variants.forEach((variant) => {
+      if (variant.slice(0, 2) === primary.slice(0, 2) && variant[2] && variant[2] !== primary[2]) {
+        weights[variant[2]] = Math.max(weights[variant[2]], 0.7);
+      }
+    });
+
+    return weights;
+  }
+
+  scoreCandidateByWeights(weights, candidateCode) {
+    const code = this.normalizeHollandCode(candidateCode);
+    if (!code || !weights) return 0;
+    const multipliers = [1.0, 0.8, 0.6];
+    return code.split('').reduce((sum, letter, idx) => sum + (Number(weights[letter] || 0) * multipliers[idx]), 0);
+  }
+
+  scoreCodeAlignment(targetCode, candidateCode) {
+    const target = this.normalizeHollandCode(targetCode);
+    const candidate = this.normalizeHollandCode(candidateCode);
+    if (!target || !candidate) return 0;
+
+    const [t1, t2, t3] = target.split('');
+    const [c1, c2, c3] = candidate.split('');
+    let score = 0;
+
+    if (candidate === target) score += 120;
+    if (c1 === t1) score += 45;
+    if (c2 === t2) score += 30;
+    if (c3 === t3) score += 20;
+
+    const overlap = [...new Set(candidate.split(''))].filter((l) => target.includes(l)).length;
+    score += overlap * 10;
+
+    // Penalize weak/accidental overlaps to reduce irrelevant recommendations.
+    if (overlap < 2) score -= 50;
+    return score;
+  }
+
+  bestAlignmentScore(targetCode, candidateCodes = []) {
+    const codes = Array.isArray(candidateCodes) ? candidateCodes : [];
+    const scores = codes.map((c) => this.scoreCodeAlignment(targetCode, c));
+    return scores.length ? Math.max(...scores) : 0;
+  }
+
+  /**
+   * Build Holland codes from RIASEC totals.
+   * - primaryCode: strict 3-letter deterministic code (used for DB matching)
+   * - displayCode: extended code that preserves meaningful ties for UI/reporting
+   */
+  buildHollandCodes(totals, tieThreshold = 0) {
+    const deterministicOrder = RIASEC_KEYS;
+    const ranked = deterministicOrder
+      .map((letter, index) => ({ letter, score: Number(totals[letter] || 0), index }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return a.index - b.index;
+      });
+
+    const primaryCode = ranked.slice(0, 3).map((x) => x.letter).join('') || 'RIA';
+    const third = ranked[2];
+    const fourth = ranked[3];
+    const hasThirdPlaceTie = third && fourth && Math.abs(third.score - fourth.score) <= tieThreshold;
+    const displayCode = hasThirdPlaceTie
+      ? `${ranked[0].letter}${ranked[1].letter}${ranked[2].letter}/${ranked[3].letter}`
+      : primaryCode;
+
+    return { primaryCode, displayCode, ranked };
+  }
+
   /**
    * Main entry point to finalize an assessment
    */
@@ -38,22 +154,29 @@ class ScoringService {
       const totals = { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
 
       answers.forEach(ans => {
+        const section = ans.section;
         const type = ans.riasecType;
-        if (['activities', 'competencies', 'occupations'].includes(ans.section)) {
-          if (ans.value.toUpperCase() === 'YES') {
-            totals[type] += 1;
-          }
-        } else if (ans.section === 'self_estimates') {
-          const rating = parseInt(ans.value, 10);
-          if (!isNaN(rating)) {
+
+        // Defensive scoring: ignore malformed rows instead of polluting totals.
+        if (!VALID_SECTIONS.has(section) || !RIASEC_KEYS.includes(type)) {
+          return;
+        }
+
+        if (BINARY_SECTIONS.has(section)) {
+          const value = String(ans.value || '').trim().toUpperCase();
+          if (value === 'YES') totals[type] += 1;
+          return;
+        }
+
+        if (section === 'self_estimates') {
+          const rating = parseInt(String(ans.value || '').trim(), 10);
+          if (Number.isInteger(rating) && rating >= 1 && rating <= 6) {
             totals[type] += rating;
           }
         }
       });
 
-      // Calculate Holland code: sort by score descending, take top 3 letters
-      const sorted = Object.entries(totals).sort(([, valA], [, valB]) => valB - valA);
-      const hollandCode = sorted.slice(0, 3).map(([letter]) => letter).join('') || 'RIA';
+      const { primaryCode: hollandCode, displayCode: hollandCodeDisplay } = this.buildHollandCodes(totals, 0);
 
       await assessment.update({
         scoreR: totals.R,
@@ -71,7 +194,8 @@ class ScoringService {
       const recommendations = await this.getRecommendations(
         hollandCode, 
         assessment.user.educationLevel,
-        transaction
+        transaction,
+        { scores: totals, displayCode: hollandCodeDisplay }
       );
 
       await transaction.commit();
@@ -81,7 +205,7 @@ class ScoringService {
         await AuditLog.create({
           userId: assessment.userId,
           actionType: 'ASSESSMENT_COMPLETED_NOTIFY',
-          description: `${student?.firstName || 'Student'} ${student?.lastName || ''} completed their SDS assessment. Holland Code: ${hollandCode}`,
+          description: `${student?.firstName || 'Student'} ${student?.lastName || ''} completed their SDS assessment. Holland Code: ${hollandCodeDisplay}`,
           details: {
             assessmentId,
             userId: assessment.userId,
@@ -89,6 +213,7 @@ class ScoringService {
             studentEmail: student?.email || null,
             institutionId: student?.institutionId || null,
             hollandCode,
+            hollandCodeDisplay,
             isRead: false
           },
           ipAddress: '127.0.0.1',
@@ -101,6 +226,7 @@ class ScoringService {
       return {
         scores: totals,
         hollandCode,
+        hollandCodeDisplay,
         recommendations
       };
 
@@ -150,8 +276,17 @@ class ScoringService {
    * - Institutions offering those courses
    * - Entry requirements per course
    */
-  async getRecommendations(code, eduLevel, transaction = null) {
+  async getRecommendations(code, eduLevel, transaction = null, profile = null) {
     const opts = transaction ? { transaction } : {};
+    const normalizedCode = this.normalizeHollandCode(code);
+    const variants = this.buildCodeVariants(normalizedCode, profile?.displayCode);
+    const weights = this.buildWeightsFromScores(profile?.scores) || this.buildWeightsFromCodeVariants(normalizedCode, variants);
+    const codeLetters = normalizedCode.length
+      ? normalizedCode.split('')
+      : RIASEC_KEYS
+          .filter((k) => Number(weights?.[k] || 0) > 0)
+          .sort((a, b) => Number(weights[b] || 0) - Number(weights[a] || 0))
+          .slice(0, 3);
 
     // 1. Validate education level
     const levelExists = eduLevel
@@ -175,41 +310,40 @@ class ScoringService {
       }
     ];
 
+    const occupationWhere = {
+      [Op.or]: [
+        ...(variants.length > 0 ? [{ code: { [Op.in]: variants } }] : []),
+        ...codeLetters.map((letter) => ({ code: { [Op.iLike]: `%${letter}%` } })),
+      ]
+    };
+
     let occupations = await Occupation.findAll({
-      where: { code },
+      where: occupationWhere,
       include: occupationIncludes,
       ...opts
     });
-
-    // Fallback: try partial match on any 2 of 3 letters
-    if (occupations.length === 0 && code && code.length >= 2) {
-      const letters = code.split('');
-      occupations = await Occupation.findAll({
-        where: {
-          [Op.or]: letters.map(l => ({
-            code: { [Op.iLike]: `%${l}%` }
-          }))
-        },
-        limit: 15,
-        include: occupationIncludes,
-        ...opts
-      });
-    }
+    occupations = occupations
+      .map((occ) => {
+        const weightedScore = this.scoreCandidateByWeights(weights, occ.code);
+        occ.setDataValue('relevanceScore', Number((weightedScore * 100).toFixed(2)));
+        return occ;
+      })
+      .filter((occ) => occ.getDataValue('relevanceScore') >= 90)
+      .sort((a, b) => b.getDataValue('relevanceScore') - a.getDataValue('relevanceScore') || a.name.localeCompare(b.name))
+      .slice(0, MAX_OCCUPATION_RECOMMENDATIONS);
 
     // 3. Find matching courses by RIASEC code overlap
     let courses = [];
     try {
-      const codeLetters = code ? code.split('') : [];
-      
-      courses = await Course.findAll({
+      const broadCourses = await Course.findAll({
         where: {
           isActive: true,
-          [Op.or]: codeLetters.length > 0
-            ? codeLetters.map(l => sequelize.where(
-                sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
-                { [Op.iLike]: `%${l}%` }
-              ))
-            : [{ id: { [Op.ne]: null } }]
+          [Op.or]: codeLetters.map((letter) => (
+            sequelize.where(
+              sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
+              { [Op.iLike]: `%${letter}%` }
+            )
+          ))
         },
         include: [
           { model: CourseRequirement, as: 'requirements' },
@@ -235,22 +369,43 @@ class ScoringService {
         order: [['funding_priority', 'DESC'], ['name', 'ASC']],
         ...opts
       });
+
+      courses = broadCourses
+        .map((course) => {
+          const candidateCodes = Array.isArray(course.riasecCodes) ? course.riasecCodes : [];
+          const weightedScore = candidateCodes.reduce((max, c) => {
+            const score = this.scoreCandidateByWeights(weights, c);
+            return score > max ? score : max;
+          }, 0);
+          const hasInstitutionLink = Array.isArray(course.courseInstitutions) && course.courseInstitutions.length > 0;
+          const institutionScore = hasInstitutionLink ? 10 : 0;
+          const relevanceScore = Number((weightedScore * 100).toFixed(2)) + institutionScore;
+          course.setDataValue('relevanceScore', relevanceScore);
+          return course;
+        })
+        .filter((course) => course.getDataValue('relevanceScore') >= 80)
+        .sort((a, b) => {
+          const byScore = b.getDataValue('relevanceScore') - a.getDataValue('relevanceScore');
+          if (byScore !== 0) return byScore;
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, MAX_COURSE_RECOMMENDATIONS);
     } catch (_err) {
       courses = [];
     }
 
     // 4. Suggested subjects from Holland code (dynamic from database)
-    const suggestedSubjects = await this.getSuggestedSubjects(code, transaction);
+    const suggestedSubjects = await this.getSuggestedSubjects(profile?.displayCode || code, transaction);
 
     // 5. Government Funding Priority Alignment (driven by course.funding_priority)
-    const fundingAlignment = this.computeFundingAlignment(code, courses);
+    const fundingAlignment = this.computeFundingAlignment(normalizedCode, courses);
 
     return {
       occupations,
       courses,
       suggestedSubjects,
       fundingAlignment,
-      hollandCode: code,
+      hollandCode: normalizedCode,
       educationLevel: levelExists
     };
   }
