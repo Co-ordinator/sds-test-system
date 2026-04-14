@@ -37,7 +37,7 @@ const generateUniqueUsername = async (base, transaction) => {
  *   class          | class_name | className        — e.g. A, Blue
  *   gender                                         — male|female|other
  *
- * Returns array of credentials including plain-text passwords for card printing.
+ * Returns non-sensitive import details.
  */
 const bulkCreateStudents = async (csvData, institutionId) => {
   const records = parse(csvData, {
@@ -53,7 +53,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
   const defaultEduLevelId = await EducationLevel.min('id');
   const currentYear = new Date().getFullYear();
 
-  const credentials = [];
+  const importedStudents = [];
   const transaction = await User.sequelize.transaction();
 
   try {
@@ -140,12 +140,11 @@ const bulkCreateStudents = async (csvData, institutionId) => {
         }, { transaction });
       }
 
-      credentials.push({
+      importedStudents.push({
         studentNumber: studentNumber || null,
         studentCode: user.studentCode,
         username: user.username,
         email: user.email || null,
-        password,
         firstName: user.firstName,
         lastName: user.lastName,
         grade: grade || null,
@@ -157,7 +156,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
 
     // Fire-and-forget: send credential emails to students who have an email address
     const loginUrl = process.env.FRONTEND_URL || 'https://careers.gov.sz';
-    const studentsWithEmail = credentials.filter(c => c.email);
+    const studentsWithEmail = importedStudents.filter(c => c.email);
     if (studentsWithEmail.length > 0) {
       setImmediate(async () => {
         for (const c of studentsWithEmail) {
@@ -170,7 +169,6 @@ const bulkCreateStudents = async (csvData, institutionId) => {
                 firstName: c.firstName,
                 lastName: c.lastName,
                 studentCode: c.studentCode,
-                password: c.password,
                 grade: c.grade || null,
                 className: c.className || null,
                 loginUrl
@@ -183,7 +181,10 @@ const bulkCreateStudents = async (csvData, institutionId) => {
       });
     }
 
-    return credentials;
+    return {
+      importedCount: importedStudents.length,
+      students: importedStudents
+    };
   } catch (error) {
     await transaction.rollback();
     throw error;

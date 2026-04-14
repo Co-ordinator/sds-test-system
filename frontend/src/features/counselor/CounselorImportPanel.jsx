@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Upload, Download } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { GOV, TYPO } from '../../theme/government';
 import { useToast } from '../../components/ui/StatusIndicators';
 import { counselorService } from '../../services/counselorService';
@@ -31,27 +31,15 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
     setImportError(null);
     setImportResult(null);
     try {
-      const credentials = await counselorService.importStudents(csvText, isAdmin ? importInstitutionId : '');
-      setImportResult(credentials);
+      const report = await counselorService.importStudents(csvText, isAdmin ? importInstitutionId : '');
+      setImportResult(report);
       setCsvText('');
       setImportFile(null);
       onImportComplete?.();
-      showToast(`Imported ${credentials.length} students`);
+      showToast(`Imported ${report.importedCount} students`);
     } catch (err) {
       setImportError(err.response?.data?.message || 'Import failed. Check your CSV format.');
     } finally { setIsSaving(false); }
-  };
-
-  const downloadCredentials = () => {
-    const rows = [
-      'Login Number,Username,Password,Name',
-      ...importResult.map(c => `${c.studentCode || ''},${c.username},${c.password},"${c.fullName || `${c.firstName || ''} ${c.lastName || ''}`.trim()}"`)
-    ].join('\n');
-    const blob = new Blob([rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'student_credentials.csv'; a.click();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -66,7 +54,7 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
             <code className="font-mono block">student_number, first_name, last_name, national_id, grade, class, gender, email</code>
             <p className="text-[11px]">• <strong>national_id</strong> (PIN): 13-digit national ID number — <strong>required for each student</strong></p>
             <p className="text-[11px]">• System auto-generates a unique <strong>Login Number</strong> (e.g., SDS123456) for each student</p>
-            <p className="text-[11px]">• Passwords are auto-generated and shown below after import · Print login cards from the <strong>Login Cards</strong> tab</p>
+            <p className="text-[11px]">• Passwords are auto-generated securely and are never shown in the UI/API</p>
           </div>
 
           {isAdmin && (
@@ -97,13 +85,10 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
           </button>
         </div>
 
-        {importResult && importResult.length > 0 && (
+        {importResult && importResult.importedCount > 0 && (
           <div className="bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
             <div className="p-4 border-b flex items-center justify-between" style={{ borderColor: GOV.border }}>
-              <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Import Successful — {importResult.length} students</h3>
-              <button type="button" onClick={downloadCredentials} className="flex items-center gap-1 text-xs px-3 py-1.5 border rounded-md" style={{ borderColor: GOV.border, color: GOV.blue }}>
-                <Download className="w-3 h-3" /> Download Credentials
-              </button>
+              <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Import Successful — {importResult.importedCount} students</h3>
             </div>
             <div className="overflow-x-auto max-h-64">
               <table className="w-full text-left text-xs">
@@ -111,17 +96,15 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
                   <tr>
                     <th className="px-4 py-2 uppercase">Name</th>
                     <th className="px-4 py-2 uppercase">Login Number</th>
-                    <th className="px-4 py-2 uppercase">Password</th>
                     <th className="px-4 py-2 uppercase">Grade</th>
                     <th className="px-4 py-2 uppercase">Class</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {importResult.map((c, idx) => (
+                  {importResult.students.map((c, idx) => (
                     <tr key={idx} className="border-b" style={{ borderColor: GOV.borderLight }}>
                       <td className="px-4 py-2" style={{ color: GOV.text }}>{`${c.firstName || ''} ${c.lastName || ''}`.trim() || '–'}</td>
                       <td className="px-4 py-2 font-mono font-semibold" style={{ color: GOV.blue }}>{c.studentCode || '–'}</td>
-                      <td className="px-4 py-2 font-mono" style={{ color: GOV.textMuted }}>{c.password}</td>
                       <td className="px-4 py-2" style={{ color: GOV.textMuted }}>{c.grade || '–'}</td>
                       <td className="px-4 py-2" style={{ color: GOV.textMuted }}>{c.className || '–'}</td>
                     </tr>

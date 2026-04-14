@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const { hashValue, encryptValue, decryptValue } = require('../utils/security.util');
 
 // Helper function to parse national ID
 const parseNationalId = (nationalId) => {
@@ -77,13 +78,32 @@ module.exports = (sequelize, DataTypes) => {
     },
     nationalId: {
       type: DataTypes.STRING,
-      unique: true,
       allowNull: true,
       field: 'national_id',
+      set(value) {
+        if (!value) {
+          this.setDataValue('nationalId', null);
+          this.setDataValue('nationalIdHash', null);
+          return;
+        }
+        const normalized = String(value).trim();
+        this.setDataValue('nationalId', encryptValue(normalized));
+        this.setDataValue('nationalIdHash', hashValue(normalized));
+      },
+      get() {
+        const encrypted = this.getDataValue('nationalId');
+        return decryptValue(encrypted);
+      },
       validate: {
         len: [13, 13],
         isNumeric: true
       }
+    },
+    nationalIdHash: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true,
+      field: 'national_id_hash'
     },
     dateOfBirth: {
       type: DataTypes.DATEONLY,
@@ -336,7 +356,7 @@ module.exports = (sequelize, DataTypes) => {
     indexes: [
       { fields: ['username'], unique: true },
       { fields: ['email'], unique: true },
-      { fields: ['national_id'], unique: true },
+      { fields: ['national_id_hash'], unique: true },
       { fields: ['student_number'], unique: true },
       { fields: ['student_code'], unique: true },
       { fields: ['institution_id'] },
@@ -394,6 +414,7 @@ module.exports = (sequelize, DataTypes) => {
     delete values.emailVerificationToken;
     delete values.refreshToken;
     delete values.refreshTokenExpires;
+    delete values.nationalIdHash;
     return values;
   };
   

@@ -2,6 +2,7 @@
 
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const now = new Date();
 
 /**
@@ -10,7 +11,6 @@ const now = new Date();
  *          1 university student, 1 professional
  *
  * NOTE: bulkInsert bypasses model hooks, so passwords are pre-hashed here.
- * Credentials summary at end of file.
  */
 
 module.exports = {
@@ -33,6 +33,7 @@ module.exports = {
     };
 
     // ── Pre-hash passwords ────────────────────────────────────────
+    const seededPassword = (envKey) => process.env[envKey] || crypto.randomBytes(12).toString('base64url');
     const hash = (plain) => bcrypt.hashSync(plain, 10);
 
     const UNESWA   = byName('University of Eswatini');
@@ -49,7 +50,7 @@ module.exports = {
         id: uuidv4(),
         username: 'sysadmin',
         email: 'admin@labor.gov.sz',
-        password: hash('Admin@123'),
+        password: hash(seededPassword('SEED_ADMIN_PASSWORD')),
         first_name: 'Sipho',
         last_name: 'Dlamini',
         gender: 'male',
@@ -80,7 +81,7 @@ module.exports = {
         id: uuidv4(),
         username: 'testadmin.mbabane',
         email: 'testadmin@labor.gov.sz',
-        password: hash('TestAdmin@123'),
+        password: hash(seededPassword('SEED_TEST_ADMIN_PASSWORD')),
         first_name: 'Nomvula',
         last_name: 'Nkosi',
         gender: 'female',
@@ -113,7 +114,7 @@ module.exports = {
         id: uuidv4(),
         username: '20250101',
         email: null,
-        password: hash('Pass@2025'),
+        password: hash(seededPassword('SEED_SCHOOL_TEST_TAKER_PASSWORD')),
         first_name: 'Thabo',
         last_name: 'Zwane',
         gender: 'male',
@@ -146,7 +147,7 @@ module.exports = {
         id: uuidv4(),
         username: 'zanele.motsa',
         email: 'zanele.motsa@student.uneswa.sz',
-        password: hash('Student@123'),
+        password: hash(seededPassword('SEED_UNIVERSITY_TEST_TAKER_PASSWORD')),
         first_name: 'Zanele',
         last_name: 'Motsa',
         gender: 'female',
@@ -179,7 +180,7 @@ module.exports = {
         id: uuidv4(),
         username: 'mandla.dlamini',
         email: 'mandla.dlamini@gmail.com',
-        password: hash('Professional@123'),
+        password: hash(seededPassword('SEED_PROFESSIONAL_TEST_TAKER_PASSWORD')),
         first_name: 'Mandla',
         last_name: 'Dlamini',
         gender: 'male',
@@ -209,14 +210,6 @@ module.exports = {
     await queryInterface.bulkInsert('users', users, { ignoreDuplicates: true });
     console.log(`Inserted ${users.length} users.`);
 
-    /*
-     * ── Credentials Summary ───────────────────────────────────────
-     * Admin:              admin@labor.gov.sz             / Admin@123
-     * Test Administrator: testadmin@labor.gov.sz         / TestAdmin@123
-     * School Test Taker:  username=20250101              / Pass@2025
-     * Uni Test Taker:     zanele.motsa@student.uneswa.sz / Student@123
-     * Professional:       mandla.dlamini@gmail.com       / Professional@123
-     */
   },
 
   async down(queryInterface) {

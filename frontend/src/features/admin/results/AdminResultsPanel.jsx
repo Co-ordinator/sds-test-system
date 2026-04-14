@@ -6,7 +6,7 @@ import DataTable from '../../../components/data/DataTable';
 import { StatusBadge, useToast, ErrorBanner } from '../../../components/ui/StatusIndicators';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { adminService } from '../../../services/adminService';
-import { usePermissions, PermissionGate } from '../../../context/PermissionContext';
+import { usePermissions } from '../../../context/PermissionContext';
 
 const AdminResultsPanel = () => {
   const navigate = useNavigate();

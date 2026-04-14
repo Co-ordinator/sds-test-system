@@ -221,7 +221,7 @@ module.exports = {
       res.status(201).json({
         status: 'success',
         message: `${roleLabel} created successfully. Login credentials sent to ${user.email}.`,
-        data: { user: user.toJSON(), tempPassword }
+        data: { user: user.toJSON() }
       });
     } catch (error) {
       if (error.message.includes('required') || error.message.includes('Invalid role') || error.message.includes('already exists')) {

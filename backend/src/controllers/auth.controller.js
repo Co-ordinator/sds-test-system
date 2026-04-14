@@ -4,6 +4,14 @@ const { logAuthAction } = require('../middleware/authentication.middleware');
 const { sendEmail } = require('../config/email.config');
 const logger = require('../utils/logger');
 
+const ACCESS_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 60 * 60 * 1000,
+  path: '/api/v1'
+};
+
 const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
@@ -14,8 +22,16 @@ const setRefreshTokenCookie = (res, token) => {
   });
 };
 
+const setAccessTokenCookie = (res, token) => {
+  res.cookie('accessToken', token, ACCESS_COOKIE_OPTIONS);
+};
+
 const clearRefreshTokenCookie = (res) => {
   res.clearCookie('refreshToken', { path: '/api/v1/auth', httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' });
+};
+
+const clearAccessTokenCookie = (res) => {
+  res.clearCookie('accessToken', { ...ACCESS_COOKIE_OPTIONS, maxAge: undefined });
 };
 
 const register = async (req, res, next) => {
@@ -24,6 +40,7 @@ const register = async (req, res, next) => {
     logger.info({ actionType: 'REGISTER', message: `User registered: ${user.email}`, req, details: { email: user.email, role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
     setRefreshTokenCookie(res, refreshToken);
+    setAccessTokenCookie(res, token);
 
     res.status(201).json({ status: 'success', token, data: { user: user.toJSON() } });
 
@@ -52,8 +69,9 @@ const verifyEmail = async (req, res, next) => {
     const { user, token, refreshToken, alreadyVerified } = await authService.verifyEmail(req.params.token);
     if (!alreadyVerified) {
       logger.info({ actionType: 'VERIFY_EMAIL', message: `Email verified for user: ${user.email}`, req, details: { userId: user.id } });
-      await AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Email verified', details: { resourceType: 'user', resourceId: user.id, requestMethod: 'GET', requestPath: `/api/v1/auth/verify-email/${req.params.token}` }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
+      await AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Email verified', details: { resourceType: 'user', resourceId: user.id, requestMethod: 'GET', requestPath: '/api/v1/auth/verify-email/[REDACTED]' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
     }
+    if (token) setAccessTokenCookie(res, token);
     if (refreshToken) setRefreshTokenCookie(res, refreshToken);
     res.status(200).json({ status: 'success', message: alreadyVerified ? 'Your email is already verified. Please log in.' : (token ? 'Email successfully verified!' : 'Email successfully verified. Please log in.'), ...(token ? { token } : {}), data: { user: user.toJSON() } });
   } catch (error) {
@@ -70,6 +88,7 @@ const login = async (req, res, next) => {
     logger.info({ actionType: 'LOGIN', message: `User logged in: ${user.email}`, req, details: { userId: user.id } });
     await logAuthAction(req, 'LOGIN', user.id);
     setRefreshTokenCookie(res, refreshToken);
+    setAccessTokenCookie(res, token);
     res.status(200).json({ status: 'success', token, mustChangePassword, data: { user: user.toJSON ? user.toJSON() : user } });
   } catch (error) {
     logger.warn({ actionType: 'LOGIN_FAILED', message: error.message, req });
@@ -132,6 +151,7 @@ const resetPassword = async (req, res, next) => {
     logger.info({ actionType: 'RESET_PASSWORD', message: `Password reset for user: ${user.email}`, req, details: { userId: user.id } });
     await logAuthAction(req, 'PASSWORD_CHANGE', user.id);
     setRefreshTokenCookie(res, refreshToken);
+    setAccessTokenCookie(res, token);
     res.status(200).json({ status: 'success', token });
   } catch (error) {
     logger.error({ actionType: 'RESET_PASSWORD_FAILED', message: 'Failed to reset password', req, details: { error: error.message } });
@@ -143,6 +163,7 @@ const resetPassword = async (req, res, next) => {
 const refreshToken = async (req, res, next) => {
   try {
     const { newAccessToken } = await authService.refreshAccessToken(req.cookies?.refreshToken);
+    setAccessTokenCookie(res, newAccessToken);
     res.status(200).json({ status: 'success', token: newAccessToken });
   } catch (error) {
     logger.error({ actionType: 'REFRESH_TOKEN_FAILED', message: 'Failed to refresh token', req, details: { error: error.message } });
@@ -155,6 +176,7 @@ const logout = async (req, res, next) => {
   try {
     await authService.logout(req.cookies?.refreshToken);
     clearRefreshTokenCookie(res);
+    clearAccessTokenCookie(res);
     res.status(200).json({ status: 'success', message: 'Logged out successfully' });
   } catch (error) {
     logger.error({ actionType: 'LOGOUT_FAILED', message: 'Failed to logout', req, details: { error: error.message } });
@@ -182,6 +204,7 @@ const deleteUserAccount = async (req, res, next) => {
     const user = await authService.deleteUserAccount(req.user.id);
     logger.info({ actionType: 'ACCOUNT_DELETION', message: `User account deleted: ${user.email}`, req, details: { userId: user.id } });
     clearRefreshTokenCookie(res);
+    clearAccessTokenCookie(res);
     res.status(200).json({ status: 'success', message: 'Account deleted successfully' });
   } catch (error) {
     logger.error({ actionType: 'ACCOUNT_DELETION_FAILED', message: 'Failed to delete user account', req, details: { error: error.message } });

@@ -5,7 +5,6 @@ import {
 import FilterDialog from '../components/ui/FilterDialog';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { PermissionGate } from '../context/PermissionContext';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import { adminService } from '../services/adminService';

@@ -115,8 +115,8 @@ module.exports = {
     }
     if (!institutionId) throw new Error('Institution is required');
 
-    const credentials = await bulkCreateStudents(csvData, institutionId);
-    return { credentials, actor, institutionId };
+    const importReport = await bulkCreateStudents(csvData, institutionId);
+    return { importReport, actor, institutionId };
   },
 
   deleteStudent: async (actorId, actorRole, actorInstitutionId, studentId) => {

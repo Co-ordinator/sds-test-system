@@ -6,7 +6,6 @@ import DataTable from '../../../components/data/DataTable';
 import { ErrorBanner } from '../../../components/ui/StatusIndicators';
 import { useToast } from '../../../components/ui/StatusIndicators';
 import { adminService } from '../../../services/adminService';
-import { PermissionGate } from '../../../context/PermissionContext';
 
 const AdminCertificatesPanel = () => {
   const { toast, showToast, Toast: ToastComp } = useToast();

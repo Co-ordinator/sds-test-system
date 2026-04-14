@@ -28,9 +28,9 @@ const getInstitutionStats = async (req, res, next) => {
 const importStudents = async (req, res, next) => {
   try {
     const queryInstitutionId = req.query.institutionId || req.body?.institutionId;
-    const { credentials, actor, institutionId } = await counselorService.importStudents(req.user.id, req.body, queryInstitutionId);
-    logger.info({ actionType: 'COUNSELOR_STUDENTS_IMPORTED', message: `${actor.role} ${actor.id} imported ${credentials.length} students`, req, details: { actorId: actor.id, institutionId, count: credentials.length } });
-    return res.status(201).json({ status: 'success', data: { credentials } });
+    const { importReport, actor, institutionId } = await counselorService.importStudents(req.user.id, req.body, queryInstitutionId);
+    logger.info({ actionType: 'COUNSELOR_STUDENTS_IMPORTED', message: `${actor.role} ${actor.id} imported ${importReport.importedCount} students`, req, details: { actorId: actor.id, institutionId, count: importReport.importedCount } });
+    return res.status(201).json({ status: 'success', data: { importReport } });
   } catch (error) {
     if (error.message === 'CSV data is required' || error.message === 'Institution is required') return res.status(400).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'COUNSELOR_STUDENTS_IMPORT_FAILED', message: 'Failed to import students', req, details: { error: error.message, stack: error.stack } });

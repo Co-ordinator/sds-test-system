@@ -35,32 +35,18 @@ const processQueue = (error, token = null) => {
   failedQueue = [];
 };
 
-// Request interceptor for adding auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
 // Response interceptor for handling errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
-    const hasAccessToken = !!localStorage.getItem('token');
     
     if (
       error.response?.status === 401
       && originalRequest
       && !originalRequest._retry
       && !isAuthEndpoint(requestUrl)
-      && hasAccessToken
     ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -77,17 +63,11 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const response = await api.post('/api/v1/auth/refresh-token');
-        const { token } = response.data;
-        
-        localStorage.setItem('token', token);
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        processQueue(null, token);
+        await api.post('/api/v1/auth/refresh-token');
+        processQueue(null, true);
         return api(originalRequest);
       } catch (err) {
         processQueue(err, null);
-        localStorage.removeItem('token');
-        window.location.href = '/login';
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

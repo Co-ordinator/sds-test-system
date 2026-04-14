@@ -5,6 +5,9 @@ const {
   Question,
   Occupation
 } = require('./models');
+const crypto = require('crypto');
+
+const randomSeedPassword = () => crypto.randomBytes(12).toString('base64url');
 
 const EDUCATION_LEVELS = [
   { level: 1, description: 'Lower than matric' },
@@ -25,21 +28,21 @@ const INSTITUTIONS = [
 const TEST_USERS = [
   {
     email: 'admin@labor.gov.sz',
-    password: 'Admin@123',
+    password: process.env.SEED_ADMIN_PASSWORD || randomSeedPassword(),
     firstName: 'System',
     lastName: 'Admin',
     role: 'admin'
   },
   {
     email: 'counselor@labor.gov.sz',
-    password: 'Counselor@123',
+    password: process.env.SEED_COUNSELOR_PASSWORD || randomSeedPassword(),
     firstName: 'Career',
     lastName: 'Counselor',
     role: 'counselor'
   },
   {
     email: 'student@test.sz',
-    password: 'Student@123',
+    password: process.env.SEED_STUDENT_PASSWORD || randomSeedPassword(),
     firstName: 'Demo',
     lastName: 'Student',
     role: 'user'

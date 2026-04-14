@@ -41,7 +41,7 @@ export const counselorService = {
       ? `/api/v1/counselor/students/import?institutionId=${institutionId}`
       : '/api/v1/counselor/students/import';
     return api.post(url, csvText, { headers: { 'Content-Type': 'text/csv' } })
-      .then(r => r.data?.data?.credentials || []);
+      .then(r => r.data?.data?.importReport || { importedCount: 0, students: [] });
   },
 
   // ── Login cards ────────────────────────────────────────────────────────

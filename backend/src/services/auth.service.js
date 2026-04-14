@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { User, EducationLevel, Occupation, Institution } = require('../models');
 const { Op } = require('sequelize');
 const { generateStudentCode } = require('../utils/generateStudentCode');
+const { hashValue } = require('../utils/security.util');
 
 // Grade level text → education_levels.level mapping
 const GRADE_TO_EDUCATION_LEVEL = {
@@ -61,6 +62,11 @@ const signToken = (id, role) =>
 const signRefreshToken = (id, role) =>
   jwt.sign({ id, role }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
+const hashToken = (tokenValue) => {
+  if (!tokenValue) return null;
+  return crypto.createHash('sha256').update(tokenValue).digest('hex');
+};
+
 module.exports = {
   signToken,
   signRefreshToken,
@@ -77,7 +83,7 @@ module.exports = {
       throw Object.assign(new Error('National ID must be exactly 13 digits'), { status: 400 });
     }
 
-    const existingUser = await User.findOne({ where: { nationalId: cleanNationalId } });
+    const existingUser = await User.findOne({ where: { nationalIdHash: hashValue(cleanNationalId) } });
     if (existingUser) {
       throw Object.assign(new Error('An account with this National ID already exists. Please login instead.'), { status: 409 });
     }
@@ -100,13 +106,13 @@ module.exports = {
       studentCode,
       isConsentGiven: true,
       consentDate: new Date(),
-      emailVerificationToken: emailToken,
+      emailVerificationToken: hashToken(emailToken),
       emailVerificationExpires: emailTokenExpires
     });
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = refreshToken;
+    user.refreshToken = hashToken(refreshToken);
     user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await user.save();
 
@@ -116,7 +122,7 @@ module.exports = {
   /* ─── Verify Email ────────────────────────────────────────────────────── */
   verifyEmail: async (tokenParam) => {
     let user = await User.findOne({
-      where: { emailVerificationToken: tokenParam, emailVerificationExpires: { [Op.gt]: new Date() } }
+      where: { emailVerificationToken: hashToken(tokenParam), emailVerificationExpires: { [Op.gt]: new Date() } }
     });
 
     if (!user) {
@@ -147,7 +153,7 @@ module.exports = {
     try {
       token = signToken(user.id, user.role);
       refreshToken = signRefreshToken(user.id, user.role);
-      user.refreshToken = refreshToken;
+      user.refreshToken = hashToken(refreshToken);
       user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       await user.save();
     } catch (_) {}
@@ -179,7 +185,7 @@ module.exports = {
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = refreshToken;
+    user.refreshToken = hashToken(refreshToken);
     user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await user.save();
 
@@ -316,7 +322,7 @@ module.exports = {
     if (!user.email) throw Object.assign(new Error('Cannot send reset link: no email on file'), { status: 400 });
 
     const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    user.passwordResetToken = resetToken;
+    user.passwordResetToken = hashToken(resetToken);
     user.passwordResetExpires = new Date(Date.now() + 3600000);
     await user.save();
 
@@ -327,7 +333,7 @@ module.exports = {
   resetPassword: async (tokenParam, newPassword) => {
     const decoded = jwt.verify(tokenParam, process.env.JWT_SECRET);
     const user = await User.findOne({
-      where: { id: decoded.id, passwordResetToken: tokenParam, passwordResetExpires: { [Op.gt]: new Date() } }
+      where: { id: decoded.id, passwordResetToken: hashToken(tokenParam), passwordResetExpires: { [Op.gt]: new Date() } }
     });
     if (!user) throw Object.assign(new Error('Token is invalid or has expired'), { status: 400 });
 
@@ -338,6 +344,9 @@ module.exports = {
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);
+    user.refreshToken = hashToken(refreshToken);
+    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await user.save();
     return { user, token, refreshToken };
   },
 
@@ -346,7 +355,7 @@ module.exports = {
     if (!refreshTokenValue) throw Object.assign(new Error('No refresh token provided'), { status: 401 });
     const decoded = jwt.verify(refreshTokenValue, process.env.JWT_REFRESH_SECRET);
     const user = await User.findOne({
-      where: { id: decoded.id, refreshToken: refreshTokenValue, refreshTokenExpires: { [Op.gt]: new Date() } }
+      where: { id: decoded.id, refreshToken: hashToken(refreshTokenValue), refreshTokenExpires: { [Op.gt]: new Date() } }
     });
     if (!user) throw Object.assign(new Error('Invalid or expired refresh token'), { status: 401 });
     const newAccessToken = signToken(user.id, user.role);
@@ -356,7 +365,7 @@ module.exports = {
   /* ─── Logout ──────────────────────────────────────────────────────────── */
   logout: async (refreshTokenValue) => {
     if (refreshTokenValue) {
-      const user = await User.findOne({ where: { refreshToken: refreshTokenValue } });
+      const user = await User.findOne({ where: { refreshToken: hashToken(refreshTokenValue) } });
       if (user) {
         user.refreshToken = null;
         user.refreshTokenExpires = null;
@@ -389,7 +398,7 @@ module.exports = {
     if (user.isEmailVerified) throw Object.assign(new Error('Email is already verified'), { status: 400 });
 
     const emailToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = emailToken;
+    user.emailVerificationToken = hashToken(emailToken);
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
 

@@ -249,7 +249,6 @@ export default function Profile() {
     setIsDeleting(true);
     try {
       await api.delete('/api/v1/auth/users/me/account');
-      localStorage.removeItem('token');
       window.location.href = '/';
     } catch (err) {
       console.error(err.response?.data?.message || 'Deletion failed');

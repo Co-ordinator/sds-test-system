@@ -14,14 +14,6 @@ export const AuthProvider = ({ children }) => {
   // Check for active session on initial load
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setUser(null);
-        setIsAuthenticated(false);
-        setLoading(false);
-        return;
-      }
-
       try {
         const response = await api.get('/api/v1/auth/me');
         const userData = response.data?.data?.user ?? response.data?.user;
@@ -41,7 +33,6 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (credentials) => {
     try {
       const response = await api.post('/api/v1/auth/login', credentials);
-      localStorage.setItem('token', response.data.token);
       setUser(response.data.data?.user ?? response.data.user);
       setIsAuthenticated(true);
       return response.data;
@@ -51,7 +42,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const setSession = useCallback((token, userData) => {
-    if (token) localStorage.setItem('token', token);
     setUser(userData ?? null);
     setIsAuthenticated(!!userData);
   }, []);
@@ -59,7 +49,6 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(async () => {
     try {
       await api.post('/api/v1/auth/logout');
-      localStorage.removeItem('token');
       setUser(null);
       setIsAuthenticated(false);
       navigate('/login');

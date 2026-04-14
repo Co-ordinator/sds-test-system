@@ -42,13 +42,43 @@ const requestMetadata = winston.format((info) => {
   return info;
 });
 
+const SENSITIVE_KEYS = new Set([
+  'password', 'newpassword', 'currentpassword', 'confirmpassword',
+  'token', 'accesstoken', 'refreshtoken', 'passwordresettoken', 'emailverificationtoken',
+  'authorization', 'apikey', 'secret', 'nationalid', 'national_id',
+  'email', 'phonenumber', 'phone_number', 'address'
+]);
+
+const redactValue = (value) => {
+  if (!value || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map(redactValue);
+  const output = {};
+  for (const [key, nested] of Object.entries(value)) {
+    const lowered = key.toLowerCase();
+    output[key] = SENSITIVE_KEYS.has(lowered) ? '[REDACTED]' : redactValue(nested);
+  }
+  return output;
+};
+
+const redactPathTokens = (pathValue) => {
+  if (typeof pathValue !== 'string') return pathValue;
+  return pathValue
+    .replace(/(\/verify-email\/)[^/?#]+/i, '$1[REDACTED]')
+    .replace(/(\/reset-password\/)[^/?#]+/i, '$1[REDACTED]');
+};
+
 // Redact sensitive information
 const redactSensitive = winston.format((info) => {
-  if (info.body) {
-    if (info.body.password) info.body.password = '[REDACTED]';
-    if (info.body.token) info.body.token = '[REDACTED]';
-    if (info.body.nationalId) info.body.nationalId = '[REDACTED]';
+  if (info.req) {
+    info.req.body = redactValue(info.req.body);
+    info.req.params = redactValue(info.req.params);
+    info.req.query = redactValue(info.req.query);
+    info.req.url = redactPathTokens(info.req.url);
+    info.req.path = redactPathTokens(info.req.path);
   }
+  if (info.body) info.body = redactValue(info.body);
+  if (info.details) info.details = redactValue(info.details);
+  if (typeof info.message === 'string') info.message = redactPathTokens(info.message);
   return info;
 });
 

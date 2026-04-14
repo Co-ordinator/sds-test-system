@@ -10,7 +10,7 @@ const handleJWTError = () => {
 
 // Middleware to verify JWT token
 const verifyToken = (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.headers.authorization?.split(' ')[1] || req.cookies?.accessToken;
 
   if (!token) {
     return next(handleJWTError());

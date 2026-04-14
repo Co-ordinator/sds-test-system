@@ -3,9 +3,13 @@ const logger = require('../utils/logger');
 
 // Custom Morgan format
 const morganFormat = (tokens, req, res) => {
+  const rawUrl = tokens.url(req, res);
+  const redactedUrl = rawUrl
+    ?.replace(/(\/verify-email\/)[^/?#]+/i, '$1[REDACTED]')
+    ?.replace(/(\/reset-password\/)[^/?#]+/i, '$1[REDACTED]');
   return JSON.stringify({
     method: tokens.method(req, res),
-    url: tokens.url(req, res),
+    url: redactedUrl,
     status: tokens.status(req, res),
     responseTime: `${tokens['response-time'](req, res)}ms`,
     remoteAddr: tokens['remote-addr'](req, res),
