@@ -50,7 +50,7 @@ export const ESWATINI_GEOJSON = {
         "COUNTRY": "SWAZILAND",
         "Admin2Name": "Shiselweni",
         "Admin2ID": "SZ4",
-        "fill": "#FF5733"
+        "fill": "#60a5fa"
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -11900,7 +11900,7 @@ export const ESWATINI_GEOJSON = {
         "COUNTRY": "SWAZILAND",
         "Admin2Name": "Lubombo",
         "Admin2ID": "SZ2",
-        "fill": "#33FF57"
+        "fill": "#3b82f6"     
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -25190,7 +25190,7 @@ export const ESWATINI_GEOJSON = {
         "COUNTRY": "SWAZILAND",
         "Admin2Name": "Hhohho",
         "Admin2ID": "SZ1",
-        "fill": "#F333FF"
+        "fill": "#1d4ed8"
       },
       "geometry": {
         "type": "MultiPolygon",
@@ -39580,7 +39580,7 @@ export const ESWATINI_GEOJSON = {
         "COUNTRY": "SWAZILAND",
         "Admin2Name": "Manzini",
         "Admin2ID": "SZ3",
-        "fill": "#3357FF"
+        "fill": "#2563eb"
       },
       "geometry": {
         "type": "MultiPolygon",

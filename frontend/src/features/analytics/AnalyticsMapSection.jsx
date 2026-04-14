@@ -187,7 +187,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
             <p className="text-xs font-semibold mb-2" style={{ color: GOV.textMuted }}>Legend</p>
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(to right, rgba(30,58,95,0.2), rgba(30,58,95,0.88))' }} />
+                <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(to right, rgba(96,165,250,0.55), rgba(29,78,216,0.88))' }} />
                 <span style={{ color: GOV.text }}>User Density</span>
               </div>
               <div className="flex items-center gap-2">

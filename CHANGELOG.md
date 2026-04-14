@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.14.3] - 2026-04-14
+
+### Fixed - Role-specific dashboard routing
+
+- Test Administrator navigation now routes to `/test-administrator` instead of System Admin dashboard paths.
+- Logo and user menu dashboard links now resolve to the logged-in user's correct dashboard route.
+- Applied in:
+  - `frontend/src/components/layout/AppShell.jsx`
+  - `frontend/src/components/layout/AssessmentShell.jsx`
+
+### Fixed - System Admin dashboard filters
+
+- Normalized region filter values before API requests to avoid casing mismatches.
+- Fixed backend trend query ambiguity by qualifying `Assessment.created_at` and `Assessment.id` when filters introduce joins.
+- Included region metadata in admin assessment queries to support accurate institution and regional filtering.
+- Applied in:
+  - `frontend/src/pages/AdminDashboard.jsx`
+  - `backend/src/services/analytics.service.js`
+  - `backend/src/services/admin.service.js`
+
+### Fixed - Assessment timer persistence
+
+- Timer now continues correctly after pause/resume.
+- Timer state now persists across refresh while an assessment is in progress.
+- Timer cache is cleared after assessment submission.
+- Applied in:
+  - `frontend/src/pages/Questionnaire.jsx`
+
+### Fixed - Profile onboarding and occupation edit stability
+
+- Resolved runtime error when typing into current occupation for existing profiles by restoring `currentOccupationId` mapping.
+- Added onboarding fallback logic for legacy users without explicit `onboardingCompleted` values.
+- Applied in:
+  - `frontend/src/pages/Profile.jsx`
+  - `frontend/src/utils/profileOnboarding.js`
+
+### Updated - Database connection configuration
+
+- Added SSL-aware database configuration for hosted PostgreSQL environments.
+- Added support for separate test DB host/user/password overrides.
+- Applied in:
+  - `backend/config/config.js`
+  - `backend/src/config/database.config.js`
+
 ## [2.14.2] - 2026-03-24
 
 ### Added — Full Glossary Page with Learning Tracking

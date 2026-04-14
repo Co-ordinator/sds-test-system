@@ -266,8 +266,8 @@ module.exports = {
       include: [{
         model: User, as: 'user', required: Object.keys(userWhere).length > 0,
         where: userWhere,
-        attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId'],
-        include: [{ model: Institution, as: 'institution', attributes: ['id', 'name'] }]
+        attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'region'],
+        include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'region', 'type'] }]
       }],
       order: [['createdAt', 'DESC']],
       limit: Number(limit),

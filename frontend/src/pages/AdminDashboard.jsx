@@ -28,6 +28,8 @@ import {
 } from 'recharts';
 import { PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../features/analytics/analyticsConstants';
 
+const normalizeRegion = (value) => (value || '').toString().trim().toLowerCase();
+
 const AdminDashboard = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
@@ -50,7 +52,7 @@ const AdminDashboard = () => {
 
   const buildParams = () => {
     const p = new URLSearchParams();
-    if (filters.region) p.set('region', filters.region);
+    if (filters.region) p.set('region', normalizeRegion(filters.region));
     if (filters.institutionId) p.set('institutionId', filters.institutionId);
     if (filters.startDate) p.set('startDate', filters.startDate);
     if (filters.endDate) p.set('endDate', filters.endDate);
@@ -137,12 +139,15 @@ const AdminDashboard = () => {
   );
 
   const regionalChartData = useMemo(
-    () => (regionalData?.regions || []).map(r => ({
-      key: r.region,
-      region: REGION_LABELS[r.region] || r.region,
-      users: Number(r.totalUsers || 0),
-      completed: Number(r.completedAssessments || 0),
-    })),
+    () => (regionalData?.regions || []).map((r) => {
+      const key = normalizeRegion(r.region) || 'unknown';
+      return {
+        key,
+        region: REGION_LABELS[key] || r.region || 'Unknown',
+        users: Number(r.totalUsers || 0),
+        completed: Number(r.completedAssessments || 0),
+      };
+    }),
     [regionalData]
   );
 
@@ -156,15 +161,19 @@ const AdminDashboard = () => {
     const parseDate = (v) => (v ? new Date(v) : null);
     const start = parseDate(filters.startDate);
     const end = parseDate(filters.endDate);
+    const selectedRegion = normalizeRegion(filters.region);
     // Keep date filtering inclusive of the selected "to" date.
     if (end) end.setHours(23, 59, 59, 999);
 
     assessments.forEach((a) => {
       const inst = a.user?.institution;
+      const institutionRegion = normalizeRegion(inst?.region);
+      const userRegion = normalizeRegion(a.user?.region);
+      const rowRegion = institutionRegion || userRegion || 'unknown';
       const completedAt = parseDate(a.completedAt || a.createdAt);
       if (start && completedAt && completedAt < start) return;
       if (end && completedAt && completedAt > end) return;
-      if (filters.region && inst?.region !== filters.region) return;
+      if (selectedRegion && rowRegion !== selectedRegion) return;
       if (filters.institutionId && String(inst?.id) !== String(filters.institutionId)) return;
 
       const key = inst?.id || a.user?.institutionId || 'unknown';
@@ -172,7 +181,7 @@ const AdminDashboard = () => {
         map.set(key, {
           id: key,
           institutionName: inst?.name || 'Unknown Institution',
-          region: inst?.region || 'unknown',
+          region: rowRegion,
           tested: 0,
           completed: 0,
           topCode: null,
@@ -202,7 +211,11 @@ const AdminDashboard = () => {
   }, [assessments, filters.endDate, filters.institutionId, filters.region, filters.startDate]);
 
   const selectedRegionDetail = useMemo(
-    () => (filters.region ? (regionalData?.regions || []).find(r => r.region === filters.region) : null),
+    () => (
+      filters.region
+        ? (regionalData?.regions || []).find((r) => normalizeRegion(r.region) === normalizeRegion(filters.region))
+        : null
+    ),
     [filters.region, regionalData]
   );
 

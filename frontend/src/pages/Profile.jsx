@@ -68,7 +68,7 @@ export default function Profile() {
     accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).label('Accessibility Needs')
   });
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm({
     resolver: joiResolver(schema)
   });
 
@@ -86,7 +86,7 @@ export default function Profile() {
           });
           setOccupation({
             name: user.currentOccupation || '',
-            id: null,
+            id: user.currentOccupationId || null,
           });
         }
       } catch (err) {

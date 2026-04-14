@@ -73,12 +73,20 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const role = user?.role || 'Test Taker';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
+  const dashboardPath = role === 'System Administrator'
+    ? '/admin/dashboard'
+    : role === 'Test Administrator'
+      ? '/test-administrator'
+      : '/dashboard';
   const navLinks = useMemo(() => {
     if (isAdminLike) {
-      return ADMIN_NAV_LINKS.filter(link => !link.permission || hasPermission(link.permission));
+      const adminDashboardPath = role === 'Test Administrator' ? '/test-administrator' : '/admin/dashboard';
+      return ADMIN_NAV_LINKS
+        .map((link) => (link.label === 'Dashboard' ? { ...link, to: adminDashboardPath } : link))
+        .filter(link => !link.permission || hasPermission(link.permission));
     }
     return TEST_TAKER_NAV;
-  }, [isAdminLike, hasPermission]);
+  }, [isAdminLike, hasPermission, role]);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const notificationCount = useNotificationCount(isAdminLike);
   const roleLabel = ROLE_LABELS[role] || 'Test Taker';
@@ -90,6 +98,9 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
   useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
 
   const isActive = useCallback((to) => {
+    if (to === '/test-administrator') {
+      return location.pathname.startsWith('/test-administrator') || location.pathname.startsWith('/counselor');
+    }
     if (to === '/counselor' || to === '/counselor/dashboard') {
       return location.pathname.startsWith('/counselor');
     }
@@ -130,7 +141,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
               {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
             </button>
 
-            <Link to="/" className="flex-shrink-0 flex items-center gap-2">
+            <Link to={dashboardPath} className="flex-shrink-0 flex items-center gap-2">
               <img src="/siyinqaba.png" alt="Siyinqaba" className="h-10 w-auto object-contain" />
             </Link>
           </div>
@@ -214,12 +225,12 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
 
                     {isAdminLike && (
                       <Link
-                        to="/admin/dashboard"
+                        to={dashboardPath}
                         className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
                         style={{ color: GOV.text }}
                         onClick={() => setUserMenuOpen(false)}
                       >
-                        <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Admin Dashboard
+                        <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Dashboard
                       </Link>
                     )}
 
