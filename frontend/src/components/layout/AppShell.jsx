@@ -80,6 +80,9 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
       : '/dashboard';
   const navLinks = useMemo(() => {
     if (isAdminLike) {
+      if (role === 'Test Administrator') {
+        return [{ to: '/test-administrator', label: 'Dashboard', Icon: Home, permission: null }];
+      }
       const adminDashboardPath = role === 'Test Administrator' ? '/test-administrator' : '/admin/dashboard';
       return ADMIN_NAV_LINKS
         .map((link) => (link.label === 'Dashboard' ? { ...link, to: adminDashboardPath } : link))

@@ -1,14 +1,16 @@
-import React, { useMemo, useCallback, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, Users, CheckCircle, TrendingUp, MoreHorizontal, Maximize2, Minimize2 } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
 import { GOV } from '../../theme/government';
 import { REGION_COLORS, REGION_LABELS, RIASEC_COLORS } from './analyticsConstants';
-import { ESWATINI_GEOJSON } from '../../data/regionsGeoJson';
+import { ESWATINI_GEOJSON, ESWATINI_BOUNDS } from '../../data/regionsGeoJson';
 
-const ESWATINI_CENTER = [-26.52, 31.47];
-const ESWATINI_ZOOM = 9;
+const MAP_BOUNDS_PADDING_NORMAL = [20, 20];
+const MAP_BOUNDS_PADDING_FULLSCREEN = [64, 64];
+const MAP_MAX_ZOOM_NORMAL = 8;
+const MAP_MAX_ZOOM_FULLSCREEN = 9;
 
 const MiniBar = ({ value, max, color = GOV.blue }) => {
   const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -29,7 +31,25 @@ const StatBadge = ({ icon: Icon, label, value, color }) => (
   </div>
 );
 
-const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
+const MapViewportController = ({ isFullscreen }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      map.invalidateSize();
+      map.fitBounds(ESWATINI_BOUNDS, {
+        padding: isFullscreen ? MAP_BOUNDS_PADDING_FULLSCREEN : MAP_BOUNDS_PADDING_NORMAL,
+        maxZoom: isFullscreen ? MAP_MAX_ZOOM_FULLSCREEN : MAP_MAX_ZOOM_NORMAL,
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [map, isFullscreen]);
+
+  return null;
+};
+
+const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange, isFullscreen = false }) => {
   const maxUsers = useMemo(
     () => Math.max(...(regionData || []).map(r => Number(r.totalUsers) || 0), 1),
     [regionData]
@@ -97,9 +117,12 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
 
   return (
     <MapContainer
-      center={ESWATINI_CENTER}
-      zoom={ESWATINI_ZOOM}
-      style={{ height: '420px', width: '100%', borderRadius: '8px', zIndex: 0 }}
+      bounds={ESWATINI_BOUNDS}
+      boundsOptions={{
+        padding: isFullscreen ? MAP_BOUNDS_PADDING_FULLSCREEN : MAP_BOUNDS_PADDING_NORMAL,
+        maxZoom: isFullscreen ? MAP_MAX_ZOOM_FULLSCREEN : MAP_MAX_ZOOM_NORMAL
+      }}
+      style={{ height: '100%', width: '100%', borderRadius: '8px', zIndex: 0 }}
       scrollWheelZoom={false}
       zoomControl={true}
     >
@@ -115,6 +138,7 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange }) => {
         style={regionStyle}
         onEachFeature={onEachFeature}
       />
+      <MapViewportController isFullscreen={isFullscreen} />
     </MapContainer>
   );
 };
@@ -126,8 +150,30 @@ function intensity(key, maxUsers, info) {
 
 const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, onRegionChange }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenRef = useRef(null);
 
-  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === fullscreenRef.current);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const element = fullscreenRef.current;
+    if (!element || !element.requestFullscreen) {
+      setIsFullscreen((prev) => !prev);
+      return;
+    }
+    if (document.fullscreenElement === element) {
+      document.exitFullscreen?.().catch(() => {});
+      return;
+    }
+    element.requestFullscreen().catch(() => {
+      setIsFullscreen((prev) => !prev);
+    });
+  }, []);
 
   const selectedDetail = useMemo(
     () => selectedRegion && regionalData?.regions
@@ -149,10 +195,13 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
     : '–';
 
   return (
-    <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white p-6 overflow-auto' : ''}`}>
+    <section
+      ref={fullscreenRef}
+      className={isFullscreen ? 'fixed inset-0 z-50 bg-slate-100 p-3 md:p-6 overflow-auto' : ''}
+    >
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridAutoRows: 'min-content' }}>
         {/* Map */}
-        <div className={`${isFullscreen ? 'col-span-12' : 'col-span-12 lg:col-span-7'} bg-white rounded-lg border p-4`} style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+        <div className={`${isFullscreen ? 'col-span-12 h-[calc(100vh-2.75rem)]' : 'col-span-12 lg:col-span-7'} bg-white rounded-lg border p-4 flex flex-col`} style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
           <div className="flex items-start justify-between mb-3">
             <div>
               <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>Eswatini Regional Map</p>
@@ -171,16 +220,20 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
                 className="p-1.5 rounded hover:bg-gray-100 transition-colors" 
                 style={{ color: GOV.blue }}
                 title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                aria-label={isFullscreen ? 'Exit fullscreen map view' : 'Enter fullscreen map view'}
               >
                 {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
             </div>
           </div>
-          <LeafletChoropleth
-            regionData={regionalData?.regions || []}
-            selectedRegion={selectedRegion}
-            onRegionChange={onRegionChange}
-          />
+          <div className={isFullscreen ? 'flex-1 min-h-[58vh]' : 'h-[420px]'}>
+            <LeafletChoropleth
+              regionData={regionalData?.regions || []}
+              selectedRegion={selectedRegion}
+              onRegionChange={onRegionChange}
+              isFullscreen={isFullscreen}
+            />
+          </div>
           
           {/* Legend */}
           <div className="mt-3 p-3 rounded-lg border" style={{ borderColor: GOV.borderLight, backgroundColor: '#fafafa' }}>
@@ -348,7 +401,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
         </div>
       )}
     </div>
-    </div>
+    </section>
   );
 };
 

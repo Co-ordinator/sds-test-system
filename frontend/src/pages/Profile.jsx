@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import Joi from 'joi';
 import { joiResolver } from '@hookform/resolvers/joi';
@@ -9,7 +9,6 @@ import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
-import OccupationSearchInput from '../components/ui/OccupationSearchInput';
 import AccessibilityDialog from '../components/ui/AccessibilityDialog';
 import { Monitor } from 'lucide-react';
 
@@ -33,8 +32,11 @@ export default function Profile() {
   const { user: authUser } = useAuth();
   const [userData, setUserData] = useState(null);
   const [saveStatus, setSaveStatus] = useState(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [workplace, setWorkplace] = useState({ name: '', institutionId: null });
-  const [occupation, setOccupation] = useState({ name: '', id: null });
+  const [phoneError, setPhoneError] = useState('');
+  const phoneInputRef = useRef(null);
+  const phoneDigitsRef = useRef('');
   const [showAccessibilityDialog, setShowAccessibilityDialog] = useState(false);
 
   // Qualifications state
@@ -50,27 +52,33 @@ export default function Profile() {
 
   // Extended schema for profile fields
   const schema = Joi.object({
-    phoneNumber: Joi.string().pattern(/^\+268\d{8}$/).allow('').label('Phone Number'),
-    region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').allow('').label('Region'),
-    district: Joi.string().allow('').label('District'),
-    address: Joi.string().allow('').label('Address'),
-    educationLevel: Joi.string().valid(
-      'primary', 'junior_secondary', 'senior_secondary', 'tvet',
-      'diploma', 'undergraduate', 'postgraduate', 'other'
-    ).allow('').label('Education Level'),
-    currentInstitution: Joi.string().allow('').label('Current Institution'),
+    region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').allow('', null).label('Region'),
+    district: Joi.string().allow('', null).label('District'),
+    address: Joi.string().allow('', null).label('Address'),
+    // Keep this flexible to avoid blocking profile saves for legacy UUID-based values.
+    educationLevel: Joi.string().allow('', null).label('Education Level'),
+    currentInstitution: Joi.string().allow('', null).label('Current Institution'),
     employmentStatus: Joi.string().valid(
       'student', 'employed', 'unemployed', 'self_employed', 'other'
-    ).allow('').label('Employment Status'),
-    currentOccupation: Joi.string().allow('').label('Current Occupation'),
-    preferredLanguage: Joi.string().valid('en', 'ss').label('Preferred Language'),
-    requiresAccessibility: Joi.boolean().label('Requires Accessibility'),
-    accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).label('Accessibility Needs')
+    ).allow('', null).label('Employment Status'),
+    currentOccupation: Joi.string().allow('', null).label('Current Occupation'),
+    preferredLanguage: Joi.string().valid('en', 'ss').allow('', null).label('Preferred Language'),
+    requiresAccessibility: Joi.boolean().allow(null).label('Requires Accessibility'),
+    accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).allow(null).label('Accessibility Needs')
   });
 
-  const { register, handleSubmit, formState: { errors }, reset, setValue } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset } = useForm({
     resolver: joiResolver(schema)
   });
+
+  const handlePhoneNumberChange = (e) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
+    if (e.target.value !== digits) {
+      e.target.value = digits;
+    }
+    phoneDigitsRef.current = digits;
+    if (phoneError) setPhoneError('');
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -79,14 +87,27 @@ export default function Profile() {
         const user = response.data?.data?.user || response.data?.user;
         if (user) {
           setUserData(user);
-          reset(user);
+          reset({
+            region: user.region || '',
+            district: user.district || '',
+            address: user.address || '',
+            educationLevel: user.educationLevel || '',
+            currentInstitution: user.currentInstitution || '',
+            employmentStatus: user.employmentStatus || '',
+            currentOccupation: user.currentOccupation || '',
+            preferredLanguage: user.preferredLanguage || 'en',
+            requiresAccessibility: Boolean(user.requiresAccessibility),
+            accessibilityNeeds: user.accessibilityNeeds || {},
+          });
+          const rawPhone = (user.phoneNumber || '').toString();
+          const parsedPhoneDigits = rawPhone.startsWith('+268')
+            ? rawPhone.slice(4).replace(/\D/g, '').slice(0, 8)
+            : rawPhone.replace(/\D/g, '').slice(0, 8);
+          phoneDigitsRef.current = parsedPhoneDigits;
+          if (phoneInputRef.current) phoneInputRef.current.value = parsedPhoneDigits;
           setWorkplace({
             name: user.workplaceName || '',
             institutionId: user.workplaceInstitutionId || null,
-          });
-          setOccupation({
-            name: user.currentOccupation || '',
-            id: user.currentOccupationId || null,
           });
         }
       } catch (err) {
@@ -178,27 +199,64 @@ export default function Profile() {
   };
 
   const onSubmit = async (data) => {
+    setIsSavingProfile(true);
+    setSaveStatus(null);
     const isProfessional = (userData?.userType === 'Professional') ||
       (authUser?.userType === 'Professional') ||
       (userData?.userType === 'professional');
+    const normalizedOccupation = (data.currentOccupation || '').trim();
+    const normalizedPhone = phoneDigitsRef.current ? `+268${phoneDigitsRef.current}` : null;
+    const normalizeText = (value) => {
+      if (value === null || value === undefined) return null;
+      const txt = String(value).trim();
+      return txt.length > 0 ? txt : null;
+    };
+    if (phoneDigitsRef.current && phoneDigitsRef.current.length !== 8) {
+      setPhoneError('Phone number must have 8 digits after +268.');
+      setSaveStatus({ type: 'error', message: 'Could not save: phone number must have 8 digits after +268.' });
+      setIsSavingProfile(false);
+      return;
+    }
     const payload = {
-      ...data,
-      currentOccupation: occupation.name || null,
-      currentOccupationId: occupation.id || null,
+      region: data.region || null,
+      district: normalizeText(data.district),
+      address: normalizeText(data.address),
+      educationLevel: data.educationLevel || null,
+      currentInstitution: normalizeText(data.currentInstitution),
+      employmentStatus: data.employmentStatus || null,
+      currentOccupation: normalizedOccupation || null,
+      currentOccupationId: null,
+      preferredLanguage: data.preferredLanguage || 'en',
+      requiresAccessibility: Boolean(data.requiresAccessibility),
+      accessibilityNeeds: data.accessibilityNeeds || {},
+      phoneNumber: normalizedPhone,
       ...(isProfessional ? {
-        workplaceName: workplace.name || null,
+        workplaceName: normalizeText(workplace.name),
         workplaceInstitutionId: workplace.institutionId || null,
       } : {}),
     };
     try {
       await api.patch('/api/v1/auth/me', payload);
       setUserData((prev) => ({ ...prev, ...payload }));
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(null), 3000);
+      const savedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setSaveStatus({ type: 'success', message: `Profile saved successfully at ${savedAt}.` });
+      setTimeout(() => setSaveStatus(null), 4000);
     } catch (err) {
-      setSaveStatus('error');
+      setSaveStatus({
+        type: 'error',
+        message: err.response?.data?.message || 'Failed to save changes. Please try again.'
+      });
       console.error(err.response?.data?.message || 'Update failed');
+    } finally {
+      setIsSavingProfile(false);
     }
+  };
+
+  const onInvalidProfile = (formErrors) => {
+    const firstError = Object.values(formErrors || {})[0];
+    const message = firstError?.message || 'Could not save profile. Please review highlighted fields.';
+    setSaveStatus({ type: 'error', message });
+    setIsSavingProfile(false);
   };
 
   const handleExportData = async () => {
@@ -218,27 +276,33 @@ export default function Profile() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [pwForm, setPwForm] = useState({ current: '', newPw: '', confirm: '' });
+  const pwRefs = useRef({ current: null, newPw: null, confirm: null });
   const [pwStatus, setPwStatus] = useState(null);
   const [pwSaving, setPwSaving] = useState(false);
   const [showPw, setShowPw] = useState({ current: false, newPw: false, confirm: false });
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!pwForm.current || !pwForm.newPw || !pwForm.confirm) {
+    const currentPw = pwRefs.current.current?.value || '';
+    const newPw = pwRefs.current.newPw?.value || '';
+    const confirmPw = pwRefs.current.confirm?.value || '';
+
+    if (!currentPw || !newPw || !confirmPw) {
       setPwStatus({ type: 'error', msg: 'All fields are required.' }); return;
     }
-    if (pwForm.newPw.length < 8) {
+    if (newPw.length < 8) {
       setPwStatus({ type: 'error', msg: 'New password must be at least 8 characters.' }); return;
     }
-    if (pwForm.newPw !== pwForm.confirm) {
+    if (newPw !== confirmPw) {
       setPwStatus({ type: 'error', msg: 'New passwords do not match.' }); return;
     }
     setPwSaving(true); setPwStatus(null);
     try {
-      await api.post('/api/v1/auth/change-password', { currentPassword: pwForm.current, newPassword: pwForm.newPw });
+      await api.post('/api/v1/auth/change-password', { currentPassword: currentPw, newPassword: newPw });
       setPwStatus({ type: 'success', msg: 'Password changed successfully.' });
-      setPwForm({ current: '', newPw: '', confirm: '' });
+      if (pwRefs.current.current) pwRefs.current.current.value = '';
+      if (pwRefs.current.newPw) pwRefs.current.newPw.value = '';
+      if (pwRefs.current.confirm) pwRefs.current.confirm.value = '';
     } catch (err) {
       setPwStatus({ type: 'error', msg: err.response?.data?.message || 'Failed to change password.' });
     } finally { setPwSaving(false); }
@@ -327,19 +391,43 @@ export default function Profile() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={handleSubmit(onSubmit, onInvalidProfile)} className="space-y-5">
+          {saveStatus?.message && (
+            <div
+              className="rounded-md border px-3 py-2 text-sm"
+              style={
+                saveStatus.type === 'success'
+                  ? { borderColor: '#86efac', backgroundColor: '#f0fdf4', color: '#166534' }
+                  : { borderColor: '#fecaca', backgroundColor: '#fef2f2', color: '#b91c1c' }
+              }
+            >
+              {saveStatus.message}
+            </div>
+          )}
           {/* Personal Information Section */}
           <SectionCard icon={User} title="Personal Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <FieldLabel>Phone Number</FieldLabel>
-                <input
-                  {...register('phoneNumber')}
-                  placeholder="+268XXXXXXXX"
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.phoneNumber ? errorInputStyle : {}), focusRingColor: GOV.blue }}
-                />
-                <FieldError error={errors.phoneNumber} />
+                <div
+                  className="w-full py-2 flex items-center gap-1.5"
+                  style={{ ...inputStyle, ...(phoneError ? errorInputStyle : {}) }}
+                >
+                  <span className="text-sm font-medium" style={{ color: GOV.textMuted }}>+268</span>
+                  <input
+                    ref={phoneInputRef}
+                    type="tel"
+                    inputMode="numeric"
+                    onChange={handlePhoneNumberChange}
+                    placeholder="XXXXXXXX"
+                    autoComplete="tel-national"
+                    className="flex-1 bg-transparent focus:outline-none focus:ring-0 text-sm"
+                    style={{ color: GOV.text }}
+                  />
+                </div>
+                {phoneError ? (
+                  <p className="mt-1" style={{ color: GOV.error, fontSize: '0.75rem' }}>{phoneError}</p>
+                ) : null}
               </div>
 
               <div>
@@ -437,15 +525,11 @@ export default function Profile() {
 
               <div>
                 <FieldLabel>Current Occupation</FieldLabel>
-                <OccupationSearchInput
-                  value={occupation.name}
-                  occupationId={occupation.id}
-                  onChange={(name, id) => {
-                    setOccupation({ name, id });
-                    setValue('currentOccupation', name);
-                  }}
-                  placeholder="Search for your occupation..."
-                  error={!!errors.currentOccupation}
+                <input
+                  {...register('currentOccupation')}
+                  placeholder="Type your current occupation"
+                  className={inputFocusClass}
+                  style={{ ...inputStyle, ...(errors.currentOccupation ? errorInputStyle : {}) }}
                 />
                 <FieldError error={errors.currentOccupation} />
               </div>
@@ -523,20 +607,15 @@ export default function Profile() {
 
           {/* Save button */}
           <div className="flex items-center justify-end gap-3">
-            {saveStatus === 'saved' && (
-              <span className={TYPO.bodySmall} style={{ color: '#059669' }}>Changes saved successfully</span>
-            )}
-            {saveStatus === 'error' && (
-              <span className={TYPO.bodySmall} style={{ color: GOV.error }}>Failed to save changes</span>
-            )}
             <button
               type="submit"
+              disabled={isSavingProfile}
               className="flex items-center gap-2 px-5 py-2 rounded-md text-sm font-semibold text-white transition-colors"
               style={{ backgroundColor: GOV.blue }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = GOV.blueHover}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = GOV.blue}
             >
-              <Save size={14} /> Save Changes
+              <Save size={14} /> {isSavingProfile ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -601,8 +680,7 @@ export default function Profile() {
                   <div className="relative">
                     <input
                       type={showPw[field] ? 'text' : 'password'}
-                      value={pwForm[field]}
-                      onChange={e => setPwForm(p => ({ ...p, [field]: e.target.value }))}
+                      ref={(el) => { pwRefs.current[field] = el; }}
                       className={inputFocusClass + ' pr-9'}
                       style={inputStyle}
                       autoComplete={field === 'current' ? 'current-password' : 'new-password'}
