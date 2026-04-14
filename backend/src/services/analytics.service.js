@@ -115,6 +115,8 @@ const analyticsService = {
   /* ── 3. Monthly Assessment Trend ────────────────────────────────────────── */
   getTrend: async (query = {}) => {
     const { assessmentWhere, assessmentInclude } = buildFilters(query);
+    const assessmentCreatedAt = Assessment.sequelize.col('Assessment.created_at');
+    const assessmentId = Assessment.sequelize.col('Assessment.id');
 
     const trendWhere = { ...assessmentWhere };
     if (!trendWhere.createdAt) {
@@ -127,12 +129,12 @@ const analyticsService = {
       where: trendWhere,
       include: assessmentInclude,
       attributes: [
-        [Assessment.sequelize.fn('DATE_TRUNC', 'month', Assessment.sequelize.col('created_at')), 'month'],
-        [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('id')), 'total'],
+        [Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt), 'month'],
+        [Assessment.sequelize.fn('COUNT', assessmentId), 'total'],
         [Assessment.sequelize.fn('SUM', Assessment.sequelize.literal("CASE WHEN status='completed' THEN 1 ELSE 0 END")), 'completed']
       ],
-      group: [Assessment.sequelize.fn('DATE_TRUNC', 'month', Assessment.sequelize.col('created_at'))],
-      order: [[Assessment.sequelize.fn('DATE_TRUNC', 'month', Assessment.sequelize.col('created_at')), 'ASC']],
+      group: [Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt)],
+      order: [[Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt), 'ASC']],
       raw: true
     });
 

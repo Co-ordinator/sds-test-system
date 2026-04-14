@@ -57,6 +57,8 @@ const RIASEC_NAMES = {
 const NAV_TEXT_ACTION =
   'inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium transition-colors rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent';
 
+const getTimerStorageKey = (assessmentId) => `sds_assessment_timer_${assessmentId}`;
+
 const Questionnaire = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -76,7 +78,6 @@ const Questionnaire = () => {
   const [saving, setSaving] = useState(false);
   const [isAdvancing, setIsAdvancing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [startTime] = useState(Date.now());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
@@ -93,6 +94,7 @@ const Questionnaire = () => {
   const rawProgressPercent = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
   const progressPercent = allAnswered ? 100 : Math.floor(rawProgressPercent);
   const currentSectionMeta = SECTIONS[currentSectionIndex];
+  const timerStorageKey = assessment?.id ? getTimerStorageKey(assessment.id) : null;
 
   const loadQuestions = useCallback(async () => {
     try {
@@ -236,6 +238,9 @@ const Questionnaire = () => {
     setError(null);
     try {
       await api.post(`/api/v1/assessments/${assessment.id}/complete`);
+      if (timerStorageKey) {
+        try { localStorage.removeItem(timerStorageKey); } catch (_) {}
+      }
       navigate('/test-complete', { replace: true });
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to submit. You may need to answer all 228 questions.');
@@ -248,16 +253,48 @@ const Questionnaire = () => {
   const isLastQuestion =
     currentSectionIndex === totalSections - 1 && currentQuestionIndex === sectionQuestions.length - 1;
 
-  // Update elapsed time every second when not paused
+  // Restore timer state for the active assessment (if previously saved in this browser).
+  useEffect(() => {
+    if (!timerStorageKey) return;
+    try {
+      const raw = localStorage.getItem(timerStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Number.isFinite(parsed?.elapsedSeconds)) {
+        setElapsedTime(Math.max(0, Math.floor(parsed.elapsedSeconds)));
+      }
+      if (typeof parsed?.isPaused === 'boolean') {
+        setIsPaused(parsed.isPaused);
+      }
+    } catch (_) {
+      // Ignore malformed local timer data.
+    }
+  }, [timerStorageKey]);
+
+  // Persist timer state locally so pause/resume survives page reloads.
+  useEffect(() => {
+    if (!timerStorageKey) return;
+    try {
+      localStorage.setItem(timerStorageKey, JSON.stringify({
+        elapsedSeconds: elapsedTime,
+        isPaused,
+        updatedAt: new Date().toISOString(),
+      }));
+    } catch (_) {
+      // Ignore storage write failures.
+    }
+  }, [timerStorageKey, elapsedTime, isPaused]);
+
+  // Tick elapsed timer every second while the assessment is active.
   useEffect(() => {
     if (isPaused || !assessment) return;
-    
+
     const interval = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - startTime) / 1000));
+      setElapsedTime((prev) => prev + 1);
     }, 1000);
-    
+
     return () => clearInterval(interval);
-  }, [isPaused, startTime, assessment]);
+  }, [isPaused, assessment]);
   
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);

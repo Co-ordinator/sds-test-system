@@ -27,10 +27,13 @@ import {
 } from 'recharts';
 import { PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../features/analytics/analyticsConstants';
 
+const normalizeRegion = (value) => (value || '').toString().trim().toLowerCase();
+
 const AdminDashboard = () => {
   const { user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
   const [regionalData, setRegionalData] = useState(null);
+  const [mapRegionalData, setMapRegionalData] = useState(null);
   const [hollandDist, setHollandDist] = useState([]);
   const [trend, setTrend] = useState([]);
   const [assessments, setAssessments] = useState([]);
@@ -47,9 +50,9 @@ const AdminDashboard = () => {
 
   const firstName = user?.firstName?.trim() || 'User';
 
-  const buildParams = () => {
+  const buildParams = ({ includeRegion = true } = {}) => {
     const p = new URLSearchParams();
-    if (filters.region) p.set('region', filters.region);
+    if (includeRegion && filters.region) p.set('region', normalizeRegion(filters.region));
     if (filters.institutionId) p.set('institutionId', filters.institutionId);
     if (filters.startDate) p.set('startDate', filters.startDate);
     if (filters.endDate) p.set('endDate', filters.endDate);
@@ -61,19 +64,25 @@ const AdminDashboard = () => {
       setLoading(true);
       try {
         const qs = buildParams();
-        const [aRes, rRes, hRes, tRes] = await Promise.all([
+        const mapQs = buildParams({ includeRegion: false });
+        const [aRes, rRes, hRes, tRes, mapRes] = await Promise.all([
           api.get(`/api/v1/analytics${qs ? `?${qs}` : ''}`),
           api.get(`/api/v1/analytics/regional${qs ? `?${qs}` : ''}`),
           api.get(`/api/v1/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
           api.get(`/api/v1/analytics/trend${qs ? `?${qs}` : ''}`),
+          filters.region
+            ? api.get(`/api/v1/analytics/regional${mapQs ? `?${mapQs}` : ''}`)
+            : Promise.resolve(null),
         ]);
         setAnalytics(aRes.data?.data || null);
         setRegionalData(rRes.data?.data || null);
+        setMapRegionalData(mapRes?.data?.data || rRes.data?.data || null);
         setHollandDist(hRes.data?.data?.distribution || []);
         setTrend(tRes.data?.data?.trend || []);
       } catch {
         setAnalytics(null);
         setRegionalData(null);
+        setMapRegionalData(null);
         setHollandDist([]);
         setTrend([]);
       } finally {
@@ -87,14 +96,19 @@ const AdminDashboard = () => {
     setRefreshing(true);
     try {
       const qs = buildParams();
-      const [aRes, rRes, hRes, tRes] = await Promise.all([
+      const mapQs = buildParams({ includeRegion: false });
+      const [aRes, rRes, hRes, tRes, mapRes] = await Promise.all([
         api.get(`/api/v1/analytics${qs ? `?${qs}` : ''}`),
         api.get(`/api/v1/analytics/regional${qs ? `?${qs}` : ''}`),
         api.get(`/api/v1/analytics/holland-distribution${qs ? `?${qs}` : ''}`),
         api.get(`/api/v1/analytics/trend${qs ? `?${qs}` : ''}`),
+        filters.region
+          ? api.get(`/api/v1/analytics/regional${mapQs ? `?${mapQs}` : ''}`)
+          : Promise.resolve(null),
       ]);
       setAnalytics(aRes.data?.data || null);
       setRegionalData(rRes.data?.data || null);
+      setMapRegionalData(mapRes?.data?.data || rRes.data?.data || null);
       setHollandDist(hRes.data?.data?.distribution || []);
       setTrend(tRes.data?.data?.trend || []);
     } catch { /* silent */ }
@@ -136,12 +150,15 @@ const AdminDashboard = () => {
   );
 
   const regionalChartData = useMemo(
-    () => (regionalData?.regions || []).map(r => ({
-      key: r.region,
-      region: REGION_LABELS[r.region] || r.region,
-      users: Number(r.totalUsers || 0),
-      completed: Number(r.completedAssessments || 0),
-    })),
+    () => (regionalData?.regions || []).map((r) => {
+      const key = normalizeRegion(r.region) || 'unknown';
+      return {
+        key,
+        region: REGION_LABELS[key] || r.region || 'Unknown',
+        users: Number(r.totalUsers || 0),
+        completed: Number(r.completedAssessments || 0),
+      };
+    }),
     [regionalData]
   );
 
@@ -155,15 +172,19 @@ const AdminDashboard = () => {
     const parseDate = (v) => (v ? new Date(v) : null);
     const start = parseDate(filters.startDate);
     const end = parseDate(filters.endDate);
+    const selectedRegion = normalizeRegion(filters.region);
     // Keep date filtering inclusive of the selected "to" date.
     if (end) end.setHours(23, 59, 59, 999);
 
     assessments.forEach((a) => {
       const inst = a.user?.institution;
+      const institutionRegion = normalizeRegion(inst?.region);
+      const userRegion = normalizeRegion(a.user?.region);
+      const rowRegion = institutionRegion || userRegion || 'unknown';
       const completedAt = parseDate(a.completedAt || a.createdAt);
       if (start && completedAt && completedAt < start) return;
       if (end && completedAt && completedAt > end) return;
-      if (filters.region && inst?.region !== filters.region) return;
+      if (selectedRegion && rowRegion !== selectedRegion) return;
       if (filters.institutionId && String(inst?.id) !== String(filters.institutionId)) return;
 
       const key = inst?.id || a.user?.institutionId || 'unknown';
@@ -171,7 +192,7 @@ const AdminDashboard = () => {
         map.set(key, {
           id: key,
           institutionName: inst?.name || 'Unknown Institution',
-          region: inst?.region || 'unknown',
+          region: rowRegion,
           tested: 0,
           completed: 0,
           topCode: null,
@@ -201,8 +222,12 @@ const AdminDashboard = () => {
   }, [assessments, filters.endDate, filters.institutionId, filters.region, filters.startDate]);
 
   const selectedRegionDetail = useMemo(
-    () => (filters.region ? (regionalData?.regions || []).find(r => r.region === filters.region) : null),
-    [filters.region, regionalData]
+    () => (
+      filters.region
+        ? (mapRegionalData?.regions || []).find((r) => normalizeRegion(r.region) === normalizeRegion(filters.region))
+        : null
+    ),
+    [filters.region, mapRegionalData]
   );
 
   const schoolUsageColumns = [
@@ -463,7 +488,7 @@ const AdminDashboard = () => {
             <p className="text-xs mb-3" style={{ color: GOV.textMuted }}>Click regions to filter. Hover for details.</p>
             {loading ? <LoadingChart /> : (
               <EswatiniLeafletMap
-                regionRows={regionalData?.regions || []}
+                regionRows={mapRegionalData?.regions || []}
                 selectedRegion={filters.region}
                 onSelectRegion={(region) => setFilters(prev => ({ ...prev, region: prev.region === region ? '' : region }))}
               />

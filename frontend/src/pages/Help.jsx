@@ -356,13 +356,13 @@ export default function Help() {
                       <ContactItem
                         icon={Mail}
                         label="Email Support"
-                        value="coordinator@bitsandpc.co.za"
+                        value="mis@datamatics.co.sz"
                         description="For technical issues and account help"
                       />
                       <ContactItem
                         icon={Phone}
                         label="Phone Support"
-                        value="+268 4041971/2/3"
+                        value="+268 24047198"
                         description="Monday-Friday, 8:00 AM - 5:00 PM"
                       />
                       <ContactItem

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+﻿import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Briefcase, X } from 'lucide-react';
 import api from '../../services/api';
 import { GOV, TYPO } from '../../theme/government';
@@ -7,12 +7,12 @@ import { GOV, TYPO } from '../../theme/government';
  * OccupationSearchInput
  *
  * Props:
- *   value        — display string (occupation name)
- *   occupationId — UUID of the matched occupation (null for free text)
- *   onChange(name, id) — called when selection or text changes
- *   placeholder  — input placeholder
- *   inputClassName — extra class on the input
- *   error        — truthy to show error border
+ *   value        â€” display string (occupation name)
+ *   occupationId â€” UUID of the matched occupation (null for free text)
+ *   onChange(name, id) â€” called when selection or text changes
+ *   placeholder  â€” input placeholder
+ *   inputClassName â€” extra class on the input
+ *   error        â€” truthy to show error border
  */
 export default function OccupationSearchInput({
   value = '',
@@ -28,6 +28,7 @@ export default function OccupationSearchInput({
   const [loading, setLoading] = useState(false);
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
+  const parentSyncRef = useRef(null);
 
   // Keep local query in sync when value prop changes externally (e.g. form reset)
   useEffect(() => {
@@ -45,8 +46,13 @@ export default function OccupationSearchInput({
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  useEffect(() => () => {
+    clearTimeout(debounceRef.current);
+    clearTimeout(parentSyncRef.current);
+  }, []);
+
   const fetchResults = useCallback(async (q) => {
-    if (!q || q.trim().length < 1) {
+    if (!q || q.trim().length < 2) {
       setResults([]);
       return;
     }
@@ -64,21 +70,27 @@ export default function OccupationSearchInput({
   const handleInputChange = (e) => {
     const val = e.target.value;
     setQuery(val);
-    setOpen(true);
-    // Notify parent: free text, no occupation ID yet
-    onChange(val, null);
+    setOpen(val.trim().length > 0);
+    // Debounce parent updates to avoid full-profile re-render on every keypress.
+    clearTimeout(parentSyncRef.current);
+    parentSyncRef.current = setTimeout(() => onChange(val, null), 220);
+    if (val.trim().length < 2) {
+      setResults([]);
+    }
     // Debounce API call
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchResults(val), 280);
   };
 
   const handleSelect = (occupation) => {
+    clearTimeout(parentSyncRef.current);
     setQuery(occupation.name);
     setOpen(false);
     onChange(occupation.name, occupation.id);
   };
 
   const handleClear = () => {
+    clearTimeout(parentSyncRef.current);
     setQuery('');
     setResults([]);
     setOpen(false);
@@ -100,7 +112,7 @@ export default function OccupationSearchInput({
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (query.trim()) {
+            if (query.trim().length >= 2) {
               setOpen(true);
               fetchResults(query);
             }
@@ -142,9 +154,14 @@ export default function OccupationSearchInput({
               Searching...
             </li>
           )}
-          {!loading && results.length === 0 && query.trim().length > 0 && (
+          {!loading && query.trim().length > 0 && query.trim().length < 2 && (
             <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-              No registered occupation found — your entry will be saved as typed.
+              Type at least 2 characters to search occupations.
+            </li>
+          )}
+          {!loading && results.length === 0 && query.trim().length >= 2 && (
+            <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
+              No registered occupation found â€” your entry will be saved as typed.
             </li>
           )}
           {!loading && results.map((occ) => (

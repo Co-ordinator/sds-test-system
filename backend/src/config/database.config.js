@@ -2,6 +2,26 @@ const { Sequelize } = require('sequelize');
 const config = require('./config');
 
 const isTest = process.env.NODE_ENV === 'test';
+const shouldUseSSL = (() => {
+  if (process.env.DB_SSL === 'true') return true;
+  if (process.env.DB_SSL === 'false') return false;
+  const host = (process.env.DB_HOST || '').toLowerCase();
+  const url = (process.env.DATABASE_URL || '').toLowerCase();
+  return host.includes('render.com') || url.includes('render.com') || process.env.NODE_ENV === 'production';
+})();
+const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
+const sequelizeOptions = {
+  dialect: 'postgres',
+  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  pool: {
+    max: 5,
+    min: 0,
+    acquire: 30000,
+    idle: 10000
+  },
+  ...(shouldUseSSL ? { dialectOptions: { ssl: { require: true, rejectUnauthorized: sslRejectUnauthorized } } } : {}),
+};
+
 let connectionUrl = null;
 if (isTest && process.env.TEST_DATABASE_URL) {
   connectionUrl = process.env.TEST_DATABASE_URL;
@@ -13,31 +33,12 @@ if (isTest && process.env.TEST_DATABASE_URL) {
 }
 
 const sequelize = connectionUrl
-  ? new Sequelize(connectionUrl, {
-      dialect: 'postgres',
-      logging: process.env.NODE_ENV === 'development' ? console.log : false,
-      pool: {
-        max: 5,
-        min: 0,
-        acquire: 30000,
-        idle: 10000
-      }
-    })
+  ? new Sequelize(connectionUrl, sequelizeOptions)
   : new Sequelize(
       config.db.database,
       config.db.username,
       config.db.password,
-      {
-        host: config.db.host,
-        dialect: 'postgres',
-        pool: {
-          max: 5,
-          min: 0,
-          acquire: 30000,
-          idle: 10000
-        },
-        logging: process.env.NODE_ENV === 'development' ? console.log : false
-      }
+      { ...sequelizeOptions, host: config.db.host }
     );
 
 // Test connection (skip in automated tests to speed up and avoid noisy output)
