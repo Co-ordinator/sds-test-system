@@ -28,7 +28,7 @@ module.exports = {
       logger.info({ actionType: 'EDUCATION_LEVEL_CREATED', message: `Level ${created.level} created`, req });
       res.status(201).json({ status: 'success', data: { educationLevel: created } });
     } catch (error) {
-      if (error.message.includes('required') || error.message.includes('already exists')) {
+      if (error.code === 'REQUIRED_FIELDS_MISSING' || error.code === 'EDUCATION_LEVEL_EXISTS') {
         return res.status(400).json({ status: 'error', message: error.message });
       }
       next(error);
@@ -41,8 +41,8 @@ module.exports = {
       await AuditLog.create({ userId: req.user?.id, actionType: 'EDUCATION_LEVEL_UPDATED', description: `Education level updated: ${el.description}`, details: { resourceType: 'education_level', resourceId: el.id, updates: req.body }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
       res.status(200).json({ status: 'success', data: { educationLevel: el } });
     } catch (error) {
-      if (error.message === 'Education level not found') return res.status(404).json({ status: 'error', message: error.message });
-      if (error.message.includes('already exists')) return res.status(400).json({ status: 'error', message: error.message });
+      if (error.code === 'EDUCATION_LEVEL_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.code === 'EDUCATION_LEVEL_EXISTS') return res.status(400).json({ status: 'error', message: error.message });
       next(error);
     }
   },
@@ -53,7 +53,7 @@ module.exports = {
       await AuditLog.create({ userId: req.user?.id, actionType: 'EDUCATION_LEVEL_DELETED', description: `Education level deleted: ${el.description}`, details: { resourceType: 'education_level', resourceId: el.id }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
       res.status(200).json({ status: 'success', message: 'Education level deleted' });
     } catch (error) {
-      if (error.message === 'Education level not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.code === 'EDUCATION_LEVEL_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
       next(error);
     }
   }

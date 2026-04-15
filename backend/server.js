@@ -4,6 +4,23 @@ const app = require('./src/app');
 require('dotenv').config();
 
 const PORT = process.env.PORT || 5000;
+let server;
+
+const shutdown = async (signal, error) => {
+  if (error) {
+    logger.error({ actionType: 'SYSTEM', message: `${signal}: ${error.message}`, details: { stack: error.stack } });
+  } else {
+    logger.info({ actionType: 'SYSTEM', message: `Received ${signal}, shutting down gracefully` });
+  }
+  try {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+    await sequelize.close();
+  } finally {
+    process.exit(error ? 1 : 0);
+  }
+};
 
 const start = async () => {
   try {
@@ -15,7 +32,7 @@ const start = async () => {
     // await sequelize.sync({ force: process.env.NODE_ENV === 'development' });
     // logger.info('✅ Database models synchronized');
 
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV}`);
     });
@@ -24,5 +41,10 @@ const start = async () => {
     process.exit(1);
   }
 };
+
+process.on('uncaughtException', (error) => shutdown('uncaughtException', error));
+process.on('unhandledRejection', (reason) => shutdown('unhandledRejection', reason instanceof Error ? reason : new Error(String(reason))));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 start();

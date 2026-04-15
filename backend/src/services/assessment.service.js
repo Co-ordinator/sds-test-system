@@ -3,6 +3,7 @@
 const { Assessment, Answer, Question, User } = require('../models');
 const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
+const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
 
 module.exports = {
 
@@ -39,7 +40,7 @@ module.exports = {
     const assessment = await Assessment.findOne({
       where: { id: assessmentId, userId }
     });
-    if (!assessment) throw new Error('Assessment not found');
+    if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
     return assessment;
   },
 
@@ -49,7 +50,7 @@ module.exports = {
     const assessment = await Assessment.findOne({
       where: { id: assessmentId, userId }
     });
-    if (!assessment) throw new Error('Assessment not found');
+    if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
 
     const saved = await Answer.findAll({
       where: { assessmentId },
@@ -66,11 +67,11 @@ module.exports = {
       where: { id: assessmentId, userId }
     });
     if (!assessment || assessment.status !== 'in_progress') {
-      throw new Error('Assessment not found or not in progress');
+      throw new NotFoundError('Assessment not found or not in progress', 'ASSESSMENT_NOT_IN_PROGRESS');
     }
 
     if (!Array.isArray(answers) || answers.length === 0) {
-      throw new Error('answers array is required');
+      throw new BadRequestError('answers array is required', 'INVALID_ANSWERS_PAYLOAD');
     }
 
     const totalQuestions = await Question.count();
@@ -152,16 +153,13 @@ module.exports = {
       where: { id: assessmentId, userId }
     });
     if (!assessment || assessment.status !== 'in_progress') {
-      throw new Error('Assessment not found or not in progress');
+      throw new NotFoundError('Assessment not found or not in progress', 'ASSESSMENT_NOT_IN_PROGRESS');
     }
 
     const answeredCount = await Answer.count({ where: { assessmentId } });
     const totalQuestions = await Question.count();
     if (answeredCount < totalQuestions) {
-      const error = new Error('Assessment is incomplete');
-      error.answered = answeredCount;
-      error.total = totalQuestions;
-      throw error;
+      throw new BadRequestError('Assessment is incomplete', 'ASSESSMENT_INCOMPLETE');
     }
 
     const results = await scoringService.finalizeAssessment(assessmentId);
@@ -172,13 +170,13 @@ module.exports = {
     const assessment = await Assessment.findByPk(assessmentId);
 
     if (!assessment || assessment.status !== 'completed') {
-      throw new Error('Results not found');
+      throw new NotFoundError('Results not found', 'RESULTS_NOT_FOUND');
     }
 
     const isOwner = assessment.userId === userId;
     const isStaff = ['System Administrator', 'Test Administrator'].includes(userRole);
     if (!isOwner && !isStaff) {
-      throw new Error('Not authorized to view these results');
+      throw new ForbiddenError('Not authorized to view these results', 'RESULTS_NOT_AUTHORIZED');
     }
 
     const { displayCode } = scoringService.buildHollandCodes({
@@ -217,14 +215,14 @@ module.exports = {
     });
 
     if (!assessment || assessment.status !== 'completed') {
-      throw new Error('Completed assessment not found');
+      throw new NotFoundError('Completed assessment not found', 'COMPLETED_ASSESSMENT_NOT_FOUND');
     }
 
     const isOwner = assessment.userId === userId;
     const isAdmin = userRole === 'System Administrator';
     const isCounselor = userRole === 'Test Administrator';
     if (!isOwner && !isAdmin && !isCounselor) {
-      throw new Error('Not authorized');
+      throw new ForbiddenError('Not authorized', 'RESULTS_NOT_AUTHORIZED');
     }
 
     let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };

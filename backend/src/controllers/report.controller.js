@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const reportService = require('../services/report.service');
 const logger = require('../utils/logger');
+const { BadRequestError } = require('../utils/errors/appError');
 
 const LOGO_PATHS = [
   path.join(__dirname, '../../assets/siyinqaba.png'),
@@ -508,7 +509,7 @@ module.exports.previewReport = async (req, res, next) => {
   try {
     const { type } = req.params;
     const config = REPORT_TYPES[type];
-    if (!config) return res.status(400).json({ status: 'error', message: `Unknown report type: ${type}` });
+    if (!config) throw new BadRequestError(`Unknown report type: ${type}`, 'UNKNOWN_REPORT_TYPE');
 
     const filters = {
       institutionId: req.query.institutionId || '',
@@ -538,7 +539,7 @@ module.exports.generateReport = async (req, res, next) => {
       sections = [fallback];
     }
     const validSections = sections.filter(s => REPORT_TYPES[s]);
-    if (validSections.length === 0) return res.status(400).json({ status: 'error', message: 'No valid report sections specified' });
+    if (validSections.length === 0) throw new BadRequestError('No valid report sections specified', 'NO_VALID_REPORT_SECTIONS');
 
     /* Dynamic report title based on filters */
     let reportLabel = 'National Report';

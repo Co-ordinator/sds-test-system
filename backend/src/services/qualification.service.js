@@ -3,6 +3,7 @@
 const path = require('path');
 const fs = require('fs');
 const { UserQualification } = require('../models');
+const { BadRequestError, NotFoundError } = require('../utils/errors/appError');
 
 const UPLOAD_DIR = path.join(__dirname, '../../uploads/qualifications');
 
@@ -21,10 +22,10 @@ module.exports = {
   },
 
   uploadQualification: async (userId, file, { title, documentType, issuedBy, issueDate }) => {
-    if (!file) throw new Error('No file uploaded');
+    if (!file) throw new BadRequestError('No file uploaded', 'FILE_REQUIRED');
     if (!title || !title.trim()) {
       fs.unlink(file.path, () => {});
-      throw new Error('Title is required');
+      throw new BadRequestError('Title is required', 'TITLE_REQUIRED');
     }
 
     const qualification = await UserQualification.create({
@@ -57,8 +58,8 @@ module.exports = {
       where: { id: qualificationId, userId }
     });
 
-    if (!qualification) throw new Error('Qualification not found');
-    if (!fs.existsSync(qualification.filePath)) throw new Error('File not found on server');
+    if (!qualification) throw new NotFoundError('Qualification not found', 'QUALIFICATION_NOT_FOUND');
+    if (!fs.existsSync(qualification.filePath)) throw new NotFoundError('File not found on server', 'FILE_NOT_FOUND');
 
     return {
       filePath: qualification.filePath,
@@ -73,7 +74,7 @@ module.exports = {
       where: { id: qualificationId, userId }
     });
 
-    if (!qualification) throw new Error('Qualification not found');
+    if (!qualification) throw new NotFoundError('Qualification not found', 'QUALIFICATION_NOT_FOUND');
 
     if (fs.existsSync(qualification.filePath)) {
       fs.unlinkSync(qualification.filePath);

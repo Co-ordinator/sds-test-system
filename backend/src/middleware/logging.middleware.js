@@ -8,6 +8,7 @@ const morganFormat = (tokens, req, res) => {
     ?.replace(/(\/verify-email\/)[^/?#]+/i, '$1[REDACTED]')
     ?.replace(/(\/reset-password\/)[^/?#]+/i, '$1[REDACTED]');
   return JSON.stringify({
+    requestId: req.requestId || null,
     method: tokens.method(req, res),
     url: redactedUrl,
     status: tokens.status(req, res),

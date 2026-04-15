@@ -37,9 +37,9 @@ module.exports = {
       await adminService.deleteUser(req.params.id);
       await AuditLog.create({ userId: req.user?.id, actionType: 'USER_DELETED', description: 'User account deleted by admin', details: { resourceType: 'user', resourceId: req.params.id, requestMethod: req.method }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
       logger.info({ actionType: 'USER_DELETION', message: `User deleted: ${req.params.id}`, req, details: { deletedBy: req.user?.id } });
-      res.status(204).json({ status: 'success', data: null });
+      res.status(204).send();
     } catch (error) {
-      if (error.message === 'User not found') {
+      if (error.code === 'USER_NOT_FOUND') {
         logger.warn({ actionType: 'USER_DELETION', message: `User not found for deletion: ${req.params.id}`, req, details: { deletedBy: req.user?.id } });
         return res.status(404).json({ status: 'error', message: 'User not found' });
       }
@@ -86,7 +86,7 @@ module.exports = {
       logger.info({ actionType: 'ADMIN_USER_UPDATE', message: `User ${req.params.id} updated`, req, details: { adminId: req.user?.id, updates: req.body } });
       res.status(200).json({ status: 'success', data: { user } });
     } catch (error) {
-      if (error.message === 'User not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.code === 'USER_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: 'Failed to update user', req, details: { error: error.message } });
       next(error);
     }
@@ -99,7 +99,7 @@ module.exports = {
       logger.info({ actionType: 'BULK_DELETE_USERS', message: `Bulk deleted ${deleted} users`, req, details: { adminId: req.user?.id, count: deleted } });
       res.json({ status: 'success', data: { deleted } });
     } catch (error) {
-      if (error.message === 'ids array required') return res.status(400).json({ status: 'error', message: error.message });
+      if (error.code === 'INVALID_BULK_IDS') return res.status(400).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'BULK_DELETE_USERS_FAILED', message: 'Bulk delete users failed', req, details: { error: error.message } });
       next(error);
     }
@@ -112,7 +112,7 @@ module.exports = {
       logger.info({ actionType: 'BULK_UPDATE_USERS', message: `Bulk updated ${updated} users`, req, details: { adminId: req.user?.id, updates: req.body.updates, count: updated } });
       res.json({ status: 'success', data: { updated } });
     } catch (error) {
-      if (error.message === 'ids array required' || error.message === 'No valid updates provided') {
+      if (error.code === 'INVALID_BULK_IDS' || error.code === 'NO_VALID_UPDATES') {
         return res.status(400).json({ status: 'error', message: error.message });
       }
       logger.error({ actionType: 'BULK_UPDATE_USERS_FAILED', message: 'Bulk update users failed', req, details: { error: error.message } });
@@ -169,7 +169,7 @@ module.exports = {
       const log = await adminService.markNotificationRead(req.params.id);
       res.status(200).json({ status: 'success', data: { notification: log } });
     } catch (error) {
-      if (error.message === 'Notification not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.code === 'NOTIFICATION_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
       next(error);
     }
   },
@@ -224,7 +224,7 @@ module.exports = {
         data: { user: user.toJSON() }
       });
     } catch (error) {
-      if (error.message.includes('required') || error.message.includes('Invalid role') || error.message.includes('already exists')) {
+      if (error.code === 'REQUIRED_FIELDS_MISSING' || error.code === 'INVALID_ROLE' || error.code === 'USER_ALREADY_EXISTS') {
         return res.status(400).json({ status: 'error', message: error.message });
       }
       logger.error({ actionType: 'USER_CREATION_FAILED', message: 'Failed to create user', req, details: { error: error.message, stack: error.stack } });
@@ -246,7 +246,7 @@ module.exports = {
       const user = await adminService.getUserPermissions(req.params.id);
       res.status(200).json({ status: 'success', data: { user: user.toJSON() } });
     } catch (error) {
-      if (error.message === 'User not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.code === 'USER_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
       next(error);
     }
   },
@@ -264,7 +264,7 @@ module.exports = {
       }).catch(() => {});
       res.status(200).json({ status: 'success', message: 'Permissions updated', data: { user: updated.toJSON() } });
     } catch (error) {
-      if (error.message === 'User not found') return res.status(404).json({ status: 'error', message: error.message });
+      if (error.code === 'USER_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
       next(error);
     }
   },

@@ -6,6 +6,7 @@ const { Readable } = require('stream');
 const { Question, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { questionsArraySchema } = require('../validations/question.validation');
+const { ValidationError, NotFoundError, BadRequestError } = require('../utils/errors/appError');
 
 const parseCsvQuestions = async (csvText) => {
   return new Promise((resolve, reject) => {
@@ -33,9 +34,7 @@ const validateQuestionsArray = (questions) => {
   const { value, error } = questionsArraySchema.validate(questions, { abortEarly: false, stripUnknown: true });
   if (error) {
     const errors = error.details.map((d) => d.message.replace(/['"]/g, ''));
-    const err = new Error(`Validation failed: ${errors.join('; ')}`);
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('Validation failed', errors.map((message) => ({ message })));
   }
   return value;
 };
@@ -72,20 +71,20 @@ module.exports = {
 
   updateQuestion: async (id, data) => {
     const question = await Question.findByPk(id);
-    if (!question) throw new Error('Question not found');
+    if (!question) throw new NotFoundError('Question not found', 'QUESTION_NOT_FOUND');
     await question.update(data);
     return question;
   },
 
   deleteQuestion: async (id) => {
     const question = await Question.findByPk(id);
-    if (!question) throw new Error('Question not found');
+    if (!question) throw new NotFoundError('Question not found', 'QUESTION_NOT_FOUND');
     await question.destroy();
     return question;
   },
 
   bulkDeleteQuestions: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     return await Question.destroy({ where: { id: { [Op.in]: ids } } });
   },
 
@@ -99,9 +98,7 @@ module.exports = {
         const normalized = normalizeCsvRecords(records);
         const missingHeaders = ['text', 'section', 'order'].filter((h) => records.length && !(h in records[0]));
         if (missingHeaders.length) {
-          const err = new Error(`CSV missing required headers: ${missingHeaders.join(', ')}`);
-          err.statusCode = 400;
-          throw err;
+          throw new ValidationError(`CSV missing required headers: ${missingHeaders.join(', ')}`);
         }
         questionsInput = normalized;
       } else if (Array.isArray(payload)) {
@@ -109,18 +106,13 @@ module.exports = {
       } else if (payload && Array.isArray(payload.questions)) {
         questionsInput = payload.questions;
       } else {
-        const err = new Error('Invalid import payload. Provide an array or { questions: [...] }');
-        err.statusCode = 400;
-        throw err;
+        throw new BadRequestError('Invalid import payload. Provide an array or { questions: [...] }', 'INVALID_IMPORT_PAYLOAD');
       }
 
       const validatedQuestions = validateQuestionsArray(questionsInput);
       const duplicates = detectDuplicatePairs(validatedQuestions);
       if (duplicates.length) {
-        const err = new Error('Duplicate section+order combinations found in payload');
-        err.statusCode = 400;
-        err.details = duplicates;
-        throw err;
+        throw new ValidationError('Duplicate section+order combinations found in payload', duplicates);
       }
 
       const sections = [...new Set(validatedQuestions.map((q) => q.section))];

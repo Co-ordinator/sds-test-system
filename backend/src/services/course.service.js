@@ -8,6 +8,7 @@ const {
   Institution, Occupation
 } = require('../models');
 const { Op } = require('sequelize');
+const { BadRequestError, NotFoundError } = require('../utils/errors/appError');
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 
@@ -36,7 +37,7 @@ function coerceFundingPriority(value) {
   const v = String(value).toLowerCase();
   if (v === 'true' || v === '1') return true;
   if (v === 'false' || v === '0') return false;
-  throw new Error('fundingPriority must be a boolean');
+  throw new BadRequestError('fundingPriority must be a boolean', 'INVALID_FUNDING_PRIORITY');
 }
 
 /* ─── Service ─────────────────────────────────────────────────────────────── */
@@ -111,9 +112,9 @@ module.exports = {
       requirements = [], institutions = [], occupations = []
     } = data;
 
-    if (!name) throw new Error('name is required');
+    if (!name) throw new BadRequestError('name is required', 'COURSE_NAME_REQUIRED');
     if (!QUAL_TYPES.includes(qualificationType)) {
-      throw new Error(`qualificationType must be one of: ${QUAL_TYPES.join(', ')}`);
+      throw new BadRequestError(`qualificationType must be one of: ${QUAL_TYPES.join(', ')}`, 'INVALID_QUALIFICATION_TYPE');
     }
     let fundingP;
     if (fundingPriority !== undefined && fundingPriority !== null) {
@@ -152,7 +153,7 @@ module.exports = {
   /* Update course fields */
   updateCourse: async (id, updates) => {
     const course = await Course.findByPk(id);
-    if (!course) throw new Error('Course not found');
+    if (!course) throw new NotFoundError('Course not found', 'COURSE_NOT_FOUND');
 
     const allowed = ['name','nameSwati','qualificationType','durationYears','description','riasecCodes','suggestedSubjects','fieldOfStudy','isActive','fundingPriority'];
     const sanitized = {};
@@ -174,14 +175,14 @@ module.exports = {
   /* Soft delete course (set isActive = false) */
   deleteCourse: async (id) => {
     const course = await Course.findByPk(id);
-    if (!course) throw new Error('Course not found');
+    if (!course) throw new NotFoundError('Course not found', 'COURSE_NOT_FOUND');
     await course.update({ isActive: false });
     return course;
   },
 
   /* Bulk soft delete courses */
   bulkDeleteCourses: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     const [count] = await Course.update({ isActive: false }, { where: { id: { [Op.in]: ids } } });
     return count;
   },
@@ -189,20 +190,20 @@ module.exports = {
   /* ─── Requirements ───────────────────────────────────────────────────────── */
 
   addRequirement: async (courseId, { subject, minimumGrade, isMandatory = true }) => {
-    if (!subject || !minimumGrade) throw new Error('subject and minimumGrade required');
+    if (!subject || !minimumGrade) throw new BadRequestError('subject and minimumGrade required', 'REQUIREMENT_FIELDS_REQUIRED');
     return await CourseRequirement.create({ courseId, subject, minimumGrade, isMandatory });
   },
 
   removeRequirement: async (courseId, reqId) => {
     const r = await CourseRequirement.findOne({ where: { id: reqId, courseId } });
-    if (!r) throw new Error('Requirement not found');
+    if (!r) throw new NotFoundError('Requirement not found', 'REQUIREMENT_NOT_FOUND');
     await r.destroy();
   },
 
   /* ─── Institution links ──────────────────────────────────────────────────── */
 
   linkInstitution: async (courseId, { institutionId, applicationUrl, customRequirements }) => {
-    if (!institutionId) throw new Error('institutionId required');
+    if (!institutionId) throw new BadRequestError('institutionId required', 'INSTITUTION_ID_REQUIRED');
     const [link, created] = await CourseInstitution.findOrCreate({
       where: { courseId, institutionId },
       defaults: { applicationUrl, customRequirements, isActive: true }
@@ -213,14 +214,14 @@ module.exports = {
 
   unlinkInstitution: async (courseId, institutionId) => {
     const link = await CourseInstitution.findOne({ where: { courseId, institutionId } });
-    if (!link) throw new Error('Link not found');
+    if (!link) throw new NotFoundError('Link not found', 'COURSE_INSTITUTION_LINK_NOT_FOUND');
     await link.destroy();
   },
 
   /* ─── Occupation links ───────────────────────────────────────────────────── */
 
   linkOccupation: async (courseId, { occupationId, relevanceScore, isPrimaryPathway = false, notes }) => {
-    if (!occupationId) throw new Error('occupationId required');
+    if (!occupationId) throw new BadRequestError('occupationId required', 'OCCUPATION_ID_REQUIRED');
     const [link, created] = await OccupationCourse.findOrCreate({
       where: { courseId, occupationId },
       defaults: { relevanceScore, isPrimaryPathway, notes }
@@ -231,7 +232,7 @@ module.exports = {
 
   unlinkOccupation: async (courseId, occupationId) => {
     const link = await OccupationCourse.findOne({ where: { courseId, occupationId } });
-    if (!link) throw new Error('Link not found');
+    if (!link) throw new NotFoundError('Link not found', 'COURSE_OCCUPATION_LINK_NOT_FOUND');
     await link.destroy();
   },
 
@@ -255,7 +256,7 @@ module.exports = {
   },
 
   importCourses: async (csvText) => {
-    if (!csvText) throw new Error('CSV body required');
+    if (!csvText) throw new BadRequestError('CSV body required', 'CSV_REQUIRED');
 
     const records = await parseCsv(csvText);
     const results = { created: 0, updated: 0, skipped: 0, errors: [] };

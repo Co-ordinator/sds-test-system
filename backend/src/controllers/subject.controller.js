@@ -17,7 +17,7 @@ module.exports = {
       logger.info({ actionType: 'SUBJECT_CREATE', message: `Created subject: ${subject.name}`, req });
       res.status(201).json({ status: 'success', data: { subject } });
     } catch (err) {
-      if (err.message === 'Name is required') return res.status(400).json({ status: 'error', message: err.message });
+      if (err.code === 'SUBJECT_NAME_REQUIRED') return res.status(400).json({ status: 'error', message: err.message });
       next(err);
     }
   },
@@ -28,7 +28,7 @@ module.exports = {
       logger.info({ actionType: 'SUBJECT_UPDATE', message: `Updated subject ${subject.id}`, req });
       res.json({ status: 'success', data: { subject } });
     } catch (err) {
-      if (err.message === 'Subject not found') return res.status(404).json({ status: 'error', message: err.message });
+      if (err.code === 'SUBJECT_NOT_FOUND') return res.status(404).json({ status: 'error', message: err.message });
       next(err);
     }
   },
@@ -39,7 +39,7 @@ module.exports = {
       logger.info({ actionType: 'SUBJECT_DELETE', message: `Deleted subject ${req.params.id}`, req });
       res.json({ status: 'success', message: 'Subject deleted' });
     } catch (err) {
-      if (err.message === 'Subject not found') return res.status(404).json({ status: 'error', message: err.message });
+      if (err.code === 'SUBJECT_NOT_FOUND') return res.status(404).json({ status: 'error', message: err.message });
       next(err);
     }
   },
@@ -51,7 +51,7 @@ module.exports = {
       logger.info({ actionType: 'SUBJECT_IMPORT', message: `Imported subjects: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`, req });
       res.json({ status: 'success', data: result });
     } catch (err) {
-      if (err.message === 'No records found in CSV') return res.status(400).json({ status: 'error', message: err.message });
+      if (err.code === 'CSV_EMPTY') return res.status(400).json({ status: 'error', message: err.message });
       next(err);
     }
   },

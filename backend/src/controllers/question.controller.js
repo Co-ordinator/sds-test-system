@@ -41,9 +41,8 @@ module.exports = {
       logger.info({ actionType: 'ADMIN_ACTION', message: 'Question updated', req, details: { adminId: req.user?.id, questionId: question.id } });
       return res.status(200).json({ status: 'success', data: { question: question.toJSON() } });
     } catch (error) {
-      if (error.message === 'Question not found') {
+      if (error.code === 'QUESTION_NOT_FOUND') {
         logger.warn({ actionType: 'ADMIN_ACTION', message: `Question not found: ${req.params.id}`, req, details: { adminId: req.user?.id } });
-        return res.status(404).json({ status: 'error', message: 'Question not found' });
       }
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: `Failed to update question ${req.params.id}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
@@ -56,7 +55,6 @@ module.exports = {
       logger.info({ actionType: 'BULK_DELETE_QUESTIONS', message: `Bulk deleted ${deleted} questions`, req, details: { adminId: req.user?.id, count: deleted } });
       return res.json({ status: 'success', data: { deleted } });
     } catch (error) {
-      if (error.message === 'ids array required') return res.status(400).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'BULK_DELETE_QUESTIONS_FAILED', message: 'Bulk delete questions failed', req, details: { error: error.message } });
       return next(error);
     }
@@ -66,11 +64,10 @@ module.exports = {
     try {
       const question = await questionService.deleteQuestion(req.params.id);
       logger.info({ actionType: 'ADMIN_ACTION', message: 'Question deleted', req, details: { adminId: req.user?.id, questionId: question.id } });
-      return res.status(204).json({ status: 'success', data: null });
+      return res.status(204).send();
     } catch (error) {
-      if (error.message === 'Question not found') {
+      if (error.code === 'QUESTION_NOT_FOUND') {
         logger.warn({ actionType: 'ADMIN_ACTION', message: `Question not found for deletion: ${req.params.id}`, req, details: { adminId: req.user?.id } });
-        return res.status(404).json({ status: 'error', message: 'Question not found' });
       }
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: `Failed to delete question ${req.params.id}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
@@ -85,7 +82,6 @@ module.exports = {
       return res.status(dryRun ? 200 : 201).json({ status: 'success', data: summary });
     } catch (error) {
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: 'Failed to import questions', req, details: { error: error.message, stack: error.stack } });
-      if (error.statusCode) return res.status(error.statusCode).json({ status: 'error', message: error.message, details: error.details });
       return next(error);
     }
   },

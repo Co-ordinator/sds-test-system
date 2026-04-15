@@ -2,6 +2,7 @@
 
 const { EducationLevel } = require('../models');
 const { Op } = require('sequelize');
+const { BadRequestError, NotFoundError, ConflictError } = require('../utils/errors/appError');
 
 module.exports = {
 
@@ -15,21 +16,21 @@ module.exports = {
 
   createEducationLevel: async ({ level, description }) => {
     if (level === undefined || !description) {
-      throw new Error('level (integer) and description are required');
+      throw new BadRequestError('level (integer) and description are required', 'REQUIRED_FIELDS_MISSING');
     }
     const existing = await EducationLevel.findOne({ where: { level: Number(level) } });
-    if (existing) throw new Error(`Level ${level} already exists`);
+    if (existing) throw new ConflictError(`Level ${level} already exists`, 'EDUCATION_LEVEL_EXISTS');
 
     return await EducationLevel.create({ level: Number(level), description });
   },
 
   updateEducationLevel: async (id, { level, description }) => {
     const el = await EducationLevel.findByPk(id);
-    if (!el) throw new Error('Education level not found');
+    if (!el) throw new NotFoundError('Education level not found', 'EDUCATION_LEVEL_NOT_FOUND');
 
     if (level !== undefined && Number(level) !== el.level) {
       const conflict = await EducationLevel.findOne({ where: { level: Number(level), id: { [Op.ne]: el.id } } });
-      if (conflict) throw new Error(`Level ${level} already exists`);
+      if (conflict) throw new ConflictError(`Level ${level} already exists`, 'EDUCATION_LEVEL_EXISTS');
     }
     const updates = {};
     if (level !== undefined) updates.level = Number(level);
@@ -41,7 +42,7 @@ module.exports = {
 
   deleteEducationLevel: async (id) => {
     const el = await EducationLevel.findByPk(id);
-    if (!el) throw new Error('Education level not found');
+    if (!el) throw new NotFoundError('Education level not found', 'EDUCATION_LEVEL_NOT_FOUND');
     await el.destroy();
     return el;
   }

@@ -59,7 +59,6 @@ const register = async (req, res, next) => {
     }
   } catch (error) {
     logger.error({ actionType: 'REGISTER_FAILED', message: 'User registration failed', req, details: { error: error.message, stack: error.stack } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -76,7 +75,6 @@ const verifyEmail = async (req, res, next) => {
     res.status(200).json({ status: 'success', message: alreadyVerified ? 'Your email is already verified. Please log in.' : (token ? 'Email successfully verified!' : 'Email successfully verified. Please log in.'), ...(token ? { token } : {}), data: { user: user.toJSON() } });
   } catch (error) {
     logger.error({ actionType: 'VERIFY_EMAIL_FAILED', message: 'Email verification failed', req, details: { error: error.message, stack: error.stack } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -92,9 +90,6 @@ const login = async (req, res, next) => {
     res.status(200).json({ status: 'success', token, mustChangePassword, data: { user: user.toJSON ? user.toJSON() : user } });
   } catch (error) {
     logger.warn({ actionType: 'LOGIN_FAILED', message: error.message, req });
-    if (error.status === 401) return res.status(401).json({ status: 'error', message: error.message });
-    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message, requiresVerification: error.requiresVerification });
-    if (error.status === 400) return res.status(400).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -106,7 +101,6 @@ const getMe = async (req, res, next) => {
     res.status(200).json({ status: 'success', data: { user: user.toJSON ? user.toJSON() : user } });
   } catch (error) {
     logger.error({ actionType: 'GET_ME_FAILED', message: 'Failed to retrieve user profile', req, details: { error: error.message } });
-    if (error.status === 404) return res.status(404).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -118,7 +112,6 @@ const updateProfile = async (req, res, next) => {
     res.status(200).json({ status: 'success', data: { user: updated } });
   } catch (error) {
     logger.error({ actionType: 'PROFILE_UPDATE_FAILED', message: 'Failed to update profile', req, details: { error: error.message } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -139,7 +132,6 @@ const forgotPassword = async (req, res, next) => {
       });
   } catch (error) {
     logger.error({ actionType: 'FORGOT_PASSWORD_FAILED', message: 'Failed to send password reset token', req, details: { error: error.message } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -155,7 +147,6 @@ const resetPassword = async (req, res, next) => {
     res.status(200).json({ status: 'success', token });
   } catch (error) {
     logger.error({ actionType: 'RESET_PASSWORD_FAILED', message: 'Failed to reset password', req, details: { error: error.message } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -167,7 +158,6 @@ const refreshToken = async (req, res, next) => {
     res.status(200).json({ status: 'success', token: newAccessToken });
   } catch (error) {
     logger.error({ actionType: 'REFRESH_TOKEN_FAILED', message: 'Failed to refresh token', req, details: { error: error.message } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -193,7 +183,6 @@ const exportUserData = async (req, res, next) => {
     res.status(200).send(JSON.stringify(user, null, 2));
   } catch (error) {
     logger.error({ actionType: 'DATA_EXPORT_FAILED', message: 'Failed to export user data', req, details: { error: error.message } });
-    if (error.status === 404) return res.status(404).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -208,7 +197,6 @@ const deleteUserAccount = async (req, res, next) => {
     res.status(200).json({ status: 'success', message: 'Account deleted successfully' });
   } catch (error) {
     logger.error({ actionType: 'ACCOUNT_DELETION_FAILED', message: 'Failed to delete user account', req, details: { error: error.message } });
-    if (error.status === 404) return res.status(404).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -230,7 +218,6 @@ const resendVerificationEmail = async (req, res, next) => {
       });
   } catch (error) {
     logger.error({ actionType: 'RESEND_VERIFICATION_FAILED', message: 'Failed to resend verification email', req, details: { error: error.message } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };
@@ -243,7 +230,6 @@ const changePassword = async (req, res, next) => {
     res.status(200).json({ status: 'success', message: 'Password changed successfully' });
   } catch (error) {
     logger.error({ actionType: 'PASSWORD_CHANGE_FAILED', message: 'Failed to change password', req, details: { error: error.message } });
-    if (error.status) return res.status(error.status).json({ status: 'error', message: error.message });
     next(error);
   }
 };

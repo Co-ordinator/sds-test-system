@@ -63,7 +63,6 @@ const AdminUsersPanel = ({ institutions = [] }) => {
     } catch { showToast('Bulk deactivate failed', 'error'); }
   }, [selectedUsers, load, showToast]);
 
-  useEffect(() => { load(); }, [load]);
   useEffect(() => { load(); }, [search, roleFilter, load]);
 
   // Load all permissions for create form
@@ -121,7 +120,7 @@ const AdminUsersPanel = ({ institutions = [] }) => {
       setCreatePerms(new Set());
       load();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to create user', 'error');
+      showToast(err.uiMessage || 'Failed to create user', 'error');
     } finally { setCreating(false); }
   };
 

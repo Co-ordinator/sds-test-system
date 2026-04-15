@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizeApiError } from './errorNormalizer';
 
 // Use origin only (e.g. http://localhost:5000). Paths in the app include /api/v1.
 const rawUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -14,6 +15,7 @@ const api = axios.create({
 
 let isRefreshing = false;
 let failedQueue = [];
+let authFailureNotified = false;
 
 const isAuthEndpoint = (url = '') => {
   const normalizedUrl = url.toLowerCase();
@@ -33,6 +35,12 @@ const processQueue = (error, token = null) => {
   });
 
   failedQueue = [];
+};
+
+const notifyAuthFailure = () => {
+  if (authFailureNotified) return;
+  authFailureNotified = true;
+  window.dispatchEvent(new CustomEvent('auth:session-expired'));
 };
 
 // Response interceptor for handling errors
@@ -64,17 +72,21 @@ api.interceptors.response.use(
 
       try {
         await api.post('/api/v1/auth/refresh-token');
+        authFailureNotified = false;
         processQueue(null, true);
         return api(originalRequest);
       } catch (err) {
-        processQueue(err, null);
-        return Promise.reject(err);
+        const normalized = normalizeApiError(err);
+        processQueue(normalized, null);
+        notifyAuthFailure();
+        return Promise.reject(normalized);
       } finally {
         isRefreshing = false;
       }
     }
 
-    return Promise.reject(error);
+    const normalized = normalizeApiError(error);
+    return Promise.reject(normalized);
   }
 );
 

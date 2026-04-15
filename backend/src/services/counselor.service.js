@@ -4,6 +4,7 @@ const { User, Assessment, Institution, SchoolStudent } = require('../models');
 const { Op } = require('sequelize');
 const { bulkCreateStudents } = require('./studentImport.service');
 const scoringService = require('./scoring.service');
+const { BadRequestError, NotFoundError, ForbiddenError } = require('../utils/errors/appError');
 
 const resolveInstitutionId = (actor, queryParam) => {
   if (actor.role === 'System Administrator') return queryParam || null;
@@ -111,9 +112,9 @@ module.exports = {
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
 
     if (!csvData || typeof csvData !== 'string' || !csvData.trim()) {
-      throw new Error('CSV data is required');
+      throw new BadRequestError('CSV data is required', 'CSV_REQUIRED');
     }
-    if (!institutionId) throw new Error('Institution is required');
+    if (!institutionId) throw new BadRequestError('Institution is required', 'INSTITUTION_REQUIRED');
 
     const importReport = await bulkCreateStudents(csvData, institutionId);
     return { importReport, actor, institutionId };
@@ -121,10 +122,10 @@ module.exports = {
 
   deleteStudent: async (actorId, actorRole, actorInstitutionId, studentId) => {
     const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
-    if (!student) throw new Error('Student not found');
+    if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
 
     if (actorRole === 'Test Administrator' && student.institutionId !== actorInstitutionId) {
-      throw Object.assign(new Error('Not authorized to manage this student'), { status: 403 });
+      throw new ForbiddenError('Not authorized to manage this student', 'STUDENT_NOT_AUTHORIZED');
     }
 
     await student.destroy();
@@ -133,10 +134,10 @@ module.exports = {
 
   updateStudent: async (actorRole, actorInstitutionId, studentId, body) => {
     const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
-    if (!student) throw new Error('Student not found');
+    if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
 
     if (actorRole === 'Test Administrator' && student.institutionId !== actorInstitutionId) {
-      throw Object.assign(new Error('Not authorized to manage this student'), { status: 403 });
+      throw new ForbiddenError('Not authorized to manage this student', 'STUDENT_NOT_AUTHORIZED');
     }
 
     const allowed = ['firstName', 'lastName', 'gradeLevel', 'email', 'institutionId'];
@@ -154,10 +155,10 @@ module.exports = {
 
   getStudentResults: async (actorRole, actorInstitutionId, studentId) => {
     const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
-    if (!student) throw new Error('Student not found');
+    if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
 
     if (actorRole === 'Test Administrator' && student.institutionId !== actorInstitutionId) {
-      throw Object.assign(new Error('Not authorized to view this student'), { status: 403 });
+      throw new ForbiddenError('Not authorized to view this student', 'STUDENT_RESULTS_NOT_AUTHORIZED');
     }
 
     const assessments = await Assessment.findAll({
@@ -205,10 +206,10 @@ module.exports = {
     const actor = await User.findByPk(actorId);
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
 
-    if (!institutionId) throw new Error('Institution is required');
+    if (!institutionId) throw new BadRequestError('Institution is required', 'INSTITUTION_REQUIRED');
 
     const institution = await Institution.findByPk(institutionId);
-    if (!institution) throw new Error('Institution not found');
+    if (!institution) throw new NotFoundError('Institution not found', 'INSTITUTION_NOT_FOUND');
 
     const where = { institutionId, role: 'Test Taker' };
     if (grade) {
@@ -225,7 +226,7 @@ module.exports = {
       order: [['lastName', 'ASC'], ['firstName', 'ASC']]
     });
 
-    if (students.length === 0) throw new Error('No students found for these criteria');
+    if (students.length === 0) throw new NotFoundError('No students found for these criteria', 'NO_STUDENTS_FOUND');
 
     return { students, institution, actor };
   },

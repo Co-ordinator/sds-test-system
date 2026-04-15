@@ -6,6 +6,7 @@ const { User, EducationLevel, Occupation, Institution } = require('../models');
 const { Op } = require('sequelize');
 const { generateStudentCode } = require('../utils/generateStudentCode');
 const { hashValue } = require('../utils/security.util');
+const { BadRequestError, ConflictError, AuthError, NotFoundError } = require('../utils/errors/appError');
 
 // Grade level text → education_levels.level mapping
 const GRADE_TO_EDUCATION_LEVEL = {
@@ -73,19 +74,19 @@ module.exports = {
 
   /* ─── Register ────────────────────────────────────────────────────────── */
   register: async ({ nationalId, email, password, consent }) => {
-    if (!consent) throw Object.assign(new Error('You must accept the data processing terms to register.'), { code: 'NO_CONSENT', status: 400 });
-    if (!nationalId?.trim()) throw Object.assign(new Error('National ID is required'), { status: 400 });
-    if (!email?.trim()) throw Object.assign(new Error('Email is required'), { status: 400 });
-    if (!password) throw Object.assign(new Error('Password is required'), { status: 400 });
+    if (!consent) throw new BadRequestError('You must accept the data processing terms to register.', 'NO_CONSENT');
+    if (!nationalId?.trim()) throw new BadRequestError('National ID is required', 'NATIONAL_ID_REQUIRED');
+    if (!email?.trim()) throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    if (!password) throw new BadRequestError('Password is required', 'PASSWORD_REQUIRED');
 
     const cleanNationalId = String(nationalId).trim();
     if (!/^\d{13}$/.test(cleanNationalId)) {
-      throw Object.assign(new Error('National ID must be exactly 13 digits'), { status: 400 });
+      throw new BadRequestError('National ID must be exactly 13 digits', 'INVALID_NATIONAL_ID');
     }
 
     const existingUser = await User.findOne({ where: { nationalIdHash: hashValue(cleanNationalId) } });
     if (existingUser) {
-      throw Object.assign(new Error('An account with this National ID already exists. Please login instead.'), { status: 409 });
+      throw new ConflictError('An account with this National ID already exists. Please login instead.', 'NATIONAL_ID_EXISTS');
     }
 
     const emailToken = crypto.randomBytes(32).toString('hex');
@@ -140,7 +141,7 @@ module.exports = {
       if (recentlyVerifiedUser) {
         return { user: recentlyVerifiedUser, token: null, refreshToken: null, alreadyVerified: true };
       }
-      throw Object.assign(new Error('Token is invalid or has expired'), { status: 400 });
+      throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
     }
 
     user.isEmailVerified = true;
@@ -164,7 +165,7 @@ module.exports = {
   /* ─── Login ───────────────────────────────────────────────────────────── */
   login: async (identifier, password) => {
     if (!identifier || !password) {
-      throw Object.assign(new Error('Please provide your email or username and password'), { status: 400 });
+      throw new BadRequestError('Please provide your email or username and password', 'LOGIN_FIELDS_REQUIRED');
     }
 
     const user = await User.findOne({
@@ -172,12 +173,14 @@ module.exports = {
     });
 
     if (!user || !(await user.comparePassword(password))) {
-      throw Object.assign(new Error('Incorrect email/username or password'), { status: 401 });
+      throw new AuthError('Incorrect email/username or password', 'INVALID_CREDENTIALS', 401);
     }
 
     const requiresVerification = user.email && !user.isEmailVerified && !user.createdByTestAdministrator;
     if (requiresVerification) {
-      throw Object.assign(new Error('Your email address is not verified. Please check your inbox for the verification link.'), { status: 403, requiresVerification: true });
+      const error = new AuthError('Your email address is not verified. Please check your inbox for the verification link.', 'EMAIL_NOT_VERIFIED', 403);
+      error.requiresVerification = true;
+      throw error;
     }
 
     user.lastLogin = new Date();
@@ -205,7 +208,7 @@ module.exports = {
       attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken'] },
       include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
     });
-    if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     return user;
   },
 
@@ -213,7 +216,7 @@ module.exports = {
   updateProfile: async (userId, body) => {
     const { sequelize } = require('../models');
     const user = await User.findByPk(userId);
-    if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
 
     const allowed = [
       'firstName', 'lastName', 'gender', 'nationalId', 'phoneNumber', 'region', 'district', 'address',
@@ -299,7 +302,7 @@ module.exports = {
     }
 
     if (Object.keys(updates).length === 0) {
-      throw Object.assign(new Error('No valid fields to update'), { status: 400 });
+      throw new BadRequestError('No valid fields to update', 'NO_VALID_UPDATES');
     }
 
     await user.update(updates);
@@ -313,13 +316,13 @@ module.exports = {
 
   /* ─── Forgot Password ─────────────────────────────────────────────────── */
   forgotPassword: async (identifier) => {
-    if (!identifier) throw Object.assign(new Error('Login number, email, username, or student number is required'), { status: 400 });
+    if (!identifier) throw new BadRequestError('Login number, email, username, or student number is required', 'IDENTIFIER_REQUIRED');
 
     const user = await User.findOne({
       where: { [Op.or]: [{ studentCode: identifier }, { email: identifier }, { username: identifier }, { studentNumber: identifier }] }
     });
-    if (!user) throw Object.assign(new Error('No user found with that login number, email, username, or student number'), { status: 404 });
-    if (!user.email) throw Object.assign(new Error('Cannot send reset link: no email on file'), { status: 400 });
+    if (!user) throw new NotFoundError('No user found with that login number, email, username, or student number', 'USER_NOT_FOUND');
+    if (!user.email) throw new BadRequestError('Cannot send reset link: no email on file', 'EMAIL_MISSING');
 
     const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     user.passwordResetToken = hashToken(resetToken);
@@ -335,7 +338,7 @@ module.exports = {
     const user = await User.findOne({
       where: { id: decoded.id, passwordResetToken: hashToken(tokenParam), passwordResetExpires: { [Op.gt]: new Date() } }
     });
-    if (!user) throw Object.assign(new Error('Token is invalid or has expired'), { status: 400 });
+    if (!user) throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
 
     user.password = newPassword;
     user.passwordResetToken = null;
@@ -352,12 +355,12 @@ module.exports = {
 
   /* ─── Refresh Token ───────────────────────────────────────────────────── */
   refreshAccessToken: async (refreshTokenValue) => {
-    if (!refreshTokenValue) throw Object.assign(new Error('No refresh token provided'), { status: 401 });
+    if (!refreshTokenValue) throw new AuthError('No refresh token provided', 'REFRESH_TOKEN_MISSING', 401);
     const decoded = jwt.verify(refreshTokenValue, process.env.JWT_REFRESH_SECRET);
     const user = await User.findOne({
       where: { id: decoded.id, refreshToken: hashToken(refreshTokenValue), refreshTokenExpires: { [Op.gt]: new Date() } }
     });
-    if (!user) throw Object.assign(new Error('Invalid or expired refresh token'), { status: 401 });
+    if (!user) throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
     const newAccessToken = signToken(user.id, user.role);
     return { newAccessToken };
   },
@@ -379,14 +382,14 @@ module.exports = {
     const user = await User.findByPk(userId, {
       include: [{ association: 'assessments', include: [{ association: 'answers' }] }, { association: 'auditLogs' }]
     });
-    if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     return user;
   },
 
   /* ─── Delete Account ──────────────────────────────────────────────────── */
   deleteUserAccount: async (userId) => {
     const user = await User.findByPk(userId);
-    if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     await user.destroy();
     return user;
   },
@@ -394,8 +397,8 @@ module.exports = {
   /* ─── Resend Verification ─────────────────────────────────────────────── */
   resendVerificationEmail: async (email) => {
     const user = await User.findOne({ where: { email } });
-    if (!user) throw Object.assign(new Error('No user found with that email'), { status: 404 });
-    if (user.isEmailVerified) throw Object.assign(new Error('Email is already verified'), { status: 400 });
+    if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
+    if (user.isEmailVerified) throw new BadRequestError('Email is already verified', 'EMAIL_ALREADY_VERIFIED');
 
     const emailToken = crypto.randomBytes(32).toString('hex');
     user.emailVerificationToken = hashToken(emailToken);
@@ -408,13 +411,13 @@ module.exports = {
   /* ─── Change Password ─────────────────────────────────────────────────── */
   changePassword: async (userId, currentPassword, newPassword) => {
     if (!currentPassword || !newPassword) {
-      throw Object.assign(new Error('Current password and new password are required'), { status: 400 });
+      throw new BadRequestError('Current password and new password are required', 'PASSWORD_FIELDS_REQUIRED');
     }
     const user = await User.findByPk(userId);
-    if (!user) throw Object.assign(new Error('User not found'), { status: 404 });
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
 
     const isValid = await user.comparePassword(currentPassword);
-    if (!isValid) throw Object.assign(new Error('Current password is incorrect'), { status: 401 });
+    if (!isValid) throw new AuthError('Current password is incorrect', 'INVALID_CURRENT_PASSWORD', 401);
 
     user.password = newPassword;
     user.mustChangePassword = false;

@@ -6,6 +6,7 @@ const { Readable } = require('stream');
 const { Occupation, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const { occupationsArraySchema } = require('../validations/occupation.validation');
+const { ValidationError, NotFoundError, BadRequestError } = require('../utils/errors/appError');
 
 const parseCsvOccupations = async (csvText) => new Promise((resolve, reject) => {
   const records = [];
@@ -41,9 +42,7 @@ const validateOccupationsArray = (rows) => {
   const { value, error } = occupationsArraySchema.validate(rows, { abortEarly: false, stripUnknown: true });
   if (error) {
     const msg = error.details.map((d) => d.message.replace(/['"]/g, '')).join('; ');
-    const err = new Error(`Validation failed: ${msg}`);
-    err.statusCode = 400;
-    throw err;
+    throw new ValidationError('Validation failed', [{ message: msg }]);
   }
   return value;
 };
@@ -88,14 +87,14 @@ module.exports = {
 
   updateOccupation: async (id, data) => {
     const occupation = await Occupation.findByPk(id);
-    if (!occupation) throw new Error('Occupation not found');
+    if (!occupation) throw new NotFoundError('Occupation not found', 'OCCUPATION_NOT_FOUND');
     await occupation.update(data);
     return occupation;
   },
 
   reviewOccupation: async (id, { status, primaryRiasec, secondaryRiasec, code, category, hollandCodes, demandLevel }) => {
     const occupation = await Occupation.findByPk(id);
-    if (!occupation) throw new Error('Occupation not found');
+    if (!occupation) throw new NotFoundError('Occupation not found', 'OCCUPATION_NOT_FOUND');
     const updates = {};
     if (status) updates.status = status;
     if (primaryRiasec !== undefined) updates.primaryRiasec = primaryRiasec;
@@ -110,18 +109,18 @@ module.exports = {
 
   deleteOccupation: async (id) => {
     const occupation = await Occupation.findByPk(id);
-    if (!occupation) throw new Error('Occupation not found');
+    if (!occupation) throw new NotFoundError('Occupation not found', 'OCCUPATION_NOT_FOUND');
     await occupation.destroy();
     return occupation;
   },
 
   bulkDeleteOccupations: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     return await Occupation.destroy({ where: { id: { [Op.in]: ids } } });
   },
 
   bulkApproveOccupations: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     const [updated] = await Occupation.update({ status: 'approved' }, { where: { id: { [Op.in]: ids } } });
     return updated;
   },
@@ -135,9 +134,7 @@ module.exports = {
         const records = await parseCsvOccupations(payload || '');
         const missingHeaders = ['code', 'name'].filter((h) => records.length && !(h in records[0]));
         if (missingHeaders.length) {
-          const err = new Error(`CSV missing required headers: ${missingHeaders.join(', ')}`);
-          err.statusCode = 400;
-          throw err;
+          throw new ValidationError(`CSV missing required headers: ${missingHeaders.join(', ')}`);
         }
         rows = normalizeCsvRecords(records);
       } else if (Array.isArray(payload)) {
@@ -145,18 +142,13 @@ module.exports = {
       } else if (payload && Array.isArray(payload.occupations)) {
         rows = payload.occupations;
       } else {
-        const err = new Error('Invalid import payload. Provide an array or { occupations: [...] }');
-        err.statusCode = 400;
-        throw err;
+        throw new BadRequestError('Invalid import payload. Provide an array or { occupations: [...] }', 'INVALID_IMPORT_PAYLOAD');
       }
 
       const validated = validateOccupationsArray(rows);
       const dupes = detectDuplicateCodes(validated);
       if (dupes.length) {
-        const err = new Error('Duplicate codes found in payload');
-        err.statusCode = 400;
-        err.details = dupes;
-        throw err;
+        throw new ValidationError('Duplicate codes found in payload', dupes);
       }
 
       const codes = validated.map((o) => o.code);

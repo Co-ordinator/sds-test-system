@@ -5,12 +5,14 @@ const cookieParser = require('cookie-parser');
 const morganMiddleware = require('./middleware/logging.middleware');
 const errorHandler = require('./middleware/errorHandling.middleware');
 const { apiLimiter } = require('./middleware/rateLimiting.middleware');
+const requestIdMiddleware = require('./middleware/requestId.middleware');
 require('dotenv').config();
 
 const app = express();
 
 // Middleware
 app.use(helmet());
+app.use(requestIdMiddleware);
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(morganMiddleware);
 app.use(cookieParser());

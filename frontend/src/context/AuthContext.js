@@ -30,6 +30,16 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+      setIsAuthenticated(false);
+      navigate('/login');
+    };
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, [navigate]);
+
   const login = useCallback(async (credentials) => {
     try {
       const response = await api.post('/api/v1/auth/login', credentials);
@@ -52,8 +62,10 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
       navigate('/login');
-    } catch (err) {
-      console.error('Logout error:', err);
+    } catch (_) {
+      setUser(null);
+      setIsAuthenticated(false);
+      navigate('/login');
     }
   }, [navigate]);
 

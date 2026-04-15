@@ -4,6 +4,7 @@ const { User, AuditLog, Assessment, Institution } = require('../models');
 const { Op } = require('sequelize');
 const { Parser } = require('json2csv');
 const crypto = require('crypto');
+const { NotFoundError, BadRequestError, ConflictError } = require('../utils/errors/appError');
 
 module.exports = {
 
@@ -36,7 +37,7 @@ module.exports = {
 
   updateUser: async (id, updates) => {
     const user = await User.findByPk(id);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
 
     const allowed = ['role', 'institutionId', 'isActive', 'firstName', 'lastName', 'email'];
     const safeUpdates = {};
@@ -50,42 +51,42 @@ module.exports = {
 
   deleteUser: async (id) => {
     const user = await User.findByPk(id);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     await user.destroy();
     return user;
   },
 
   bulkDeleteUsers: async (ids, currentUserId) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     const safeIds = ids.filter(id => id !== currentUserId);
     return await User.destroy({ where: { id: { [Op.in]: safeIds } } });
   },
 
   bulkUpdateUsers: async (ids, updates) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     const allowed = ['isActive', 'role'];
     const safeUpdates = {};
     for (const key of allowed) {
       if (updates?.[key] !== undefined) safeUpdates[key] = updates[key];
     }
-    if (Object.keys(safeUpdates).length === 0) throw new Error('No valid updates provided');
+    if (Object.keys(safeUpdates).length === 0) throw new BadRequestError('No valid updates provided', 'NO_VALID_UPDATES');
     const [updated] = await User.update(safeUpdates, { where: { id: { [Op.in]: ids } } });
     return updated;
   },
 
   createUser: async ({ firstName, lastName, email, role, institutionId, organization, permissionIds }) => {
     if (!firstName || !lastName || !email) {
-      throw new Error('First name, last name, and email are required');
+      throw new BadRequestError('First name, last name, and email are required', 'REQUIRED_FIELDS_MISSING');
     }
 
     const validRoles = ['System Administrator', 'Test Administrator', 'Test Taker'];
     if (role && !validRoles.includes(role)) {
-      throw new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+      throw new BadRequestError(`Invalid role. Must be one of: ${validRoles.join(', ')}`, 'INVALID_ROLE');
     }
 
     const existingUser = await User.findOne({ where: { [Op.or]: [{ email }, { username: email }] } });
     if (existingUser) {
-      throw new Error('A user with this email already exists');
+      throw new ConflictError('A user with this email already exists', 'USER_ALREADY_EXISTS');
     }
 
     const tempPassword = crypto.randomBytes(8).toString('hex');
@@ -336,7 +337,7 @@ module.exports = {
 
   markNotificationRead: async (id) => {
     const log = await AuditLog.findByPk(id);
-    if (!log) throw new Error('Notification not found');
+    if (!log) throw new NotFoundError('Notification not found', 'NOTIFICATION_NOT_FOUND');
     const details = { ...(log.details || {}), isRead: true };
     await log.update({ details });
     return log;
@@ -360,14 +361,14 @@ module.exports = {
       attributes: ['id', 'firstName', 'lastName', 'email', 'role'],
       include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
     });
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     return user;
   },
 
   updateUserPermissions: async (userId, permissionIds) => {
     const { Permission, UserPermission } = require('../models');
     const user = await User.findByPk(userId);
-    if (!user) throw new Error('User not found');
+    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
 
     await UserPermission.destroy({ where: { userId: user.id } });
 

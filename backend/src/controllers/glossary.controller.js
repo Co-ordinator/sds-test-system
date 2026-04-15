@@ -2,6 +2,7 @@
 
 const { GlossaryTerm } = require('../models');
 const { Op } = require('sequelize');
+const { NotFoundError, BadRequestError } = require('../utils/errors/appError');
 
 class GlossaryController {
   async listTerms(req, res, next) {
@@ -28,7 +29,7 @@ class GlossaryController {
       const term = await GlossaryTerm.findByPk(req.params.id, {
         attributes: ['id', 'term', 'definition', 'section', 'example'],
       });
-      if (!term) return res.status(404).json({ status: 'error', message: 'Term not found' });
+      if (!term) throw new NotFoundError('Term not found', 'GLOSSARY_TERM_NOT_FOUND');
       return res.json({ status: 'success', data: { term } });
     } catch (error) {
       return next(error);
@@ -39,7 +40,7 @@ class GlossaryController {
     try {
       const { term, definition, section, example } = req.body;
       if (!term || !definition) {
-        return res.status(400).json({ status: 'error', message: 'term and definition are required' });
+        throw new BadRequestError('term and definition are required', 'GLOSSARY_REQUIRED_FIELDS');
       }
       const created = await GlossaryTerm.create({ term, definition, section: section || 'general', example });
       return res.status(201).json({ status: 'success', data: { term: created } });
@@ -51,7 +52,7 @@ class GlossaryController {
   async updateTerm(req, res, next) {
     try {
       const existing = await GlossaryTerm.findByPk(req.params.id);
-      if (!existing) return res.status(404).json({ status: 'error', message: 'Term not found' });
+      if (!existing) throw new NotFoundError('Term not found', 'GLOSSARY_TERM_NOT_FOUND');
       const { term, definition, section, example, isActive } = req.body;
       await existing.update({
         ...(term !== undefined && { term }),
@@ -69,7 +70,7 @@ class GlossaryController {
   async deleteTerm(req, res, next) {
     try {
       const existing = await GlossaryTerm.findByPk(req.params.id);
-      if (!existing) return res.status(404).json({ status: 'error', message: 'Term not found' });
+      if (!existing) throw new NotFoundError('Term not found', 'GLOSSARY_TERM_NOT_FOUND');
       await existing.destroy();
       return res.json({ status: 'success', message: 'Term deleted' });
     } catch (error) {

@@ -43,9 +43,8 @@ module.exports = {
       logger.info({ actionType: 'ADMIN_ACTION', message: 'Occupation updated', req, details: { adminId: req.user?.id, code: occupation.code } });
       return res.status(200).json({ status: 'success', data: { occupation: occupation.toJSON() } });
     } catch (error) {
-      if (error.message === 'Occupation not found') {
+      if (error.code === 'OCCUPATION_NOT_FOUND') {
         logger.warn({ actionType: 'ADMIN_ACTION', message: `Occupation not found: ${req.params.id}`, req, details: { adminId: req.user?.id } });
-        return res.status(404).json({ status: 'error', message: 'Occupation not found' });
       }
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: `Failed to update occupation ${req.params.id}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
@@ -58,7 +57,6 @@ module.exports = {
       logger.info({ actionType: 'OCCUPATION_REVIEWED', message: `Occupation reviewed: ${occupation.name}`, req, details: { adminId: req.user?.id, occupationId: occupation.id, newStatus: req.body.status } });
       return res.status(200).json({ status: 'success', data: { occupation: occupation.toJSON() } });
     } catch (error) {
-      if (error.message === 'Occupation not found') return res.status(404).json({ status: 'error', message: 'Occupation not found' });
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: `Failed to review occupation ${req.params.id}`, req, details: { error: error.message } });
       return next(error);
     }
@@ -70,7 +68,6 @@ module.exports = {
       logger.info({ actionType: 'BULK_DELETE_OCCUPATIONS', message: `Bulk deleted ${deleted} occupations`, req, details: { adminId: req.user?.id, count: deleted } });
       return res.json({ status: 'success', data: { deleted } });
     } catch (error) {
-      if (error.message === 'ids array required') return res.status(400).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'BULK_DELETE_OCCUPATIONS_FAILED', message: 'Bulk delete occupations failed', req, details: { error: error.message } });
       return next(error);
     }
@@ -82,7 +79,6 @@ module.exports = {
       logger.info({ actionType: 'BULK_APPROVE_OCCUPATIONS', message: `Bulk approved ${updated} occupations`, req, details: { adminId: req.user?.id, count: updated } });
       return res.json({ status: 'success', data: { updated } });
     } catch (error) {
-      if (error.message === 'ids array required') return res.status(400).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'BULK_APPROVE_OCCUPATIONS_FAILED', message: 'Bulk approve occupations failed', req, details: { error: error.message } });
       return next(error);
     }
@@ -92,11 +88,10 @@ module.exports = {
     try {
       const occupation = await occupationService.deleteOccupation(req.params.id);
       logger.info({ actionType: 'ADMIN_ACTION', message: 'Occupation deleted', req, details: { adminId: req.user?.id, code: occupation.code } });
-      return res.status(204).json({ status: 'success', data: null });
+      return res.status(204).send();
     } catch (error) {
-      if (error.message === 'Occupation not found') {
+      if (error.code === 'OCCUPATION_NOT_FOUND') {
         logger.warn({ actionType: 'ADMIN_ACTION', message: `Occupation not found for deletion: ${req.params.id}`, req, details: { adminId: req.user?.id } });
-        return res.status(404).json({ status: 'error', message: 'Occupation not found' });
       }
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: `Failed to delete occupation ${req.params.id}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
@@ -111,7 +106,6 @@ module.exports = {
       return res.status(dryRun ? 200 : 201).json({ status: 'success', data: summary });
     } catch (error) {
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: 'Failed to import occupations', req, details: { error: error.message, stack: error.stack } });
-      if (error.statusCode) return res.status(error.statusCode).json({ status: 'error', message: error.message, details: error.details });
       return next(error);
     }
   },

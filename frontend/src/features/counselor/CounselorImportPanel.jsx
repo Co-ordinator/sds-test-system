@@ -38,7 +38,7 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
       onImportComplete?.();
       showToast(`Imported ${report.importedCount} students`);
     } catch (err) {
-      setImportError(err.response?.data?.message || 'Import failed. Check your CSV format.');
+      setImportError(err.uiMessage || 'Import failed. Check your CSV format.');
     } finally { setIsSaving(false); }
   };
 

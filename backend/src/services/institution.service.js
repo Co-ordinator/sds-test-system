@@ -5,6 +5,7 @@ const { parse } = require('csv-parse');
 const { Readable } = require('stream');
 const { Institution, User } = require('../models');
 const { Op } = require('sequelize');
+const { NotFoundError, BadRequestError } = require('../utils/errors/appError');
 
 const parseCsvInstitutions = (csvText) => new Promise((resolve, reject) => {
   const rows = [];
@@ -38,7 +39,7 @@ module.exports = {
 
   updateInstitution: async (id, data) => {
     const institution = await Institution.findByPk(id);
-    if (!institution) throw new Error('Institution not found');
+    if (!institution) throw new NotFoundError('Institution not found', 'INSTITUTION_NOT_FOUND');
     const allowed = ['name', 'nameSwati', 'acronym', 'type', 'region', 'district', 'description', 'phoneNumber', 'email', 'website', 'accredited', 'bursariesAvailable', 'programs', 'facilities'];
     const updates = {};
     for (const key of allowed) {
@@ -50,7 +51,7 @@ module.exports = {
 
   reviewInstitution: async (id, { status, name, type, region, district, accredited }) => {
     const institution = await Institution.findByPk(id);
-    if (!institution) throw new Error('Institution not found');
+    if (!institution) throw new NotFoundError('Institution not found', 'INSTITUTION_NOT_FOUND');
     const updates = {};
     if (status) updates.status = status;
     if (name !== undefined) updates.name = name;
@@ -64,21 +65,21 @@ module.exports = {
 
   deleteInstitution: async (id) => {
     const institution = await Institution.findByPk(id);
-    if (!institution) throw new Error('Institution not found');
+    if (!institution) throw new NotFoundError('Institution not found', 'INSTITUTION_NOT_FOUND');
     await User.update({ institutionId: null }, { where: { institutionId: institution.id } });
     await institution.destroy();
     return institution;
   },
 
   bulkDeleteInstitutions: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     await User.update({ institutionId: null }, { where: { institutionId: { [Op.in]: ids } } });
     await User.update({ workplaceInstitutionId: null }, { where: { workplaceInstitutionId: { [Op.in]: ids } } });
     return await Institution.destroy({ where: { id: { [Op.in]: ids } } });
   },
 
   bulkApproveInstitutions: async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) throw new Error('ids array required');
+    if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
     const [updated] = await Institution.update({ status: 'approved' }, { where: { id: { [Op.in]: ids } } });
     return updated;
   },
@@ -101,10 +102,10 @@ module.exports = {
   },
 
   importInstitutions: async (csvText) => {
-    if (!csvText.trim()) throw new Error('No CSV data provided');
+    if (!csvText.trim()) throw new BadRequestError('No CSV data provided', 'CSV_REQUIRED');
 
     const records = await parseCsvInstitutions(csvText);
-    if (!records.length) throw new Error('No records found in CSV');
+    if (!records.length) throw new BadRequestError('No records found in CSV', 'CSV_EMPTY');
 
     let created = 0; let updated = 0; let skipped = 0;
 

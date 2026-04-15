@@ -1,5 +1,6 @@
 const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, CourseRequirement, CourseInstitution, Institution, Subject, OccupationCourse, sequelize } = require('../models');
 const { Op } = require('sequelize');
+const { NotFoundError } = require('../utils/errors/appError');
 
 /**
  * Holland Code → Career Focus description per user type
@@ -144,7 +145,7 @@ class ScoringService {
         transaction
       });
 
-      if (!assessment) throw new Error('Assessment not found');
+      if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
 
       const answers = await Answer.findAll({ 
         where: { assessmentId },

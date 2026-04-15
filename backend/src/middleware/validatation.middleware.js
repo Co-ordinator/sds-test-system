@@ -1,4 +1,5 @@
 const { AuditLog } = require('../models');
+const { ValidationError } = require('../utils/errors/appError');
 
 const validate = (schema) => async (req, res, next) => {
   try {
@@ -30,11 +31,7 @@ const validate = (schema) => async (req, res, next) => {
         message: detail.message.replace(/['"]/g, '')
       }));
 
-      return res.status(400).json({
-        status: 'error',
-        message: 'Validation failed',
-        errors
-      });
+      return next(new ValidationError('Validation failed', errors));
     }
 
     // Replace body with validated values

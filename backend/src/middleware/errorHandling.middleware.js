@@ -1,32 +1,40 @@
 const logger = require('../utils/logger');
+const { AppError } = require('../utils/errors/appError');
 
 const errorHandler = (err, req, res, next) => {
   const statusCode = err.status || err.statusCode || 500;
-
-  if (process.env.NODE_ENV === 'production') {
-    if (statusCode >= 500) {
-      logger.error({
-        message: err.message,
-        stack: err.stack,
-        url: req.originalUrl,
-        method: req.method,
-        ip: req.ip,
-        user: req.user?.id || 'anonymous'
-      });
-    }
-    const message = statusCode >= 500 ? 'An internal server error occurred.' : err.message;
-    return res.status(statusCode).json({
-      status: 'error',
-      message
-    });
+  const code = err.code || (statusCode >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR');
+  const requestId = req.requestId || null;
+  const isOperational = err instanceof AppError || (statusCode < 500 && !!err.message);
+  const safeMessage = (isOperational && (err.expose || statusCode < 500))
+    ? err.message
+    : 'An internal server error occurred.';
+  const responseBody = {
+    status: 'error',
+    code,
+    message: safeMessage,
+    requestId
+  };
+  if (code === 'VALIDATION_ERROR' && Array.isArray(err.details)) {
+    responseBody.details = err.details;
+  }
+  if (err.requiresVerification) {
+    responseBody.requiresVerification = true;
   }
 
-  logger.error(err.stack);
-  return res.status(statusCode).json({
-    status: 'error',
-    message: err.message,
-    ...(statusCode >= 500 && { stack: err.stack })
+  logger.error({
+    actionType: 'SYSTEM',
+    message: `${code}: ${err.message}`,
+    req,
+    details: {
+      code,
+      statusCode,
+      requestId,
+      stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
+    }
   });
+
+  return res.status(statusCode).json(responseBody);
 };
 
 module.exports = errorHandler;

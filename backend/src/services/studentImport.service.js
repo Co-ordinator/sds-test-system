@@ -2,6 +2,8 @@ const { parse } = require('csv-parse/sync');
 const { User, EducationLevel, SchoolStudent } = require('../models');
 const { generateStudentCode } = require('../utils/generateStudentCode');
 const { sendEmail } = require('../config/email.config');
+const logger = require('../utils/logger');
+const { ValidationError } = require('../utils/errors/appError');
 
 const generatePassword = () => {
   const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789';
@@ -47,7 +49,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
   });
 
   if (!records.length) {
-    throw new Error('No student records found in CSV');
+    throw new ValidationError('No student records found in CSV');
   }
 
   const defaultEduLevelId = await EducationLevel.min('id');
@@ -79,14 +81,14 @@ const bulkCreateStudents = async (csvData, institutionId) => {
       const password = col(['password']) || generatePassword();
 
       if (!firstName && !lastName && !studentNumber) {
-        throw new Error('Each row must have at least first_name, last_name, or student_number');
+        throw new ValidationError('Each row must have at least first_name, last_name, or student_number');
       }
 
       if (!nationalId) {
-        throw new Error(`Row for ${firstName} ${lastName}: national_id / PIN is required`);
+        throw new ValidationError('national_id / PIN is required for each row');
       }
       if (!/^\d{13}$/.test(nationalId)) {
-        throw new Error(`Row for ${firstName} ${lastName}: national_id must be exactly 13 digits (got "${nationalId}")`);
+        throw new ValidationError('national_id must be exactly 13 digits');
       }
 
       // Preferred username = student_number; fallback to name-based slug
@@ -175,7 +177,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
               }
             });
           } catch (emailError) {
-            console.error(`Failed to send credentials email to ${c.email}:`, emailError.message);
+            logger.error({ actionType: 'EMAIL_FAILED', message: 'Failed to send student credential email', details: { error: emailError.message } });
           }
         }
       });

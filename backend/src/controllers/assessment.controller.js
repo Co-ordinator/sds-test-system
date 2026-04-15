@@ -48,7 +48,6 @@ class AssessmentController {
       const assessment = await assessmentService.getAssessment(req.params.assessmentId, req.user.id);
       return res.status(200).json({ status: 'success', data: { assessment } });
     } catch (error) {
-      if (error.message === 'Assessment not found') return res.status(404).json({ status: 'error', message: error.message });
       return next(error);
     }
   }
@@ -58,7 +57,6 @@ class AssessmentController {
       const answers = await assessmentService.getProgress(req.params.assessmentId, req.user.id);
       return res.status(200).json({ status: 'success', data: { answers } });
     } catch (error) {
-      if (error.message === 'Assessment not found') return res.status(404).json({ status: 'error', message: error.message });
       return next(error);
     }
   }
@@ -79,8 +77,6 @@ class AssessmentController {
       logger.info({ actionType: 'ASSESSMENT_PROGRESS_SAVED', message: `Progress saved for assessment ${req.params.assessmentId}`, req, details: { assessmentId: req.params.assessmentId, answeredCount, progress } });
       return res.status(200).json({ status: 'success', data: { progress } });
     } catch (error) {
-      if (error.message === 'Assessment not found or not in progress') return res.status(404).json({ status: 'error', message: error.message });
-      if (error.message === 'answers array is required') return res.status(400).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'ASSESSMENT_PROGRESS_FAILED', message: 'Failed to save progress', req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
@@ -100,8 +96,6 @@ class AssessmentController {
         }
       });
     } catch (error) {
-      if (error.message === 'Assessment not found or not in progress') return res.status(404).json({ status: 'error', message: error.message });
-      if (error.message === 'Assessment is incomplete') return res.status(400).json({ status: 'error', message: error.message, answered: error.answered });
       logger.error({ actionType: 'ASSESSMENT_COMPLETE_FAILED', message: `Failed to finalize assessment ${req.params.assessmentId}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
@@ -113,8 +107,6 @@ class AssessmentController {
       logger.info({ actionType: 'ASSESSMENT_RESULTS_FETCHED', message: `Results fetched for assessment ${req.params.assessmentId}`, req, details: { assessmentId: req.params.assessmentId } });
       return res.status(200).json({ status: 'success', data: { assessment, recommendations } });
     } catch (error) {
-      if (error.message === 'Results not found') return res.status(404).json({ status: 'error', message: error.message });
-      if (error.message === 'Not authorized to view these results') return res.status(403).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'ASSESSMENT_RESULTS_FAILED', message: `Failed to fetch results for assessment ${req.params.assessmentId}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }
@@ -417,8 +409,6 @@ class AssessmentController {
 
       doc.end();
     } catch (error) {
-      if (error.message === 'Completed assessment not found') return res.status(404).json({ status: 'error', message: error.message });
-      if (error.message === 'Not authorized') return res.status(403).json({ status: 'error', message: error.message });
       logger.error({ actionType: 'PDF_GENERATION_FAILED', message: `PDF generation failed for assessment ${req.params.assessmentId}`, req, details: { error: error.message, stack: error.stack } });
       return next(error);
     }

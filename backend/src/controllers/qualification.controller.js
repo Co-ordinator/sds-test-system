@@ -19,7 +19,7 @@ const uploadQualification = async (req, res, next) => {
     res.status(201).json({ status: 'success', data: { qualification } });
   } catch (error) {
     if (req.file) fs.unlink(req.file.path, () => {});
-    if (error.message === 'No file uploaded' || error.message === 'Title is required') {
+    if (error.code === 'FILE_REQUIRED' || error.code === 'TITLE_REQUIRED') {
       return res.status(400).json({ status: 'error', message: error.message });
     }
     logger.error({ actionType: 'QUALIFICATION_UPLOAD_FAILED', message: 'Failed to upload qualification', req, details: { error: error.message } });
@@ -36,7 +36,7 @@ const downloadQualification = async (req, res, next) => {
     const stream = fs.createReadStream(file.filePath);
     stream.pipe(res);
   } catch (error) {
-    if (error.message === 'Qualification not found' || error.message === 'File not found on server') {
+    if (error.code === 'QUALIFICATION_NOT_FOUND' || error.code === 'FILE_NOT_FOUND') {
       return res.status(404).json({ status: 'error', message: error.message });
     }
     logger.error({ actionType: 'QUALIFICATION_DOWNLOAD_FAILED', message: 'Failed to serve qualification file', req, details: { error: error.message } });
@@ -50,7 +50,7 @@ const deleteQualification = async (req, res, next) => {
     logger.info({ actionType: 'QUALIFICATION_DELETE', message: `Qualification deleted by user ${req.user.id}`, req, details: { qualificationId: req.params.id } });
     res.status(200).json({ status: 'success', message: 'Qualification deleted' });
   } catch (error) {
-    if (error.message === 'Qualification not found') return res.status(404).json({ status: 'error', message: error.message });
+    if (error.code === 'QUALIFICATION_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'QUALIFICATION_DELETE_FAILED', message: 'Failed to delete qualification', req, details: { error: error.message } });
     next(error);
   }

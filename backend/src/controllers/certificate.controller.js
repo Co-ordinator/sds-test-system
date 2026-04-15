@@ -219,8 +219,6 @@ module.exports.generateCertificate = async (req, res, next) => {
     logger.info({ actionType: 'CERTIFICATE_GENERATED', message: `Certificate ${cert.certNumber} generated for assessment ${assessmentId}`, req });
     res.json({ status: 'success', data: { certId: cert.id, certNumber: cert.certNumber, generatedAt: cert.generatedAt, assessmentId } });
   } catch (err) {
-    if (err.message === 'Assessment not found') return res.status(404).json({ status: 'error', message: err.message });
-    if (err.status === 400) return res.status(400).json({ status: 'error', message: err.message });
     next(err);
   }
 };
@@ -246,9 +244,6 @@ module.exports.downloadCertificate = async (req, res, next) => {
       ).catch(() => {});
     }
   } catch (err) {
-    if (err.message === 'Completed assessment not found') return res.status(404).json({ status: 'error', message: err.message });
-    if (err.message === 'Certificate has not been generated yet. Please contact your administrator.') return res.status(404).json({ status: 'error', message: err.message });
-    if (err.status === 403) return res.status(403).json({ status: 'error', message: err.message });
     next(err);
   }
 };
@@ -267,7 +262,6 @@ module.exports.checkCertificate = async (req, res, next) => {
     const data = await certificateService.checkCertificate(req.params.assessmentId, req.user.id, req.user.role);
     res.json({ status: 'success', data });
   } catch (err) {
-    if (err.status === 403) return res.status(403).json({ status: 'error', message: err.message });
     next(err);
   }
 };

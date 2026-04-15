@@ -21,8 +21,7 @@ export const useGlossary = () => {
         setLoading(true);
         const terms = await glossaryService.listTerms();
         setGlossaryTerms(terms);
-      } catch (error) {
-        console.warn('Failed to load glossary terms from database:', error);
+      } catch (_) {
         // Fallback to empty array - will show no glossary terms
         setGlossaryTerms([]);
       } finally {
@@ -42,8 +41,7 @@ export const useGlossary = () => {
         setLearnedTerms(new Set(parsed.terms || []));
         setTermInteractions(parsed.interactions || {});
       }
-    } catch (error) {
-      console.warn('Failed to load glossary progress:', error);
+    } catch (_) {
     }
   }, []);
 
@@ -54,8 +52,7 @@ export const useGlossary = () => {
         terms: Array.from(terms),
         interactions: interactions || {}
       }));
-    } catch (error) {
-      console.warn('Failed to save glossary progress:', error);
+    } catch (_) {
     }
   }, []);
 

@@ -32,7 +32,6 @@ const importStudents = async (req, res, next) => {
     logger.info({ actionType: 'COUNSELOR_STUDENTS_IMPORTED', message: `${actor.role} ${actor.id} imported ${importReport.importedCount} students`, req, details: { actorId: actor.id, institutionId, count: importReport.importedCount } });
     return res.status(201).json({ status: 'success', data: { importReport } });
   } catch (error) {
-    if (error.message === 'CSV data is required' || error.message === 'Institution is required') return res.status(400).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'COUNSELOR_STUDENTS_IMPORT_FAILED', message: 'Failed to import students', req, details: { error: error.message, stack: error.stack } });
     return next(error);
   }
@@ -44,8 +43,6 @@ const deleteStudent = async (req, res, next) => {
     logger.info({ actionType: 'STUDENT_DELETED', message: `Student ${req.params.studentId} deleted by ${req.user.role} ${req.user.id}`, req });
     return res.status(200).json({ status: 'success', message: 'Student deleted' });
   } catch (error) {
-    if (error.message === 'Student not found') return res.status(404).json({ status: 'error', message: error.message });
-    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'STUDENT_DELETE_FAILED', message: 'Failed to delete student', req, details: { error: error.message } });
     return next(error);
   }
@@ -56,8 +53,6 @@ const updateStudent = async (req, res, next) => {
     const updated = await counselorService.updateStudent(req.user.role, req.user.institutionId, req.params.studentId, req.body);
     return res.status(200).json({ status: 'success', data: { student: updated } });
   } catch (error) {
-    if (error.message === 'Student not found') return res.status(404).json({ status: 'error', message: error.message });
-    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'STUDENT_UPDATE_FAILED', message: 'Failed to update student', req, details: { error: error.message } });
     return next(error);
   }
@@ -71,8 +66,6 @@ const getStudentResults = async (req, res, next) => {
       data: { student: { id: student.id, firstName: student.firstName, lastName: student.lastName, email: student.email }, assessments, recommendations }
     });
   } catch (error) {
-    if (error.message === 'Student not found') return res.status(404).json({ status: 'error', message: error.message });
-    if (error.status === 403) return res.status(403).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'STUDENT_RESULTS_FAILED', message: 'Failed to get student results', req, details: { error: error.message } });
     return next(error);
   }
@@ -178,8 +171,6 @@ const generateLoginCards = async (req, res, next) => {
     logger.info({ actionType: 'LOGIN_CARDS_GENERATED', message: `${actor.role} ${actor.id} generated ${students.length} login cards for institution ${institution.id}`, req, details: { actorId: actor.id, institutionId: institution.id, count: students.length } });
 
   } catch (error) {
-    if (error.message === 'Institution is required') return res.status(400).json({ status: 'error', message: error.message });
-    if (error.message === 'Institution not found' || error.message === 'No students found for these criteria') return res.status(404).json({ status: 'error', message: error.message });
     logger.error({ actionType: 'LOGIN_CARDS_FAILED', message: 'Failed to generate login cards', req, details: { error: error.message } });
     return next(error);
   }

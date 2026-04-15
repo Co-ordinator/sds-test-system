@@ -3,6 +3,7 @@
 const { Certificate, Assessment, Answer, User } = require('../models');
 const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
+const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
 
 const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
 
@@ -44,9 +45,9 @@ module.exports = {
       include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId'] }]
     });
 
-    if (!assessment) throw new Error('Assessment not found');
+    if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
     if (assessment.status !== 'completed') {
-      throw Object.assign(new Error('Assessment must be completed before issuing a certificate'), { status: 400 });
+      throw new BadRequestError('Assessment must be completed before issuing a certificate', 'ASSESSMENT_NOT_COMPLETED');
     }
 
     let cert = await Certificate.findOne({ where: { assessmentId } });
@@ -71,19 +72,19 @@ module.exports = {
     });
 
     if (!assessment || assessment.status !== 'completed') {
-      throw new Error('Completed assessment not found');
+      throw new NotFoundError('Completed assessment not found', 'COMPLETED_ASSESSMENT_NOT_FOUND');
     }
 
     const isOwner = assessment.userId === userId;
     const isAdmin = userRole === 'System Administrator';
     const isCounselor = userRole === 'Test Administrator';
     if (!isOwner && !isAdmin && !isCounselor) {
-      throw Object.assign(new Error('Not authorized'), { status: 403 });
+      throw new ForbiddenError('Not authorized', 'CERTIFICATE_NOT_AUTHORIZED');
     }
 
     const cert = await Certificate.findOne({ where: { assessmentId } });
     if (!cert) {
-      throw Object.assign(new Error('Certificate has not been generated yet. Please contact your administrator.'), { status: 404 });
+      throw new NotFoundError('Certificate has not been generated yet. Please contact your administrator.', 'CERTIFICATE_NOT_GENERATED');
     }
 
     const sectionScores = await module.exports.computeSectionScores(assessmentId);
@@ -144,7 +145,7 @@ module.exports = {
   checkCertificate: async (assessmentId, userId, userRole) => {
     const assessment = await Assessment.findByPk(assessmentId);
     if (!assessment || (assessment.userId !== userId && userRole !== 'System Administrator' && userRole !== 'Test Administrator')) {
-      throw Object.assign(new Error('Not authorized'), { status: 403 });
+      throw new ForbiddenError('Not authorized', 'CERTIFICATE_NOT_AUTHORIZED');
     }
     const cert = await Certificate.findOne({ where: { assessmentId } });
     return { available: !!cert, certNumber: cert?.certNumber || null, generatedAt: cert?.generatedAt || null };

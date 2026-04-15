@@ -44,10 +44,10 @@ const Login = () => {
         setServerError(result?.message || 'Login failed');
       }
     } catch (err) {
-      if (err.response?.status === 403 && err.response?.data?.requiresVerification) {
+      if (err.status === 403 && err.raw?.response?.data?.requiresVerification) {
         setShowResendModal(true);
       } else {
-        setServerError(err.response?.data?.message || 'Login failed');
+        setServerError(err.uiMessage || 'Login failed');
       }
     }
   };

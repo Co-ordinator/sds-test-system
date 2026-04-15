@@ -164,7 +164,7 @@ export default function Profile() {
       setQualSuccess('Document uploaded successfully.');
       setTimeout(() => setQualSuccess(''), 4000);
     } catch (err) {
-      setQualError(err.response?.data?.message || 'Upload failed. Please try again.');
+      setQualError(err.uiMessage || 'Upload failed. Please try again.');
     } finally { setQualUploading(false); }
   };
 
@@ -174,7 +174,7 @@ export default function Profile() {
       await api.delete(`/api/v1/qualifications/${id}`);
       setQualifications(p => p.filter(q => q.id !== id));
     } catch (err) {
-      setQualError(err.response?.data?.message || 'Delete failed.');
+      setQualError(err.uiMessage || 'Delete failed.');
     }
   };
 
@@ -244,9 +244,8 @@ export default function Profile() {
     } catch (err) {
       setSaveStatus({
         type: 'error',
-        message: err.response?.data?.message || 'Failed to save changes. Please try again.'
+        message: err.uiMessage || 'Failed to save changes. Please try again.'
       });
-      console.error(err.response?.data?.message || 'Update failed');
     } finally {
       setIsSavingProfile(false);
     }
@@ -269,7 +268,10 @@ export default function Profile() {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error(err.response?.data?.message || 'Export failed');
+      setSaveStatus({
+        type: 'error',
+        message: err.uiMessage || 'Export failed'
+      });
     }
   };
 
@@ -304,7 +306,7 @@ export default function Profile() {
       if (pwRefs.current.newPw) pwRefs.current.newPw.value = '';
       if (pwRefs.current.confirm) pwRefs.current.confirm.value = '';
     } catch (err) {
-      setPwStatus({ type: 'error', msg: err.response?.data?.message || 'Failed to change password.' });
+      setPwStatus({ type: 'error', msg: err.uiMessage || 'Failed to change password.' });
     } finally { setPwSaving(false); }
   };
 
@@ -315,7 +317,10 @@ export default function Profile() {
       await api.delete('/api/v1/auth/users/me/account');
       window.location.href = '/';
     } catch (err) {
-      console.error(err.response?.data?.message || 'Deletion failed');
+      setSaveStatus({
+        type: 'error',
+        message: err.uiMessage || 'Deletion failed'
+      });
       setIsDeleting(false);
     }
   };

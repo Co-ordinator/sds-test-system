@@ -38,6 +38,7 @@ const requestMetadata = winston.format((info) => {
     info.userId = info.req.user?.id || null;
     info.ipAddress = info.req.ip || info.req.headers['x-forwarded-for'] || null;
     info.userAgent = info.req.headers['user-agent'] || null;
+    info.requestId = info.req.requestId || null;
   }
   return info;
 });

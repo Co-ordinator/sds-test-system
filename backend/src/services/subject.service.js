@@ -4,6 +4,7 @@ const { Parser } = require('json2csv');
 const { parse } = require('csv-parse');
 const { Readable } = require('stream');
 const { Subject } = require('../models');
+const { BadRequestError, NotFoundError } = require('../utils/errors/appError');
 
 const VALID_RIASEC = ['R', 'I', 'A', 'S', 'E', 'C'];
 
@@ -28,7 +29,7 @@ module.exports = {
   },
 
   createSubject: async ({ name, riasecCodes, description, level, isActive, displayOrder }) => {
-    if (!name?.trim()) throw new Error('Name is required');
+    if (!name?.trim()) throw new BadRequestError('Name is required', 'SUBJECT_NAME_REQUIRED');
     return await Subject.create({
       name: name.trim(),
       riasecCodes: riasecCodes || [],
@@ -41,7 +42,7 @@ module.exports = {
 
   updateSubject: async (id, data) => {
     const subject = await Subject.findByPk(id);
-    if (!subject) throw new Error('Subject not found');
+    if (!subject) throw new NotFoundError('Subject not found', 'SUBJECT_NOT_FOUND');
     const allowed = ['name', 'riasecCodes', 'description', 'level', 'isActive', 'displayOrder'];
     const updates = {};
     for (const k of allowed) { if (data[k] !== undefined) updates[k] = data[k]; }
@@ -51,14 +52,14 @@ module.exports = {
 
   deleteSubject: async (id) => {
     const subject = await Subject.findByPk(id);
-    if (!subject) throw new Error('Subject not found');
+    if (!subject) throw new NotFoundError('Subject not found', 'SUBJECT_NOT_FOUND');
     await subject.destroy();
     return subject;
   },
 
   importSubjects: async (csvText) => {
     const rows = await parseCsvSubjects(csvText);
-    if (!rows.length) throw new Error('No records found in CSV');
+    if (!rows.length) throw new BadRequestError('No records found in CSV', 'CSV_EMPTY');
 
     let created = 0;
     let updated = 0;
