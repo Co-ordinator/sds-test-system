@@ -57,6 +57,9 @@ const RIASEC_NAMES = {
 const NAV_TEXT_ACTION =
   'inline-flex items-center gap-2 px-2.5 py-1.5 text-sm font-medium transition-colors rounded-md hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent';
 
+const TEST_NAV_BUTTON_BASE =
+  'inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-md transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed';
+
 const getTimerStorageKey = (assessmentId) => `sds_assessment_timer_${assessmentId}`;
 
 const Questionnaire = () => {
@@ -610,27 +613,27 @@ const Questionnaire = () => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={goPrev}
               disabled={saving || isAdvancing || submitting || (currentSectionIndex === 0 && currentQuestionIndex === 0)}
-              className={NAV_TEXT_ACTION}
-              style={{ color: GOV.textMuted }}
+              className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none border bg-white`}
+              style={{ color: GOV.textMuted, borderColor: GOV.border }}
             >
               <ChevronLeft className="w-4 h-4 shrink-0" aria-hidden /> Back
             </button>
 
-            <div className="flex flex-wrap items-center gap-1 sm:gap-2 sm:justify-end">
+            <div className="flex flex-1 items-center justify-end gap-2">
               {allAnswered && (
                 <button
                   type="button"
                   onClick={handleComplete}
                   disabled={submitting}
-                  className={NAV_TEXT_ACTION}
-                  style={{ color: '#16a34a', fontWeight: 700 }}
+                  className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
+                  style={{ backgroundColor: '#16a34a' }}
                 >
-                  {submitting ? 'Submitting…' : 'Submit test'}
+                  {submitting ? 'Submitting...' : 'Submit test'}
                 </button>
               )}
               {!isLastQuestion && (
@@ -638,10 +641,10 @@ const Questionnaire = () => {
                   type="button"
                   onClick={goNext}
                   disabled={!canAdvance || saving || isAdvancing || submitting}
-                  className={NAV_TEXT_ACTION}
-                  style={{ color: GOV.blue, fontWeight: 700 }}
+                  className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
+                  style={{ backgroundColor: GOV.blue }}
                 >
-                  Next <ChevronRight className="w-4 h-4 shrink-0 inline" aria-hidden />
+                  Next <ChevronRight className="w-4 h-4 shrink-0" aria-hidden />
                 </button>
               )}
             </div>
@@ -659,3 +662,4 @@ const Questionnaire = () => {
 };
 
 export default Questionnaire;
+

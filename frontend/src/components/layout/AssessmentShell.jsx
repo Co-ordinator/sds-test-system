@@ -1,14 +1,22 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, Home, LogOut, Settings, User } from 'lucide-react';
+import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { GOV, TYPO } from '../../theme/government';
 
-export default function AssessmentShell({ title, subtitle, contextLabel, actions, children, contentClassName = 'max-w-5xl mx-auto px-6 py-6 space-y-6' }) {
+export default function AssessmentShell({
+  title,
+  subtitle,
+  contextLabel,
+  actions,
+  children,
+  contentClassName = 'max-w-5xl mx-auto px-6 py-6 space-y-6'
+}) {
   const { user, logout } = useAuth();
-  const { getAriaLabel, screenReaderMode } = useAccessibility();
+  const { getAriaLabel } = useAccessibility();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const role = user?.role || 'Test Taker';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
@@ -18,7 +26,11 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
     : role === 'Test Administrator'
       ? '/test-administrator'
       : '/dashboard';
-  const roleLabel = role === 'System Administrator' ? 'System Administrator' : role === 'Test Administrator' ? 'Test Administrator' : 'Test Taker';
+  const roleLabel = role === 'System Administrator'
+    ? 'System Administrator'
+    : role === 'Test Administrator'
+      ? 'Test Administrator'
+      : 'Test Taker';
   const roleColor = role === 'System Administrator'
     ? { bg: '#ede9fe', text: '#6d28d9' }
     : role === 'Test Administrator'
@@ -27,11 +39,10 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {/* Skip to main content for screen readers */}
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      
+
       <div
         className="flex-shrink-0 py-0.5 border-b"
         style={{ backgroundColor: GOV.ministryBarBg, borderColor: GOV.border }}
@@ -39,21 +50,32 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
       >
         <div className="max-w-7xl mx-auto px-6 py-1">
           <p className="text-[10px] font-medium text-center tracking-wide" style={{ color: GOV.ministryBarText }}>
-            Ministry of Labour &amp; Social Security · Kingdom of Eswatini
+            Ministry of Labour &amp; Social Security | Kingdom of Eswatini
           </p>
         </div>
       </div>
 
-      <header className="sticky top-0 z-20 border-b bg-white" style={{ borderColor: GOV.borderLight }} role="navigation" aria-label="Main navigation">
-        <div className="relative py-2">
-          <div className="absolute left-3 sm:left-4 lg:left-6 top-1/2 -translate-y-1/2 z-10">
-            <Link to={dashboardPath} className="flex items-center min-w-0 max-w-[40vw] sm:max-w-[180px]" aria-label="Go to dashboard">
-              <img src="/siyinqaba.png" alt="Siyinqaba - Government of Eswatini" className="h-7 sm:h-8 w-auto max-w-full object-contain" />
+      <header
+        className="sticky top-0 z-30 border-b bg-white"
+        style={{ borderColor: GOV.borderLight }}
+        role="navigation"
+        aria-label="Main navigation"
+      >
+        <div className="h-14 px-3 sm:px-4 lg:px-6">
+          <div className="h-full max-w-7xl mx-auto flex items-center justify-between">
+            <Link
+              to={dashboardPath}
+              className="flex items-center min-w-0 max-w-[48vw] sm:max-w-[180px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+              aria-label="Go to dashboard"
+            >
+              <img
+                src="/siyinqaba.png"
+                alt="Siyinqaba - Government of Eswatini"
+                className="h-7 sm:h-8 w-auto max-w-full object-contain"
+              />
               <span className="sr-only">Home</span>
             </Link>
-          </div>
 
-          <div className="absolute right-3 sm:right-4 lg:right-6 top-1/2 -translate-y-1/2 z-10">
             <div className="relative">
               <button
                 type="button"
@@ -79,9 +101,9 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
 
               {userMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} aria-hidden="true" />
+                  <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} aria-hidden="true" />
                   <div
-                    className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border rounded-md shadow-lg py-1"
+                    className="absolute right-0 top-full mt-1 z-40 w-52 bg-white border rounded-md shadow-lg py-1"
                     style={{ borderColor: GOV.border }}
                     role="menu"
                     aria-label="User menu"
@@ -139,8 +161,10 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
               )}
             </div>
           </div>
+        </div>
 
-          <div className="max-w-5xl mx-auto px-6">
+        <div className="border-t" style={{ borderColor: GOV.borderLight }}>
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0 text-left">
                 <h1 className="text-lg font-semibold" style={{ color: GOV.text }}>{title}</h1>
@@ -150,7 +174,11 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
                   </p>
                 ) : null}
               </div>
-              {actions ? <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div> : null}
+              {actions ? (
+                <div className="flex flex-wrap items-center gap-2 shrink-0 max-w-full">
+                  {actions}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -169,7 +197,6 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
       <main className="flex-1" id="main-content" role="main">
         <div className={contentClassName}>{children}</div>
       </main>
-
     </div>
   );
 }
