@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard } from 'lucide-react';
 import api from '../services/api';
@@ -64,6 +64,29 @@ const SECTION_NEXT_BUTTON =
   'w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm sm:text-base font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
 
 const getTimerStorageKey = (assessmentId) => `sds_assessment_timer_${assessmentId}`;
+const getPositionStorageKey = (assessmentId) => `sds_assessment_position_${assessmentId}`;
+
+const getResumePosition = (savedAnswers = {}, sectionQuestionMap = {}) => {
+  for (let sectionIndex = 0; sectionIndex < SECTIONS.length; sectionIndex += 1) {
+    const sectionQuestions = sectionQuestionMap[SECTIONS[sectionIndex].id] || [];
+    for (let questionIndex = 0; questionIndex < sectionQuestions.length; questionIndex += 1) {
+      const questionId = sectionQuestions[questionIndex]?.id;
+      const answer = savedAnswers[questionId];
+      if (answer === undefined || answer === null || answer === '') {
+        return { sectionIndex, questionIndex };
+      }
+    }
+  }
+
+  for (let sectionIndex = SECTIONS.length - 1; sectionIndex >= 0; sectionIndex -= 1) {
+    const sectionQuestions = sectionQuestionMap[SECTIONS[sectionIndex].id] || [];
+    if (sectionQuestions.length > 0) {
+      return { sectionIndex, questionIndex: sectionQuestions.length - 1 };
+    }
+  }
+
+  return { sectionIndex: 0, questionIndex: 0 };
+};
 
 const Questionnaire = () => {
   const navigate = useNavigate();
@@ -86,8 +109,10 @@ const Questionnaire = () => {
   const [submitting, setSubmitting] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [progressLoaded, setProgressLoaded] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
   const [sectionTransition, setSectionTransition] = useState(null);
+  const hasRestoredPositionRef = useRef(false);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
@@ -101,6 +126,7 @@ const Questionnaire = () => {
   const progressPercent = allAnswered ? 100 : Math.floor(rawProgressPercent);
   const currentSectionMeta = SECTIONS[currentSectionIndex];
   const timerStorageKey = assessment?.id ? getTimerStorageKey(assessment.id) : null;
+  const positionStorageKey = assessment?.id ? getPositionStorageKey(assessment.id) : null;
 
   const loadQuestions = useCallback(async () => {
     try {
@@ -123,6 +149,7 @@ const Questionnaire = () => {
     (async () => {
       setLoading(true);
       setError(null);
+      setProgressLoaded(false);
       await loadQuestions();
       try {
         const res = await api.post('/api/v1/assessments');
@@ -132,15 +159,19 @@ const Questionnaire = () => {
           try {
             const progRes = await api.get(`/api/v1/assessments/${data.id}/progress`);
             const saved = progRes.data?.data?.answers || {};
-            if (Object.keys(saved).length) setAnswers(saved);
+            setAnswers(saved);
           } catch (_) {
-            // non-fatal — start with empty answers
+            setAnswers({});
+          } finally {
+            setProgressLoaded(true);
           }
         } else {
           setError('Failed to initialize assessment. Please try again.');
+          setProgressLoaded(true);
         }
       } catch (e) {
         setError(e.response?.data?.message || 'Failed to start assessment');
+        setProgressLoaded(true);
       }
       setLoading(false);
     })();
@@ -247,6 +278,9 @@ const Questionnaire = () => {
       if (timerStorageKey) {
         try { localStorage.removeItem(timerStorageKey); } catch (_) {}
       }
+      if (positionStorageKey) {
+        try { localStorage.removeItem(positionStorageKey); } catch (_) {}
+      }
       navigate('/test-complete', { replace: true });
     } catch (e) {
       setError(e.response?.data?.message || 'Failed to submit. You may need to answer all 228 questions.');
@@ -258,6 +292,51 @@ const Questionnaire = () => {
   const canAdvance = isSelfEstimates ? currentAnswer != null : currentAnswer !== undefined && currentAnswer !== '';
   const isLastQuestion =
     currentSectionIndex === totalSections - 1 && currentQuestionIndex === sectionQuestions.length - 1;
+
+  useEffect(() => {
+    hasRestoredPositionRef.current = false;
+  }, [assessment?.id]);
+
+  // Restore last viewed question for in-progress assessments.
+  useEffect(() => {
+    if (loading || !progressLoaded || !assessment?.id || hasRestoredPositionRef.current) return;
+    const hasQuestions = SECTIONS.some((section) => (questionsBySection[section.id] || []).length > 0);
+    if (!hasQuestions) return;
+
+    let restored = false;
+    if (positionStorageKey) {
+      try {
+        const raw = localStorage.getItem(positionStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const parsedSectionIndex = Number(parsed?.sectionIndex);
+          const parsedQuestionIndex = Number(parsed?.questionIndex);
+          if (Number.isInteger(parsedSectionIndex) && parsedSectionIndex >= 0 && parsedSectionIndex < SECTIONS.length) {
+            const targetSectionQuestions = questionsBySection[SECTIONS[parsedSectionIndex].id] || [];
+            if (targetSectionQuestions.length > 0) {
+              const clampedQuestionIndex = Math.min(
+                Math.max(parsedQuestionIndex, 0),
+                targetSectionQuestions.length - 1
+              );
+              setCurrentSectionIndex(parsedSectionIndex);
+              setCurrentQuestionIndex(clampedQuestionIndex);
+              restored = true;
+            }
+          }
+        }
+      } catch (_) {
+        // Ignore malformed local position data.
+      }
+    }
+
+    if (!restored) {
+      const fallbackPosition = getResumePosition(answers, questionsBySection);
+      setCurrentSectionIndex(fallbackPosition.sectionIndex);
+      setCurrentQuestionIndex(fallbackPosition.questionIndex);
+    }
+
+    hasRestoredPositionRef.current = true;
+  }, [loading, progressLoaded, assessment?.id, answers, questionsBySection, positionStorageKey]);
 
   // Restore timer state for the active assessment (if previously saved in this browser).
   useEffect(() => {
@@ -290,6 +369,20 @@ const Questionnaire = () => {
       // Ignore storage write failures.
     }
   }, [timerStorageKey, elapsedTime, isPaused]);
+
+  // Persist current section/question so reopening the test returns the user to the same point.
+  useEffect(() => {
+    if (!positionStorageKey || !assessment || sectionTransition || !hasRestoredPositionRef.current) return;
+    try {
+      localStorage.setItem(positionStorageKey, JSON.stringify({
+        sectionIndex: currentSectionIndex,
+        questionIndex: currentQuestionIndex,
+        updatedAt: new Date().toISOString(),
+      }));
+    } catch (_) {
+      // Ignore storage write failures.
+    }
+  }, [positionStorageKey, assessment, sectionTransition, currentSectionIndex, currentQuestionIndex]);
 
   // Tick elapsed timer every second while the assessment is active.
   useEffect(() => {
