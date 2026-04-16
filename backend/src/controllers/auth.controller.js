@@ -120,16 +120,47 @@ const forgotPassword = async (req, res, next) => {
   try {
     const identifier = (req.body.identifier || req.body.email || '').trim();
     const { user, resetToken } = await authService.forgotPassword(identifier);
-    logger.info({ actionType: 'FORGOT_PASSWORD', message: `Password reset token sent to: ${user.email}`, req, details: { userId: user.id } });
 
-    res.status(200).json({ status: 'success', message: 'Token sent to email!' });
+    const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
+    const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
+    const hostProtocol = forwardedProto || req.protocol;
+    const hostBasedUrl = `${hostProtocol}://${req.get('host')}`;
+    const shouldFallbackToHost = process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/i.test(configuredFrontendUrl);
+    const resetUrlBase = configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
+    const resetUrl = `${resetUrlBase}/reset-password/${resetToken}`;
 
-    sendEmail({ email: user.email, subject: 'Password Reset Request', template: 'reset-password', context: { firstName: user.firstName || 'Student', resetUrl: `${process.env.FRONTEND_URL}/reset-password/${resetToken}` } })
-      .then(() => AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Password reset email sent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/forgot-password' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }))
-      .catch(emailError => {
-        logger.error({ actionType: 'EMAIL_FAILED', message: 'Password reset email failed', req, details: { error: emailError.message } });
-        AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Failed to send password reset email', details: { resourceType: 'email', resourceId: user.id, errorMessage: emailError.message, requestMethod: 'POST', requestPath: '/api/v1/auth/forgot-password' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
-      });
+    await sendEmail({
+      email: user.email,
+      subject: 'Password Reset Request',
+      template: 'reset-password',
+      context: {
+        firstName: user.firstName || 'Student',
+        resetUrl
+      }
+    });
+
+    await AuditLog.create({
+      userId: user.id,
+      actionType: 'SYSTEM',
+      description: 'Password reset email sent',
+      details: {
+        resourceType: 'email',
+        resourceId: user.id,
+        requestMethod: 'POST',
+        requestPath: '/api/v1/auth/forgot-password'
+      },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    }).catch(() => {});
+
+    logger.info({
+      actionType: 'FORGOT_PASSWORD',
+      message: `Password reset email sent to: ${user.email}`,
+      req,
+      details: { userId: user.id, resetUrlBase }
+    });
+
+    res.status(200).json({ status: 'success', message: 'Reset link sent to email!' });
   } catch (error) {
     logger.error({ actionType: 'FORGOT_PASSWORD_FAILED', message: 'Failed to send password reset token', req, details: { error: error.message } });
     next(error);

@@ -26,7 +26,7 @@ export default function Home() {
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 pt-8 pb-8">
         <div className="mb-6">
-          <img src="/siyinqaba.png" alt={LOGO_ALT} className="h-16 w-auto mx-auto" />
+          <img src="/siyinqaba.png" alt={LOGO_ALT} className="h-12 sm:h-16 w-auto max-w-full mx-auto object-contain" />
         </div>
 
         <div className="w-full max-w-3xl bg-white rounded-md p-8 text-center">

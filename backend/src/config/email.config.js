@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
+const logger = require('../utils/logger');
 
 // Create transporter
 const transporter = nodemailer.createTransport({
@@ -16,36 +17,44 @@ let hbsInitialized = false;
 
 // Email sending function
 const sendEmail = async (options) => {
-  try {
-    // Lazy-load ESM handlebars plugin (required for CommonJS)
-    if (!hbsInitialized) {
-      const hbs = (await import('nodemailer-express-handlebars')).default;
-      const handlebarOptions = {
-        viewEngine: {
-          extName: '.hbs',
-          partialsDir: path.resolve(__dirname, '../templates/emails'),
-          defaultLayout: false
-        },
-        viewPath: path.resolve(__dirname, '../templates/emails'),
-        extName: '.hbs'
-      };
-      transporter.use('compile', hbs(handlebarOptions));
-      hbsInitialized = true;
-    }
-
-    const mailOptions = {
-      from: `"SDS Test System" <${process.env.SMTP_FROM_EMAIL}>`,
-      to: options.email,
-      subject: options.subject,
-      template: options.template,
-      context: options.context
+  // Lazy-load ESM handlebars plugin (required for CommonJS)
+  if (!hbsInitialized) {
+    const hbs = (await import('nodemailer-express-handlebars')).default;
+    const handlebarOptions = {
+      viewEngine: {
+        extName: '.hbs',
+        partialsDir: path.resolve(__dirname, '../templates/emails'),
+        defaultLayout: false
+      },
+      viewPath: path.resolve(__dirname, '../templates/emails'),
+      extName: '.hbs'
     };
+    transporter.use('compile', hbs(handlebarOptions));
+    hbsInitialized = true;
+  }
 
+  const mailOptions = {
+    from: `"SDS Test System" <${process.env.SMTP_FROM_EMAIL}>`,
+    to: options.email,
+    subject: options.subject,
+    template: options.template,
+    context: options.context
+  };
+
+  try {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Email send error:', error);
-    return { success: false, error };
+    logger.error({
+      actionType: 'EMAIL_FAILED',
+      message: 'SMTP send failed',
+      details: {
+        recipient: options.email,
+        subject: options.subject,
+        error: error.message
+      }
+    });
+    throw error;
   }
 };
 

@@ -71,8 +71,8 @@ export const TYPO = {
 
 /** Single logo size and alignment for all auth/onboarding surfaces */
 export const LOGO = {
-  className: 'h-14 w-auto object-contain',
-  marginBottom: 'mb-6',
+  className: 'h-12 sm:h-14 w-auto max-w-full object-contain',
+  marginBottom: 'mb-5 sm:mb-6',
 };
 
 export const MINISTRY_NAME = 'Ministry of Labour and Social Security';

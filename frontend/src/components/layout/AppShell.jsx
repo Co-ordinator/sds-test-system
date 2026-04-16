@@ -135,7 +135,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
         style={{ borderColor: GOV.border, backgroundColor: '#ffffff' }}
       >
         <div className="relative h-full px-4 lg:px-6">
-          <div className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 flex items-center gap-3 z-10">
+          <div className="absolute left-3 sm:left-4 lg:left-6 top-1/2 -translate-y-1/2 flex items-center gap-2 sm:gap-3 z-10">
             <button
               type="button"
               className="lg:hidden p-1.5 rounded-md hover:bg-gray-100"
@@ -144,8 +144,8 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
               {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
             </button>
 
-            <Link to={dashboardPath} className="flex-shrink-0 flex items-center gap-2">
-              <img src="/siyinqaba.png" alt="Siyinqaba" className="h-10 w-auto object-contain" />
+            <Link to={dashboardPath} className="flex items-center min-w-0 max-w-[40vw] sm:max-w-[180px]" aria-label="Go to dashboard">
+              <img src="/siyinqaba.png" alt="Siyinqaba" className="h-7 sm:h-10 w-auto max-w-full object-contain" />
             </Link>
           </div>
 
@@ -177,7 +177,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
             </nav>
           </div>
 
-          <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-10">
+          <div className="absolute right-3 sm:right-4 lg:right-6 top-1/2 -translate-y-1/2 z-10">
             <div className="relative">
               <button
                 type="button"

@@ -46,14 +46,14 @@ export default function AssessmentShell({ title, subtitle, contextLabel, actions
 
       <header className="sticky top-0 z-20 border-b bg-white" style={{ borderColor: GOV.borderLight }} role="navigation" aria-label="Main navigation">
         <div className="relative py-2">
-          <div className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-10">
-            <Link to={dashboardPath} className="flex-shrink-0 flex items-center gap-2" aria-label="Go to dashboard">
-              <img src="/siyinqaba.png" alt="Siyinqaba - Government of Eswatini" className="h-8 w-auto object-contain" />
+          <div className="absolute left-3 sm:left-4 lg:left-6 top-1/2 -translate-y-1/2 z-10">
+            <Link to={dashboardPath} className="flex items-center min-w-0 max-w-[40vw] sm:max-w-[180px]" aria-label="Go to dashboard">
+              <img src="/siyinqaba.png" alt="Siyinqaba - Government of Eswatini" className="h-7 sm:h-8 w-auto max-w-full object-contain" />
               <span className="sr-only">Home</span>
             </Link>
           </div>
 
-          <div className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-10">
+          <div className="absolute right-3 sm:right-4 lg:right-6 top-1/2 -translate-y-1/2 z-10">
             <div className="relative">
               <button
                 type="button"
