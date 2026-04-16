@@ -34,6 +34,15 @@ const clearAccessTokenCookie = (res) => {
   res.clearCookie('accessToken', { ...ACCESS_COOKIE_OPTIONS, maxAge: undefined });
 };
 
+const resolveFrontendBaseUrl = (req) => {
+  const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
+  const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
+  const hostProtocol = forwardedProto || req.protocol;
+  const hostBasedUrl = `${hostProtocol}://${req.get('host')}`;
+  const shouldFallbackToHost = process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/i.test(configuredFrontendUrl);
+  return configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
+};
+
 const register = async (req, res, next) => {
   try {
     const { user, token, refreshToken, emailToken } = await authService.register(req.body);
@@ -45,11 +54,18 @@ const register = async (req, res, next) => {
     res.status(201).json({ status: 'success', token, data: { user: user.toJSON() } });
 
     if (user.email) {
+      const frontendBaseUrl = resolveFrontendBaseUrl(req);
       sendEmail({
         email: user.email,
         subject: 'Welcome to SDS Test System - Verify Your Email',
         template: 'welcome-verify',
-        context: { firstName: user.firstName || 'Student', lastName: user.lastName || '', email: user.email, region: user.region, verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}` }
+        context: {
+          firstName: user.firstName || 'Student',
+          lastName: user.lastName || '',
+          email: user.email,
+          region: user.region,
+          verificationUrl: `${frontendBaseUrl}/verify-email/${emailToken}`
+        }
       })
         .then(() => AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Welcome email sent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/register' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }))
         .catch(emailError => {
@@ -238,7 +254,16 @@ const resendVerificationEmail = async (req, res, next) => {
 
     res.status(200).json({ status: 'success', message: 'Verification email sent' });
 
-    sendEmail({ email: user.email, subject: 'Verify Your Email Address', template: 'welcome-verify', context: { firstName: user.firstName || 'Student', verificationUrl: `${process.env.FRONTEND_URL}/verify-email/${emailToken}` } })
+    const frontendBaseUrl = resolveFrontendBaseUrl(req);
+    sendEmail({
+      email: user.email,
+      subject: 'Verify Your Email Address',
+      template: 'welcome-verify',
+      context: {
+        firstName: user.firstName || 'Student',
+        verificationUrl: `${frontendBaseUrl}/verify-email/${emailToken}`
+      }
+    })
       .then(() => {
         logger.info({ actionType: 'VERIFICATION_EMAIL_RESENT', message: `Verification email resent to: ${user.email}`, req, details: { userId: user.id } });
         return AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Verification email resent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/resend-verification' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });

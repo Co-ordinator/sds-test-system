@@ -7,12 +7,12 @@ import { GOV, TYPO } from '../../theme/government';
  * OccupationSearchInput
  *
  * Props:
- *   value        â€” display string (occupation name)
- *   occupationId â€” UUID of the matched occupation (null for free text)
- *   onChange(name, id) â€” called when selection or text changes
- *   placeholder  â€” input placeholder
- *   inputClassName â€” extra class on the input
- *   error        â€” truthy to show error border
+ *   value        - display string (occupation name)
+ *   occupationId - UUID of the matched occupation (null for free text)
+ *   onChange(name, id) - called when selection or text changes
+ *   placeholder  - input placeholder
+ *   inputClassName - extra class on the input
+ *   error        - truthy to show error border
  */
 export default function OccupationSearchInput({
   value = '',
@@ -161,7 +161,7 @@ export default function OccupationSearchInput({
           )}
           {!loading && results.length === 0 && query.trim().length >= 2 && (
             <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-              No registered occupation found â€” your entry will be saved as typed.
+              No registered occupation found - your entry will be saved as typed.
             </li>
           )}
           {!loading && results.map((occ) => (

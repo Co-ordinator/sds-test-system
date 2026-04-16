@@ -15,7 +15,7 @@ export default function Register() {
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm();
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm();
 
   const onSubmit = async (data) => {
     setServerError('');
@@ -34,8 +34,30 @@ export default function Register() {
         state: { email: payload.email, fromRegistration: true }
       });
     } catch (err) {
-      const msg = err.response?.data?.message || 'Registration failed. Please try again.';
-      setServerError(msg);
+      const uiMessage = err?.uiMessage || err?.response?.data?.message || 'Registration failed. Please try again.';
+      const details = Array.isArray(err?.details) ? err.details : [];
+
+      let hasFieldError = false;
+      for (const detail of details) {
+        const field = detail?.field;
+        const message = detail?.message;
+        if (!field || !message) continue;
+        if (!['nationalId', 'email', 'password', 'consent'].includes(field)) continue;
+        setError(field, { type: 'server', message });
+        hasFieldError = true;
+      }
+
+      if (err?.code === 'NATIONAL_ID_EXISTS') {
+        setError('nationalId', { type: 'server', message: uiMessage });
+        hasFieldError = true;
+      }
+
+      if (err?.code === 'EMAIL_EXISTS') {
+        setError('email', { type: 'server', message: uiMessage });
+        hasFieldError = true;
+      }
+
+      if (!hasFieldError) setServerError(uiMessage);
     }
   };
 
@@ -154,7 +176,7 @@ export default function Register() {
               className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
               style={{ backgroundColor: GOV.blue }}
             >
-              {isSubmitting ? 'Creating account…' : 'Create account'}
+              {isSubmitting ? 'Creating account...' : 'Create account'}
             </button>
 
             <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
@@ -167,3 +189,4 @@ export default function Register() {
     </OnboardingLayout>
   );
 }
+

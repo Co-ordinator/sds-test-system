@@ -95,8 +95,13 @@ module.exports = (sequelize, DataTypes) => {
         return decryptValue(encrypted);
       },
       validate: {
-        len: [13, 13],
-        isNumeric: true
+        isValidEncryptedNationalId(value) {
+          if (!value) return;
+          const decrypted = decryptValue(value);
+          if (!/^\d{13}$/.test(String(decrypted || '').trim())) {
+            throw new Error('National ID must be exactly 13 digits');
+          }
+        }
       }
     },
     nationalIdHash: {

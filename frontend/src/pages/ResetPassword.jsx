@@ -25,7 +25,7 @@ export default function ResetPassword() {
       setError('');
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Password reset failed');
+      setError(err?.uiMessage || err?.response?.data?.message || 'Password reset failed');
       setSuccess(false);
     }
   };

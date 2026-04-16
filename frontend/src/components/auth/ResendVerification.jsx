@@ -19,7 +19,7 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
       setSuccess(true);
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to resend verification');
+      setError(err?.uiMessage || err?.response?.data?.message || 'Failed to resend verification');
       setSuccess(false);
     }
   };

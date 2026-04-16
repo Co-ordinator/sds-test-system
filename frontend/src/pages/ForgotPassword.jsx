@@ -17,7 +17,7 @@ export default function ForgotPassword() {
       setSuccess(true);
       setError('');
     } catch (err) {
-      setError(err.response?.data?.message || 'Request failed');
+      setError(err?.uiMessage || err?.response?.data?.message || 'Request failed');
       setSuccess(false);
     }
   };

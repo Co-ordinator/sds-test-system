@@ -38,7 +38,7 @@ export default function VerifyEmail() {
         }
       } catch (err) {
         setStatus('error');
-        setError(err.response?.data?.message || 'Link expired or invalid');
+        setError(err?.uiMessage || err?.response?.data?.message || 'Link expired or invalid');
       }
     };
     verifyEmail();

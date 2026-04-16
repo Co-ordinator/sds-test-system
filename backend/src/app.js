@@ -9,11 +9,31 @@ const requestIdMiddleware = require('./middleware/requestId.middleware');
 require('dotenv').config();
 
 const app = express();
+const normalizeOrigin = (origin) => String(origin || '').trim().replace(/\/$/, '');
+const configuredOrigins = [
+  ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  ...(process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : [])
+].map(normalizeOrigin).filter(Boolean);
+const devOrigins = process.env.NODE_ENV === 'production'
+  ? []
+  : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const allowedOrigins = new Set([...configuredOrigins, ...devOrigins].map(normalizeOrigin).filter(Boolean));
+
+const corsOptions = {
+  credentials: true,
+  origin: (origin, callback) => {
+    // Allow non-browser clients (no Origin header)
+    if (!origin) return callback(null, true);
+    const normalized = normalizeOrigin(origin);
+    if (allowedOrigins.size === 0 || allowedOrigins.has(normalized)) return callback(null, true);
+    return callback(null, false);
+  }
+};
 
 // Middleware
 app.use(helmet());
 app.use(requestIdMiddleware);
-app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+app.use(cors(corsOptions));
 app.use(morganMiddleware);
 app.use(cookieParser());
 app.use(express.json());

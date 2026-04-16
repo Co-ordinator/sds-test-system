@@ -80,6 +80,7 @@ module.exports = {
     if (!password) throw new BadRequestError('Password is required', 'PASSWORD_REQUIRED');
 
     const cleanNationalId = String(nationalId).trim();
+    const cleanEmail = String(email).trim().toLowerCase();
     if (!/^\d{13}$/.test(cleanNationalId)) {
       throw new BadRequestError('National ID must be exactly 13 digits', 'INVALID_NATIONAL_ID');
     }
@@ -89,27 +90,52 @@ module.exports = {
       throw new ConflictError('An account with this National ID already exists. Please login instead.', 'NATIONAL_ID_EXISTS');
     }
 
+    const existingEmailUser = await User.findOne({
+      where: { email: { [Op.iLike]: cleanEmail } }
+    });
+    if (existingEmailUser) {
+      throw new ConflictError('An account with this email already exists. Please login instead.', 'EMAIL_EXISTS');
+    }
+
     const emailToken = crypto.randomBytes(32).toString('hex');
     const emailTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const studentCode = await generateStudentCode();
     const { dateOfBirth, gender } = parseNationalId(cleanNationalId);
 
-    const user = await User.create({
-      nationalId: cleanNationalId,
-      email: email.trim(),
-      password,
-      firstName: null,
-      lastName: null,
-      onboardingCompleted: false,
-      dateOfBirth,
-      gender,
-      role: 'Test Taker',
-      studentCode,
-      isConsentGiven: true,
-      consentDate: new Date(),
-      emailVerificationToken: hashToken(emailToken),
-      emailVerificationExpires: emailTokenExpires
-    });
+    let user;
+    try {
+      user = await User.create({
+        nationalId: cleanNationalId,
+        email: cleanEmail,
+        password,
+        firstName: null,
+        lastName: null,
+        onboardingCompleted: false,
+        dateOfBirth,
+        gender,
+        role: 'Test Taker',
+        studentCode,
+        isConsentGiven: true,
+        consentDate: new Date(),
+        emailVerificationToken: hashToken(emailToken),
+        emailVerificationExpires: emailTokenExpires
+      });
+    } catch (error) {
+      if (error?.name === 'SequelizeUniqueConstraintError') {
+        const fields = (error?.errors || []).map((entry) => entry.path);
+        if (fields.includes('email')) {
+          throw new ConflictError('An account with this email already exists. Please login instead.', 'EMAIL_EXISTS');
+        }
+        if (fields.includes('national_id_hash') || fields.includes('nationalIdHash')) {
+          throw new ConflictError('An account with this National ID already exists. Please login instead.', 'NATIONAL_ID_EXISTS');
+        }
+        throw new ConflictError('An account with these details already exists. Please login instead.', 'USER_EXISTS');
+      }
+      if (error?.name === 'SequelizeValidationError') {
+        throw new BadRequestError('Invalid registration details. Check National ID, email, and password and try again.', 'INVALID_REGISTRATION_DETAILS');
+      }
+      throw error;
+    }
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);

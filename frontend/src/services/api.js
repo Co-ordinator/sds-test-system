@@ -1,8 +1,15 @@
 import axios from 'axios';
 import { normalizeApiError } from './errorNormalizer';
 
-// Use origin only (e.g. http://localhost:5000). Paths in the app include /api/v1.
-const rawUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const isBrowser = typeof window !== 'undefined';
+const hostName = isBrowser ? window.location.hostname : '';
+const origin = isBrowser ? window.location.origin : '';
+const localDevFallback = hostName === 'localhost' || hostName === '127.0.0.1'
+  ? 'http://localhost:5000'
+  : origin;
+
+// Paths in the app include /api/v1, so this should point to origin only.
+const rawUrl = (process.env.REACT_APP_API_URL || localDevFallback || 'http://localhost:5000').trim();
 const baseURL = rawUrl.replace(/\/api\/v1\/?$/, '') || rawUrl;
 
 const api = axios.create({

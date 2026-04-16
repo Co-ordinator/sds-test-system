@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Download, BookOpen, Building2, Award, ChevronDown, ChevronUp,
@@ -14,9 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   CONSTANTS & METADATA
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* Constants & Metadata */
 const RIASEC_META = {
   R: {
     label: 'Realistic', color: '#F44336', lightBg: '#ffebee',
@@ -65,10 +63,9 @@ const QUAL_LABELS = {
 
 const DEMAND_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };
 const DEMAND_LABELS = { critical: 'Critical', very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low' };
+const RIASEC_ORDER = ['R', 'I', 'A', 'S', 'E', 'C'];
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SUB-COMPONENTS
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* Sub-components */
 const DemandBadge = ({ level }) => {
   if (!level) return null;
   const color = DEMAND_COLORS[level] || '#6b7280';
@@ -196,9 +193,7 @@ const CourseCard = ({ course }) => {
   );
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   MAIN COMPONENT
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* Main component */
 const TestResults = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -256,18 +251,18 @@ const TestResults = () => {
   const handleEmailResults = () => {
     const subject = encodeURIComponent('My SDS Career Assessment Results');
     const body = encodeURIComponent(
-      `I completed my Self-Directed Search (SDS) Career Assessment.\n\nHolland Code: ${hollandCode}\nProfile: ${hollandCode.split('').map(c => RIASEC_META[c]?.label).filter(Boolean).join(' · ')}\n\nView the full results on the Eswatini National Career Guidance Platform.`
+      `I completed my Self-Directed Search (SDS) Career Assessment.\n\nHolland Code: ${hollandDisplayCode}\nProfile: ${hollandDisplayLabel}\n\nView the full results on the Eswatini National Career Guidance Platform.`
     );
     window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
   };
 
-  /* ── Loading / Error states ── */
+  /* Loading / Error states */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#f8fafc' }}>
         <div className="text-center">
           <div className="inline-block w-10 h-10 border-4 rounded-full animate-spin" style={{ borderColor: GOV.borderLight, borderTopColor: GOV.blue }} />
-          <p className="text-sm mt-3" style={{ color: GOV.textHint }}>Loading your results…</p>
+          <p className="text-sm mt-3" style={{ color: GOV.textHint }}>Loading your results...</p>
         </div>
       </div>
     );
@@ -294,7 +289,7 @@ const TestResults = () => {
     );
   }
 
-  /* ── Extract data ── */
+  /* Extract data */
   const assessment = data?.assessment || {};
   const recs = data?.recommendations || {};
   const occupations = recs.occupations || [];
@@ -306,7 +301,42 @@ const TestResults = () => {
     S: assessment.scoreS ?? 0, E: assessment.scoreE ?? 0, C: assessment.scoreC ?? 0
   };
   const maxScore = Math.max(...Object.values(scores), 1);
-  const hollandCode = assessment.hollandCode || '';
+  const hollandCode = assessment.hollandCodeDisplay || assessment.hollandCode || '';
+  const parsedDisplayGroups = String(hollandCode || '')
+    .toUpperCase()
+    .trim()
+    .split(/\s+/)
+    .map((group) => group.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_META[letter]))
+    .filter((group) => group.length > 0);
+
+  const sortedScoreEntries = Object.entries(scores)
+    .map(([key, score]) => [key, Number(score || 0)])
+    .sort((a, b) => b[1] - a[1] || RIASEC_ORDER.indexOf(a[0]) - RIASEC_ORDER.indexOf(b[0]));
+
+  const scoreRankGroups = [];
+  sortedScoreEntries.forEach(([letter, score]) => {
+    if (scoreRankGroups.length === 0) {
+      scoreRankGroups.push([{ letter, score }]);
+      return;
+    }
+    const lastGroup = scoreRankGroups[scoreRankGroups.length - 1];
+    if (lastGroup[0].score === score) {
+      lastGroup.push({ letter, score });
+      return;
+    }
+    scoreRankGroups.push([{ letter, score }]);
+  });
+
+  const hollandDisplayGroups = (parsedDisplayGroups.length > 0
+    ? parsedDisplayGroups
+    : scoreRankGroups.map((group) => group.map((entry) => entry.letter)))
+    .slice(0, 3);
+
+  const hollandDisplayCode = hollandDisplayGroups.map((group) => group.join('/')).join(' ') || hollandCode;
+  const hollandDisplayLabel = hollandDisplayGroups
+    .map((group) => group.map((letter) => RIASEC_META[letter]?.label).filter(Boolean).join('/'))
+    .join(' - ');
+  const hollandLetters = Array.from(new Set(hollandDisplayGroups.flat().filter((letter) => RIASEC_META[letter])));
   const userType = assessment.user?.userType || user?.userType;
   const studentName = [assessment.user?.firstName || user?.firstName, assessment.user?.lastName || user?.lastName].filter(Boolean).join(' ') || 'Student';
 
@@ -316,7 +346,7 @@ const TestResults = () => {
       ? 'Graduate Career Pathways'
       : 'Career Paths & Study Options';
 
-  /* ── Chart data ── */
+  /* Chart data */
   const radarData = Object.entries(scores).map(([key, score]) => ({
     type: key, label: RIASEC_META[key].label, score, fullMark: maxScore
   }));
@@ -325,14 +355,11 @@ const TestResults = () => {
     name: key, label: RIASEC_META[key].label, score, color: RIASEC_META[key].color
   }));
 
-  const hollandLetters = hollandCode.split('').filter(c => RIASEC_META[c]);
   const completedDate = assessment.completedAt
     ? new Date(assessment.completedAt).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
     : new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
 
-  /* ═══════════════════════════════════════════════════════════════════════
-     RENDER
-     ═══════════════════════════════════════════════════════════════════════ */
+  /* Render */
   return (
     <AssessmentShell
       title="Self-Directed Search (SDS) - Results"
@@ -342,7 +369,7 @@ const TestResults = () => {
           <button type="button" onClick={handleDownloadPdf} disabled={downloadingPdf}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: GOV.blue }}>
             {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {downloadingPdf ? 'Generating…' : 'Download PDF Report'}
+            {downloadingPdf ? 'Generating...' : 'Download PDF Report'}
           </button>
           <button type="button" onClick={() => navigate(getDashboardPath())}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
@@ -361,14 +388,14 @@ const TestResults = () => {
         </p>
         <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: GOV.textHint }}>
           <span>{studentName}</span>
-          <span>·</span>
+          <span>|</span>
           <span>{completedDate}</span>
-          <span>·</span>
-          <span>Holland Code: <strong style={{ color: GOV.blue }}>{hollandCode}</strong></span>
+          <span>|</span>
+          <span>Holland Code: <strong style={{ color: GOV.blue }}>{hollandDisplayCode}</strong></span>
         </div>
       </div>
 
-        {/* ── RIASEC Profile: Radar + Score Bars ── */}
+        {/* RIASEC Profile: Radar + Score Bars */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Radar Chart */}
           <div className="bg-white rounded-md p-6">
@@ -417,30 +444,34 @@ const TestResults = () => {
           </div>
         </div>
 
-        {/* ── Holland Code Interpretation ── */}
+        {/* Holland Code Interpretation */}
         <div className="bg-white rounded-md p-6">
           <div className="flex items-center gap-3 mb-1">
             <h2 className="text-sm font-bold" style={{ color: GOV.text }}>Your Top Holland Codes</h2>
             <div className="flex gap-1.5">
-              {hollandLetters.map(c => (
-                <span key={c} className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white shadow-sm" style={{ backgroundColor: RIASEC_META[c].color }}>
-                  {c}
-                </span>
-              ))}
+              {hollandDisplayGroups.map((group, idx) => {
+                const leadLetter = group[0];
+                const codeText = group.join('/');
+                return (
+                  <span key={`${codeText}-${idx}`} className="h-8 rounded-lg px-2 flex items-center justify-center text-sm font-bold text-white shadow-sm" style={{ backgroundColor: RIASEC_META[leadLetter]?.color || GOV.blue }}>
+                    {codeText}
+                  </span>
+                );
+              })}
             </div>
           </div>
           <p className="text-xs mb-5" style={{ color: GOV.textHint }}>
-            Understanding your primary interest areas and their implications. Your Holland Code <strong style={{ color: GOV.blue }}>{hollandCode}</strong> represents:{' '}
-            <strong>{hollandLetters.map(c => RIASEC_META[c].label).join('-')}</strong>.
+            Understanding your primary interest areas and their implications. Your Holland Code <strong style={{ color: GOV.blue }}>{hollandDisplayCode}</strong> represents:{' '}
+            <strong>{hollandDisplayLabel}</strong>.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {hollandLetters.slice(0, 3).map((c, i) => (
-              <HollandCodeCard key={c} letter={c} rank={i + 1} />
+            {hollandLetters.slice(0, 5).map((c, i) => (
+              <HollandCodeCard key={`${c}-${i}`} letter={c} rank={i + 1} />
             ))}
           </div>
         </div>
 
-        {/* ── Suggested Subjects ── */}
+        {/* Suggested Subjects */}
         {suggestedSubjects.length > 0 && (
           <div className="bg-white rounded-md p-6">
             <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
@@ -455,7 +486,7 @@ const TestResults = () => {
           </div>
         )}
 
-        {/* ── Career Recommendations ── */}
+        {/* Career Recommendations */}
         {occupations.length > 0 && (
           <div className="bg-white rounded-md p-6">
             <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
@@ -489,7 +520,7 @@ const TestResults = () => {
           </div>
         )}
 
-        {/* ── Courses & Qualifications ── */}
+        {/* Courses & Qualifications */}
         {courses.length > 0 && (
           <div className="bg-white rounded-md p-6">
             <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
@@ -504,7 +535,7 @@ const TestResults = () => {
           </div>
         )}
 
-        {/* ── Empty state ── */}
+        {/* Empty state */}
         {occupations.length === 0 && courses.length === 0 && (
           <div className="bg-white rounded-md p-10 text-center">
             <Award className="w-12 h-12 mx-auto mb-3" style={{ color: GOV.textHint }} />
@@ -513,7 +544,7 @@ const TestResults = () => {
           </div>
         )}
 
-        {/* ── Government Funding Priority Alignment ── */}
+        {/* Government Funding Priority Alignment */}
         {recs?.fundingAlignment && (
           <div className="bg-white rounded-md p-6">
             <h2 className="text-sm font-bold mb-1 flex items-center gap-2" style={{ color: GOV.text }}>
@@ -542,7 +573,7 @@ const TestResults = () => {
                 <p className="text-xs mt-1" style={{ color: GOV.textMuted }}>
                   {(recs.fundingAlignment.priorityFieldCount ?? 0)} priority programme field{(recs.fundingAlignment.priorityFieldCount ?? 0) === 1 ? '' : 's'} match your profile
                   {(recs.fundingAlignment.nonPriorityFieldCount ?? 0) > 0
-                    ? ` · ${recs.fundingAlignment.nonPriorityFieldCount ?? 0} other field${(recs.fundingAlignment.nonPriorityFieldCount ?? 0) === 1 ? '' : 's'} (not SLAS priority)`
+                    ? ` | ${recs.fundingAlignment.nonPriorityFieldCount ?? 0} other field${(recs.fundingAlignment.nonPriorityFieldCount ?? 0) === 1 ? '' : 's'} (not SLAS priority)`
                     : ''}
                 </p>
               </div>
@@ -593,15 +624,15 @@ const TestResults = () => {
             <div className="p-3 rounded-md mb-3" style={{ backgroundColor: '#fef3c7' }}>
               <h4 className="text-xs font-semibold mb-2" style={{ color: '#92400e' }}>How to Apply for Government Funding:</h4>
               <ul className="text-xs space-y-1" style={{ color: '#78350f' }}>
-                <li>• Eswatini National ID (applicant and at least one parent must be a citizen)</li>
-                <li>• University/College acceptance letter from a recognized institution</li>
-                <li>• Certified academic certificates and transcripts</li>
-                <li>• Graded Tax Certificate</li>
-                <li>• Two references (one academic, both Eswatini citizens)</li>
-                <li>• Completed Scholarship Application Form</li>
+                <li>- Eswatini National ID (applicant and at least one parent must be a citizen)</li>
+                <li>- University/College acceptance letter from a recognized institution</li>
+                <li>- Certified academic certificates and transcripts</li>
+                <li>- Graded Tax Certificate</li>
+                <li>- Two references (one academic, both Eswatini citizens)</li>
+                <li>- Completed Scholarship Application Form</li>
               </ul>
               <p className="text-xs mt-2" style={{ color: '#78350f' }}>
-                <strong>Deadlines:</strong> {recs.fundingAlignment.deadlines?.local} (local institutions) · {recs.fundingAlignment.deadlines?.southAfrica} (South Africa & Africa)
+                <strong>Deadlines:</strong> {recs.fundingAlignment.deadlines?.local} (local institutions) | {recs.fundingAlignment.deadlines?.southAfrica} (South Africa & Africa)
               </p>
             </div>
 
@@ -635,12 +666,13 @@ const TestResults = () => {
           </div>
         )}
 
-        {/* ── Footer ── */}
+        {/* Footer */}
         <p className="text-xs text-center py-4" style={{ color: GOV.textHint }}>
-          Kingdom of Eswatini · National Career Guidance Platform · Ministry of Labour and Social Security · {completedDate}
+          Kingdom of Eswatini | National Career Guidance Platform | Ministry of Labour and Social Security | {completedDate}
         </p>
     </AssessmentShell>
   );
 };
 
 export default TestResults;
+
