@@ -60,6 +60,9 @@ const NAV_TEXT_ACTION =
 const TEST_NAV_BUTTON_BASE =
   'inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-md transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed';
 
+const SECTION_NEXT_BUTTON =
+  'w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm sm:text-base font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
+
 const getTimerStorageKey = (assessmentId) => `sds_assessment_timer_${assessmentId}`;
 
 const Questionnaire = () => {
@@ -492,10 +495,11 @@ const Questionnaire = () => {
             <button
               type="button"
               onClick={proceedToNextSection}
-              className={`${NAV_TEXT_ACTION} text-base font-semibold`}
-              style={{ color: GOV.blue }}
+              className={SECTION_NEXT_BUTTON}
+              style={{ backgroundColor: GOV.blue, borderColor: GOV.blue }}
             >
-              Start section {nextSection.num}: {nextSection.label} <ChevronRight className="w-4 h-4 shrink-0 inline" aria-hidden />
+              <span>Start section {nextSection.num}: {nextSection.label}</span>
+              <ChevronRight className="w-4 h-4 shrink-0" aria-hidden />
             </button>
           </div>
         );
