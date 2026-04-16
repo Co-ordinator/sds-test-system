@@ -27,16 +27,43 @@ class ScoringService {
     return String(code || '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 3);
   }
 
+  parseDisplayCodeGroups(displayCode) {
+    const raw = String(displayCode || '').toUpperCase().trim();
+    if (!raw) return [];
+    return raw
+      .split(/\s+/)
+      .map((group) => group
+        .split('/')
+        .map((letter) => letter.trim())
+        .filter((letter) => RIASEC_KEYS.includes(letter)))
+      .filter((group) => group.length > 0);
+  }
+
   buildCodeVariants(code, displayCode = null) {
     const variants = new Set();
     const primary = this.normalizeHollandCode(code);
     if (primary.length === 3) variants.add(primary);
 
-    const raw = String(displayCode || code || '').toUpperCase().trim();
-    const tieMatch = raw.match(/^([RIASEC]{3})\/([RIASEC])$/);
-    if (tieMatch) {
-      variants.add(tieMatch[1]);
-      variants.add(`${tieMatch[1].slice(0, 2)}${tieMatch[2]}`);
+    const groups = this.parseDisplayCodeGroups(displayCode || code);
+    const rankGroups = groups.slice(0, 3).map((group) => [...new Set(group)]);
+
+    while (rankGroups.length < 3 && primary[rankGroups.length]) {
+      rankGroups.push([primary[rankGroups.length]]);
+    }
+
+    if (rankGroups.length === 3 && rankGroups.every((group) => group.length > 0)) {
+      const generated = [];
+      const maxVariants = 24;
+      const walk = (index, letters) => {
+        if (generated.length >= maxVariants) return;
+        if (index === 3) {
+          generated.push(letters.join(''));
+          return;
+        }
+        rankGroups[index].forEach((letter) => walk(index + 1, [...letters, letter]));
+      };
+      walk(0, []);
+      generated.forEach((variant) => variants.add(variant));
     }
 
     return Array.from(variants);
@@ -123,12 +150,27 @@ class ScoringService {
       });
 
     const primaryCode = ranked.slice(0, 3).map((x) => x.letter).join('') || 'RIA';
-    const third = ranked[2];
-    const fourth = ranked[3];
-    const hasThirdPlaceTie = third && fourth && Math.abs(third.score - fourth.score) <= tieThreshold;
-    const displayCode = hasThirdPlaceTie
-      ? `${ranked[0].letter}${ranked[1].letter}${ranked[2].letter}/${ranked[3].letter}`
-      : primaryCode;
+    const threshold = Number.isFinite(Number(tieThreshold)) ? Number(tieThreshold) : 0;
+    const rankGroups = [];
+    ranked.forEach((row) => {
+      if (rankGroups.length === 0) {
+        rankGroups.push([row]);
+        return;
+      }
+      const lastGroup = rankGroups[rankGroups.length - 1];
+      if (Math.abs(lastGroup[0].score - row.score) <= threshold) {
+        lastGroup.push(row);
+      } else {
+        rankGroups.push([row]);
+      }
+    });
+
+    // Show top three ranking groups, using "/" for tied letters and spaces between ranks.
+    const displayCode = rankGroups
+      .slice(0, 3)
+      .map((group) => group.map((entry) => entry.letter).join('/'))
+      .join(' ')
+      .trim() || primaryCode;
 
     return { primaryCode, displayCode, ranked };
   }
@@ -246,8 +288,8 @@ class ScoringService {
     
     try {
       const opts = transaction ? { transaction } : {};
-      const cleanCode = hollandCode.replace(/\//g, '');
-      const letters = cleanCode.split('');
+      const letters = [...new Set(String(hollandCode || '').toUpperCase().replace(/[^RIASEC]/g, '').split('').filter(Boolean))];
+      if (letters.length === 0) return [];
       
       const subjects = await Subject.findAll({
         where: {

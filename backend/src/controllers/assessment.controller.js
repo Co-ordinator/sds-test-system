@@ -16,6 +16,17 @@ const RIASEC_DESC = {
 };
 const DEMAND_LABELS = { critical: 'Critical', very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low' };
 const DEMAND_PDF_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };
+const LOGO_PATHS = [
+  process.env.PDF_LOGO_PATH ? path.resolve(process.env.PDF_LOGO_PATH) : null,
+  path.join(__dirname, '../../assets/siyinqaba.png'),
+  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
+  path.join(process.cwd(), 'backend/assets/siyinqaba.png'),
+  path.join(process.cwd(), 'frontend/public/siyinqaba.png'),
+  path.join(process.cwd(), 'public_html/siyinqaba.png'),
+  path.join(process.cwd(), 'siyinqaba.png'),
+].filter(Boolean);
+
+const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
 
 /**
  * Assessment Controller
@@ -118,16 +129,65 @@ class AssessmentController {
 
       const student = assessment.user || {};
       const studentName = [student.firstName, student.lastName].filter(Boolean).join(' ') || 'Student';
-      const hollandCode = assessment.hollandCode || '';
+      const hollandCode = assessment.hollandCodeDisplay || assessment.hollandCode || '';
       const scores = {
-        R: assessment.scoreR ?? 0, I: assessment.scoreI ?? 0, A: assessment.scoreA ?? 0,
-        S: assessment.scoreS ?? 0, E: assessment.scoreE ?? 0, C: assessment.scoreC ?? 0
+        R: assessment.scoreR ?? 0,
+        I: assessment.scoreI ?? 0,
+        A: assessment.scoreA ?? 0,
+        S: assessment.scoreS ?? 0,
+        E: assessment.scoreE ?? 0,
+        C: assessment.scoreC ?? 0
       };
       const occupations = recommendations.occupations || [];
       const courses = recommendations.courses || [];
       const subjects = recommendations.suggestedSubjects || [];
-      const dateStr = new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
-      const hollandLetters = hollandCode.split('').filter(c => RIASEC_LABELS[c]);
+      const fundingAlignment = recommendations.fundingAlignment || null;
+      const generatedDate = new Date();
+      const generatedDateStr = generatedDate.toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
+      const completedDate = assessment.completedAt
+        ? new Date(assessment.completedAt).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
+        : generatedDateStr;
+      const riasecOrder = ['R', 'I', 'A', 'S', 'E', 'C'];
+      const riasecOrderIndex = riasecOrder.reduce((acc, key, index) => ({ ...acc, [key]: index }), {});
+      const scoreRows = ['R', 'I', 'A', 'S', 'E', 'C'].map((key) => ({
+        key,
+        label: RIASEC_LABELS[key],
+        score: Number(scores[key] || 0),
+        color: RIASEC_COLORS[key] || '#2D8BC4'
+      }));
+      const sortedScores = [...scoreRows].sort((a, b) => b.score - a.score || riasecOrderIndex[a.key] - riasecOrderIndex[b.key]);
+      const scoreRankGroups = [];
+      sortedScores.forEach((row) => {
+        if (scoreRankGroups.length === 0) {
+          scoreRankGroups.push([row]);
+          return;
+        }
+        const lastGroup = scoreRankGroups[scoreRankGroups.length - 1];
+        if (lastGroup[0].score === row.score) {
+          lastGroup.push(row);
+        } else {
+          scoreRankGroups.push([row]);
+        }
+      });
+      const parsedDisplayGroups = String(hollandCode || '')
+        .toUpperCase()
+        .trim()
+        .split(/\s+/)
+        .map((group) => group.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_LABELS[letter]))
+        .filter((group) => group.length > 0);
+      const hollandDisplayGroups = (parsedDisplayGroups.length > 0
+        ? parsedDisplayGroups
+        : scoreRankGroups.map((group) => group.map((row) => row.key)))
+        .slice(0, 3);
+      const hollandCodeDisplayText = hollandDisplayGroups.map((group) => group.join('/')).join(' ');
+      const hollandCodeLabelText = hollandDisplayGroups
+        .map((group) => group.map((letter) => RIASEC_LABELS[letter]).join('/'))
+        .join(' - ');
+      const topRankGroups = scoreRankGroups.slice(0, 3);
+      const topThree = sortedScores.slice(0, 3);
+      const topFive = sortedScores.slice(0, 5);
+      const maxScore = Math.max(...scoreRows.map((row) => row.score), 1);
+      const totalScore = scoreRows.reduce((sum, row) => sum + row.score, 0);
 
       const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
       res.setHeader('Content-Type', 'application/pdf');
@@ -135,276 +195,494 @@ class AssessmentController {
       doc.pipe(res);
 
       const govBlue = '#2D8BC4';
-      const gold = '#FFEB3B';
       const text = '#111827';
       const muted = '#6b7280';
       const border = '#d1d5db';
-      const stripe = '#f7f9fc';
+      const lightTrack = '#e5e7eb';
       const pageWidth = doc.page.width - 100;
       const pageHeight = doc.page.height;
       const leftMargin = 50;
+      const bottomY = pageHeight - 56;
 
-      let logoPath = path.join(__dirname, '../../../frontend/public/siyinqaba.png');
-      if (!fs.existsSync(logoPath)) logoPath = null;
+      const logoPath = resolveLogoPath();
+      if (!logoPath) {
+        logger.warn({
+          actionType: 'PDF_LOGO_MISSING',
+          message: 'Assessment PDF logo not found on disk',
+          req,
+          details: { attemptedPaths: LOGO_PATHS }
+        });
+      }
 
-      const drawLetterhead = (title) => {
-        doc.font('Helvetica-Bold').fontSize(18).fillColor(text);
-        doc.text('GOVERNMENT', leftMargin + 10, 28);
-        doc.text('OF   ESWATINI', leftMargin, 28, { width: pageWidth - 10, align: 'right' });
-        if (logoPath) {
-          try { doc.image(logoPath, (doc.page.width - 72) / 2, 18, { width: 72 }); } catch (_) {}
-        }
-        doc.font('Helvetica-Bold').fontSize(8).fillColor(text);
-        doc.text('Tel:  +268 4041971/2/3', leftMargin, 74);
-        doc.text('Fax: +268 4049889', leftMargin, 86);
-        doc.text('Email: mkhaliphi@gov.sz', leftMargin, 98);
-        doc.text('Principal Secretary\'s Office', leftMargin, 74, { width: pageWidth, align: 'right' });
-        doc.font('Helvetica').fontSize(8);
-        doc.text('Ministry of Labour & Social Security', leftMargin, 86, { width: pageWidth, align: 'right' });
-        doc.text('P.O. Box 198, Mbabane H100', leftMargin, 98, { width: pageWidth, align: 'right' });
-        doc.moveTo(leftMargin, 116).lineTo(leftMargin + pageWidth, 116).strokeColor('#000000').lineWidth(0.7).stroke();
-        doc.font('Helvetica-Bold').fontSize(12).fillColor(text)
-          .text(title, leftMargin, 128, { width: pageWidth, align: 'center' });
-        doc.font('Helvetica').fontSize(7.5).fillColor(muted)
-          .text(`Generated: ${dateStr}`, leftMargin, 144, { width: pageWidth, align: 'center' });
-        doc.moveTo(leftMargin, 156).lineTo(leftMargin + pageWidth, 156).strokeColor(border).lineWidth(0.6).stroke();
+      const normalizeText = (value, fallback = 'Not provided') => {
+        const clean = String(value ?? '').trim();
+        return clean || fallback;
       };
 
-      // ══ PAGE 1: Header, Info, RIASEC Radar + Bars, Holland Code ══
-      drawLetterhead('CAREER ASSESSMENT REPORT');
+      const measureText = (value, width, font = 'Helvetica', size = 8, options = {}) => {
+        doc.font(font).fontSize(size);
+        return doc.heightOfString(String(value || ''), { width, ...options });
+      };
 
-      // Student information box
-      const infoBoxY = 170;
-      doc.rect(leftMargin, infoBoxY, pageWidth, 50).strokeColor(border).lineWidth(0.8).stroke();
-      doc.fillColor(govBlue).fontSize(9).font('Helvetica-Bold');
-      doc.text('Name:', leftMargin + 12, infoBoxY + 10);
-      doc.text('Holland Code:', leftMargin + 12, infoBoxY + 26);
-      doc.text('Date:', leftMargin + 260, infoBoxY + 10);
-      if (student.gradeLevel) doc.text('Grade:', leftMargin + 260, infoBoxY + 26);
-      doc.fillColor(text).fontSize(9).font('Helvetica');
-      doc.text(studentName, leftMargin + 70, infoBoxY + 10);
-      doc.text(dateStr, leftMargin + 300, infoBoxY + 10);
-      if (student.gradeLevel) doc.text(student.gradeLevel, leftMargin + 300, infoBoxY + 26);
+      const formatQualification = (value) => {
+        const labels = {
+          certificate: 'Certificate',
+          diploma: 'Diploma',
+          bachelor: "Bachelor's Degree",
+          honours: 'Honours Degree',
+          postgrad_diploma: 'Postgraduate Diploma',
+          masters: "Master's Degree",
+          doctorate: 'Doctorate',
+          short_course: 'Short Course',
+          tvet: 'TVET Programme',
+          other: 'Qualification'
+        };
+        return labels[String(value || '').toLowerCase()] || normalizeText(value, 'Qualification');
+      };
 
-      // Holland Code plain letter cells
-      let hcX = leftMargin + 100;
-      hollandLetters.forEach(c => {
-        doc.rect(hcX, infoBoxY + 22, 18, 18).strokeColor(border).lineWidth(0.6).stroke();
-        doc.fillColor(text).fontSize(10).font('Helvetica-Bold').text(c, hcX + 4.5, infoBoxY + 25);
-        hcX += 22;
+      const drawDemandTag = (label, demand, x, y) => {
+        if (!label) return;
+        const color = DEMAND_PDF_COLORS[demand] || '#6b7280';
+        doc.font('Helvetica-Bold').fontSize(7.5);
+        const width = doc.widthOfString(label) + 12;
+        doc.rect(x, y, width, 14).strokeColor(border).lineWidth(0.5).stroke();
+        doc.fillColor(color).text(label, x + 6, y + 4);
+      };
+
+      const drawLetterhead = (title, subtitle = '') => {
+        doc.font('Helvetica-Bold').fontSize(18).fillColor(text);
+        doc.text('GOVERNMENT OF ESWATINI', leftMargin, 30, { width: pageWidth, align: 'center' });
+        if (logoPath) {
+          try { doc.image(logoPath, (doc.page.width - 46) / 2, 48, { width: 46 }); } catch (_) {}
+        }
+        doc.font('Helvetica-Bold').fontSize(8).fillColor(text);
+        doc.text('Tel:  +268 4041971/2/3', leftMargin, 96);
+        doc.text('Fax: +268 4049889', leftMargin, 108);
+        doc.text('Email: mkhaliphi@gov.sz', leftMargin, 120);
+        doc.text('Principal Secretary\'s Office', leftMargin, 96, { width: pageWidth, align: 'right' });
+        doc.font('Helvetica').fontSize(8);
+        doc.text('Ministry of Labour & Social Security', leftMargin, 108, { width: pageWidth, align: 'right' });
+        doc.text('P.O. Box 198, Mbabane H100', leftMargin, 120, { width: pageWidth, align: 'right' });
+        doc.moveTo(leftMargin, 136).lineTo(leftMargin + pageWidth, 136).strokeColor('#000000').lineWidth(0.7).stroke();
+        doc.font('Helvetica-Bold').fontSize(12).fillColor(text)
+          .text(title, leftMargin, 146, { width: pageWidth, align: 'center' });
+        doc.font('Helvetica').fontSize(7.5).fillColor(muted);
+        const subtitleLine = subtitle ? `${subtitle} - Generated: ${generatedDateStr}` : `Generated: ${generatedDateStr}`;
+        doc.text(subtitleLine, leftMargin, 160, { width: pageWidth, align: 'center' });
+        doc.moveTo(leftMargin, 170).lineTo(leftMargin + pageWidth, 170).strokeColor(border).lineWidth(0.6).stroke();
+        return 178;
+      };
+
+      let pageContext = {
+        title: 'CAREER ASSESSMENT REPORT',
+        subtitle: 'Detailed personalized results'
+      };
+      let cursorY = drawLetterhead(pageContext.title, pageContext.subtitle);
+
+      const startPage = (title, subtitle) => {
+        pageContext = { title, subtitle };
+        doc.addPage();
+        cursorY = drawLetterhead(title, subtitle);
+      };
+
+      const ensureSpace = (neededHeight) => {
+        if (cursorY + neededHeight > bottomY) {
+          startPage(pageContext.title, pageContext.subtitle);
+        }
+      };
+
+      const sectionHeading = (title, subtitle = '') => {
+        ensureSpace(subtitle ? 34 : 24);
+        doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(11)
+          .text(title, leftMargin, cursorY);
+        cursorY += 14;
+        doc.moveTo(leftMargin, cursorY).lineTo(leftMargin + pageWidth, cursorY)
+          .strokeColor('#e5e7eb').lineWidth(0.6).stroke();
+        cursorY += 8;
+        if (subtitle) {
+          doc.fillColor(muted).font('Helvetica').fontSize(8.2)
+            .text(subtitle, leftMargin, cursorY, { width: pageWidth });
+          cursorY += 14;
+        }
+      };
+
+      const drawProfileField = (label, value, x, y, width) => {
+        doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(8.2)
+          .text(`${label}:`, x, y, { width: 58 });
+        doc.fillColor(text).font('Helvetica').fontSize(8.2)
+          .text(normalizeText(value), x + 58, y, { width: Math.max(40, width - 58), ellipsis: true });
+      };
+
+      // Page 1 - Profile summary
+      ensureSpace(92);
+      const profileBoxY = cursorY;
+      doc.rect(leftMargin, profileBoxY, pageWidth, 86).strokeColor(border).lineWidth(0.8).stroke();
+      drawProfileField('Name', studentName, leftMargin + 12, profileBoxY + 10, 235);
+      drawProfileField('Email', student.email, leftMargin + 12, profileBoxY + 26, 235);
+      drawProfileField('User Type', student.userType, leftMargin + 12, profileBoxY + 42, 235);
+      drawProfileField('Completed', completedDate, leftMargin + 272, profileBoxY + 10, 215);
+      drawProfileField('Grade', student.gradeLevel, leftMargin + 272, profileBoxY + 26, 215);
+      drawProfileField('Report ID', assessment.id, leftMargin + 272, profileBoxY + 42, 215);
+
+      doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(8.2)
+        .text('Holland Code:', leftMargin + 12, profileBoxY + 61);
+      let codeX = leftMargin + 80;
+      hollandDisplayGroups.forEach((group) => {
+        const codeGroupText = group.join('/');
+        doc.font('Helvetica-Bold').fontSize(10);
+        const codeWidth = Math.max(18, Math.ceil(doc.widthOfString(codeGroupText)) + 10);
+        doc.rect(codeX, profileBoxY + 58, codeWidth, 18).strokeColor(border).lineWidth(0.6).stroke();
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(10);
+        doc.text(codeGroupText, codeX, profileBoxY + 62, { width: codeWidth, align: 'center' });
+        codeX += codeWidth + 4;
       });
-      doc.fillColor(muted).fontSize(7.5).font('Helvetica')
-        .text(hollandLetters.map(c => RIASEC_LABELS[c]).join(' · '), hcX + 4, infoBoxY + 28);
+      doc.fillColor(muted).font('Helvetica').fontSize(7.6)
+        .text(hollandCodeLabelText, codeX + 2, profileBoxY + 63, { width: leftMargin + pageWidth - (codeX + 2) });
+      cursorY += 96;
 
-      // RIASEC Radar Chart (hexagonal)
-      const radarSectionY = 240;
-      doc.fillColor(govBlue).fontSize(11).font('Helvetica-Bold')
-        .text('Your RIASEC Profile', leftMargin, radarSectionY);
-      doc.moveTo(leftMargin, radarSectionY + 14).lineTo(leftMargin + pageWidth, radarSectionY + 14)
-        .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
+      sectionHeading('Profile Highlights', 'Key strengths from your RIASEC assessment.');
+      ensureSpace(78);
+      doc.rect(leftMargin, cursorY, pageWidth, 72).strokeColor(border).lineWidth(0.7).stroke();
+      doc.fillColor(text).font('Helvetica-Bold').fontSize(9.3)
+        .text(`Primary code: ${hollandCodeDisplayText || hollandCode || 'Not generated'}`, leftMargin + 12, cursorY + 9, { width: pageWidth - 24 });
+      topRankGroups.forEach((group, index) => {
+        const scoreValue = Number(group[0]?.score || 0);
+        const pct = totalScore > 0 ? Math.round((scoreValue / totalScore) * 100) : 0;
+        const groupLabels = group.map((row) => row.label).join('/');
+        const groupKeys = group.map((row) => row.key).join('/');
+        doc.fillColor(muted).font('Helvetica').fontSize(8.2)
+          .text(`${index + 1}. ${groupLabels} (${groupKeys}) - score ${scoreValue} (${pct}% of total profile score)`, leftMargin + 12, cursorY + 25 + index * 13, { width: pageWidth - 24 });
+      });
+      cursorY += 84;
 
-      const cx = leftMargin + 130;
-      const cy = radarSectionY + 105;
-      const maxR = 75;
-      const keys = ['R', 'I', 'A', 'S', 'E', 'C'];
-      const angles = keys.map((_, i) => (i * 60 - 90) * Math.PI / 180);
-      const maxScore = Math.max(...Object.values(scores), 1);
+      sectionHeading('RIASEC Score Profile', 'Visual and numeric breakdown across all six dimensions.');
+      ensureSpace(230);
+      const chartTop = cursorY;
+      const radarCenterX = leftMargin + 130;
+      const radarCenterY = chartTop + 98;
+      const radarRadius = 74;
+      const axes = ['R', 'I', 'A', 'S', 'E', 'C'];
+      const angles = axes.map((_, i) => ((i * 60) - 90) * Math.PI / 180);
 
-      // 3 concentric hexagons
-      for (let level = 1; level <= 3; level++) {
-        const r = (level / 3) * maxR;
-        const pts = angles.map(a => [cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-        doc.save();
-        doc.moveTo(pts[0][0], pts[0][1]);
-        pts.slice(1).forEach(p => doc.lineTo(p[0], p[1]));
-        doc.closePath().strokeColor('#e5e7eb').lineWidth(0.5).stroke();
-        doc.restore();
+      for (let level = 1; level <= 3; level += 1) {
+        const r = (level / 3) * radarRadius;
+        const points = angles.map((angle) => [radarCenterX + r * Math.cos(angle), radarCenterY + r * Math.sin(angle)]);
+        doc.moveTo(points[0][0], points[0][1]);
+        points.slice(1).forEach((point) => doc.lineTo(point[0], point[1]));
+        doc.closePath().strokeColor(lightTrack).lineWidth(0.5).stroke();
       }
-
-      // Axis lines
-      angles.forEach(a => {
-        doc.save();
-        doc.moveTo(cx, cy).lineTo(cx + maxR * Math.cos(a), cy + maxR * Math.sin(a))
-          .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
-        doc.restore();
+      angles.forEach((angle) => {
+        doc.moveTo(radarCenterX, radarCenterY)
+          .lineTo(radarCenterX + radarRadius * Math.cos(angle), radarCenterY + radarRadius * Math.sin(angle))
+          .strokeColor(lightTrack).lineWidth(0.5).stroke();
       });
 
-      // Score polygon filled
-      const scorePts = keys.map((key, i) => {
-        const r = (scores[key] / maxScore) * maxR;
-        return [cx + r * Math.cos(angles[i]), cy + r * Math.sin(angles[i])];
+      const profilePoints = axes.map((key, i) => {
+        const r = (Number(scores[key] || 0) / maxScore) * radarRadius;
+        return [radarCenterX + r * Math.cos(angles[i]), radarCenterY + r * Math.sin(angles[i])];
       });
-      doc.save();
-      doc.moveTo(scorePts[0][0], scorePts[0][1]);
-      scorePts.slice(1).forEach(p => doc.lineTo(p[0], p[1]));
-      doc.closePath().fillOpacity(0.2).fill(govBlue);
-      doc.restore();
-
-      // Score polygon stroke
-      doc.save();
-      doc.moveTo(scorePts[0][0], scorePts[0][1]);
-      scorePts.slice(1).forEach(p => doc.lineTo(p[0], p[1]));
+      doc.moveTo(profilePoints[0][0], profilePoints[0][1]);
+      profilePoints.slice(1).forEach((point) => doc.lineTo(point[0], point[1]));
+      doc.closePath().fillColor(govBlue).fillOpacity(0.2).fill();
+      doc.fillOpacity(1);
+      doc.moveTo(profilePoints[0][0], profilePoints[0][1]);
+      profilePoints.slice(1).forEach((point) => doc.lineTo(point[0], point[1]));
       doc.closePath().strokeColor(govBlue).lineWidth(2).stroke();
-      doc.restore();
 
-      // Score dots and axis labels
-      keys.forEach((key, i) => {
-        const r = (scores[key] / maxScore) * maxR;
-        const dx = cx + r * Math.cos(angles[i]);
-        const dy = cy + r * Math.sin(angles[i]);
-        doc.circle(dx, dy, 3).fill(RIASEC_COLORS[key]);
-        const labelR = maxR + 14;
-        const lx = cx + labelR * Math.cos(angles[i]);
-        const ly = cy + labelR * Math.sin(angles[i]);
-        doc.fillColor(RIASEC_COLORS[key]).fontSize(9).font('Helvetica-Bold')
-          .text(key, lx - 4, ly - 5, { width: 10 });
+      axes.forEach((key, i) => {
+        const valueRadius = (Number(scores[key] || 0) / maxScore) * radarRadius;
+        const dotX = radarCenterX + valueRadius * Math.cos(angles[i]);
+        const dotY = radarCenterY + valueRadius * Math.sin(angles[i]);
+        doc.circle(dotX, dotY, 3).fillColor(RIASEC_COLORS[key]).fill();
+        const labelRadius = radarRadius + 14;
+        doc.fillColor(RIASEC_COLORS[key]).font('Helvetica-Bold').fontSize(9)
+          .text(key, radarCenterX + labelRadius * Math.cos(angles[i]) - 4, radarCenterY + labelRadius * Math.sin(angles[i]) - 5, { width: 10 });
       });
 
-      // Score Breakdown (text only, no horizontal bars)
       const breakdownX = leftMargin + 280;
-      const breakdownY = radarSectionY + 22;
-      const breakdownWidth = pageWidth - (breakdownX - leftMargin);
-      doc.fillColor(govBlue).fontSize(9).font('Helvetica-Bold')
-        .text('Score Breakdown', breakdownX, breakdownY, { width: breakdownWidth });
-
-      keys.forEach((key, i) => {
-        const rowY = breakdownY + 18 + i * 22;
-        const score = scores[key];
+      const barTrackWidth = 86;
+      doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(9.2)
+        .text('Score Breakdown', breakdownX, chartTop + 10, { width: pageWidth - (breakdownX - leftMargin) });
+      scoreRows.forEach((row, index) => {
+        const rowY = chartTop + 28 + index * 30;
         doc.rect(breakdownX, rowY, 16, 16).strokeColor(border).lineWidth(0.6).stroke();
-        doc.fillColor(text).fontSize(8).font('Helvetica-Bold')
-          .text(key, breakdownX + 4, rowY + 3);
-        doc.fillColor('#374151').fontSize(8).font('Helvetica')
-          .text(RIASEC_LABELS[key], breakdownX + 24, rowY + 3, { width: 86, ellipsis: true });
-        doc.fillColor(RIASEC_COLORS[key]).fontSize(8.5).font('Helvetica-Bold')
-          .text(String(score), breakdownX + 112, rowY + 3, { width: 24, align: 'right' });
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(8).text(row.key, breakdownX + 4, rowY + 3);
+        doc.fillColor('#374151').font('Helvetica').fontSize(8.2)
+          .text(row.label, breakdownX + 22, rowY + 4, { width: 86, ellipsis: true });
+
+        const barX = breakdownX + 112;
+        doc.rect(barX, rowY + 4, barTrackWidth, 7).fillColor(lightTrack).fill();
+        const filledBar = Math.max(0, Math.round((row.score / maxScore) * barTrackWidth));
+        if (filledBar > 0) {
+          doc.rect(barX, rowY + 4, filledBar, 7).fillColor(row.color).fill();
+        }
+        doc.fillColor(row.color).font('Helvetica-Bold').fontSize(8.6)
+          .text(String(row.score), barX + barTrackWidth + 8, rowY + 3, { width: 24, align: 'right' });
       });
+      cursorY = chartTop + 220;
 
-      // Holland Code Interpretation
-      const hcSectionY = radarSectionY + 200;
-      doc.fillColor(govBlue).fontSize(11).font('Helvetica-Bold')
-        .text('Your Holland Code Interpretation', leftMargin, hcSectionY);
-      doc.moveTo(leftMargin, hcSectionY + 14).lineTo(leftMargin + pageWidth, hcSectionY + 14)
-        .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
+      sectionHeading('Your Top Holland Code Interpretation', 'Top five profile themes at a glance.');
+      const interpretationCardGap = 8;
+      const interpretationCardWidth = Math.floor((pageWidth - (interpretationCardGap * 4)) / 5);
+      const interpretationCardHeight = 80;
+      ensureSpace(interpretationCardHeight + 8);
+      topFive.forEach((row, index) => {
+        const cardX = leftMargin + (index * (interpretationCardWidth + interpretationCardGap));
+        const rawSummary = (RIASEC_DESC[row.key] || 'Interpretation not available').split('.')[0].trim();
+        const summary = rawSummary.length > 54 ? `${rawSummary.slice(0, 51)}...` : rawSummary;
+        const scorePct = totalScore > 0 ? Math.round((row.score / totalScore) * 100) : 0;
 
-      hollandLetters.slice(0, 3).forEach((c, i) => {
-        const cardY = hcSectionY + 20 + i * 42;
-        const color = RIASEC_COLORS[c];
-        doc.rect(leftMargin, cardY, pageWidth, 34).strokeColor(border).lineWidth(0.6).stroke();
-        doc.font('Helvetica-Bold').fontSize(10).fillColor(text)
-          .text(`${i + 1}. ${RIASEC_LABELS[c]} (${c})`, leftMargin + 10, cardY + 6);
-        doc.fillColor(muted).fontSize(8).font('Helvetica')
-          .text(RIASEC_DESC[c], leftMargin + 32, cardY + 18, { width: pageWidth - 40 });
+        doc.rect(cardX, cursorY, interpretationCardWidth, interpretationCardHeight).strokeColor(border).lineWidth(0.6).stroke();
+        doc.rect(cardX, cursorY, interpretationCardWidth, 4).fillColor(row.color).fill();
+        doc.fillColor(row.color).font('Helvetica-Bold').fontSize(7.3)
+          .text(`#${index + 1}`, cardX + 6, cursorY + 9, { width: 24 });
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(9.6)
+          .text(row.key, cardX + interpretationCardWidth - 16, cursorY + 9, { width: 10, align: 'right' });
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(7.8)
+          .text(row.label, cardX + 6, cursorY + 24, { width: interpretationCardWidth - 12, ellipsis: true });
+        doc.fillColor(muted).font('Helvetica').fontSize(7.1)
+          .text(`${row.score} points | ${scorePct}%`, cardX + 6, cursorY + 37, { width: interpretationCardWidth - 12, ellipsis: true });
+        doc.fillColor('#374151').font('Helvetica').fontSize(6.8)
+          .text(summary, cardX + 6, cursorY + 50, { width: interpretationCardWidth - 12, height: 32, ellipsis: true });
       });
+      cursorY += interpretationCardHeight + 8;
 
-      // Suggested Subjects
-      let curY = hcSectionY + 20 + Math.min(hollandLetters.length, 3) * 42 + 10;
-      if (subjects.length > 0) {
-        if (curY > 680) { doc.addPage(); curY = 50; }
-        doc.fillColor(govBlue).fontSize(11).font('Helvetica-Bold')
-          .text('Suggested School Subjects', leftMargin, curY);
-        doc.moveTo(leftMargin, curY + 14).lineTo(leftMargin + pageWidth, curY + 14)
-          .strokeColor('#e5e7eb').lineWidth(0.5).stroke();
-        curY += 20;
-        let pillX = leftMargin;
-        subjects.forEach(s => {
-          const tw = doc.widthOfString(s) + 16;
-          if (pillX + tw > leftMargin + pageWidth) { pillX = leftMargin; curY += 18; }
-          doc.rect(pillX, curY, tw, 16).strokeColor(border).lineWidth(0.5).stroke();
-          doc.fillColor(text).fontSize(7.5).font('Helvetica-Bold').text(s, pillX + 8, curY + 3.5);
-          pillX += tw + 6;
-        });
-        curY += 24;
-      }
+      // Page 2 - Occupations
+      startPage('RECOMMENDED CAREER PATHS', 'Careers aligned with your profile and local demand indicators.');
+      if (occupations.length === 0) {
+        ensureSpace(42);
+        doc.rect(leftMargin, cursorY, pageWidth, 38).strokeColor(border).lineWidth(0.6).stroke();
+        doc.fillColor(muted).font('Helvetica').fontSize(8.4)
+          .text('No occupations are currently mapped for this profile. Please consult a counselor for guided planning.', leftMargin + 10, cursorY + 12, { width: pageWidth - 20 });
+        cursorY += 46;
+      } else {
+        occupations.slice(0, 12).forEach((occupation) => {
+          const dominantLetter = occupation.primaryRiasec || hollandLetters[0] || 'R';
+          const demand = occupation.localDemand || occupation.demandLevel;
+          const demandLabel = demand ? (DEMAND_LABELS[demand] || demand) : null;
+          const categoryLabel = normalizeText(occupation.category, 'General');
+          const matchLine = `Why this matches you: ${topThree.map((row) => row.label).join(', ')} tendencies are present in this path.`;
+          const description = normalizeText(occupation.description, 'No occupation description available yet.');
+          const descriptionHeight = Math.min(58, measureText(description, pageWidth - 22, 'Helvetica', 8.1));
+          const blockHeight = 64 + descriptionHeight;
+          ensureSpace(blockHeight + 10);
 
-      // ══ PAGE 2: Career Recommendations ══
-      if (occupations.length > 0) {
-        doc.addPage();
-        drawLetterhead('RECOMMENDED CAREER PATHS');
+          doc.rect(leftMargin, cursorY, pageWidth, blockHeight).strokeColor(border).lineWidth(0.6).stroke();
+          doc.rect(leftMargin + 10, cursorY + 10, 18, 18).strokeColor(border).lineWidth(0.6).stroke();
+          doc.fillColor(text).font('Helvetica-Bold').fontSize(9).text(dominantLetter, leftMargin + 15, cursorY + 14);
 
-        let occY = 170;
-        doc.fillColor(muted).fontSize(8).font('Helvetica')
-          .text('Careers aligned with your Holland Code profile. Demand levels indicate local labour market outlook.', leftMargin, occY);
-        occY += 18;
-
-        occupations.slice(0, 10).forEach((occ) => {
-          if (occY > 700) { doc.addPage(); occY = 50; }
-          const rLetter = occ.primaryRiasec || hollandLetters[0] || 'R';
-          const color = RIASEC_COLORS[rLetter] || govBlue;
-
-          doc.rect(leftMargin, occY, 18, 18).strokeColor(border).lineWidth(0.6).stroke();
-          doc.fillColor(text).fontSize(9).font('Helvetica-Bold').text(rLetter, leftMargin + 5, occY + 4);
-          doc.fillColor(text).fontSize(9.5).font('Helvetica-Bold')
-            .text(occ.name, leftMargin + 24, occY + 1);
-
-          const demand = occ.localDemand || occ.demandLevel;
-          if (demand) {
-            const dColor = DEMAND_PDF_COLORS[demand] || '#6b7280';
-            const dLabel = DEMAND_LABELS[demand] || demand;
-            const dX = leftMargin + 24 + doc.widthOfString(occ.name) + 8;
-            doc.rect(dX, occY + 1, doc.widthOfString(dLabel) + 14, 13).strokeColor(border).lineWidth(0.5).stroke();
-            doc.fillColor(dColor).fontSize(7).font('Helvetica-Bold').text(dLabel, dX + 7, occY + 4);
+          if (demandLabel) {
+            const demandTagX = leftMargin + pageWidth - (doc.widthOfString(demandLabel) + 20);
+            drawDemandTag(demandLabel, demand, demandTagX, cursorY + 11);
           }
 
-          if (occ.description) {
-            doc.fillColor(muted).fontSize(8).font('Helvetica')
-              .text(occ.description, leftMargin + 24, occY + 14, { width: pageWidth - 30 });
-            occY += 8;
-          }
-          doc.moveTo(leftMargin, occY + 22).lineTo(leftMargin + pageWidth, occY + 22).strokeColor(border).lineWidth(0.5).stroke();
-          occY += 26;
+          doc.fillColor(text).font('Helvetica-Bold').fontSize(9.6)
+            .text(normalizeText(occupation.name, 'Occupation'), leftMargin + 34, cursorY + 10, { width: pageWidth - 170, ellipsis: true });
+          doc.fillColor(muted).font('Helvetica').fontSize(8.2)
+            .text(`Category: ${categoryLabel}`, leftMargin + 34, cursorY + 23, { width: pageWidth - 170, ellipsis: true });
+          doc.fillColor('#374151').font('Helvetica-Bold').fontSize(8.1)
+            .text(matchLine, leftMargin + 10, cursorY + 35, { width: pageWidth - 20 });
+          doc.fillColor(muted).font('Helvetica').fontSize(8.1)
+            .text(description, leftMargin + 10, cursorY + 48, { width: pageWidth - 20 });
+
+          cursorY += blockHeight + 10;
         });
       }
 
-      // ══ PAGE 3: Courses & Qualifications ══
-      if (courses.length > 0) {
-        doc.addPage();
-        drawLetterhead('RECOMMENDED COURSES & QUALIFICATIONS');
-
-        let crsY = 170;
-        doc.fillColor(muted).fontSize(8).font('Helvetica')
-          .text('Study programmes aligned to your profile with entry requirements and institutions.', leftMargin, crsY);
-        crsY += 18;
-
+      // Page 3 - Courses and qualifications
+      startPage('RECOMMENDED COURSES AND QUALIFICATIONS', 'Study pathways, entry requirements, and institutions.');
+      if (courses.length === 0) {
+        ensureSpace(42);
+        doc.rect(leftMargin, cursorY, pageWidth, 38).strokeColor(border).lineWidth(0.6).stroke();
+        doc.fillColor(muted).font('Helvetica').fontSize(8.4)
+          .text('No courses are currently linked to this profile. Career counseling can help identify suitable pathways.', leftMargin + 10, cursorY + 12, { width: pageWidth - 20 });
+        cursorY += 46;
+      } else {
         courses.slice(0, 12).forEach((course) => {
-          if (crsY > 690) { doc.addPage(); crsY = 50; }
-          const qualType = course.qualificationType ? course.qualificationType.toUpperCase() : '';
+          const qualification = formatQualification(course.qualificationType);
+          const durationText = course.durationYears ? `${course.durationYears} years` : 'Duration varies';
+          const fieldText = normalizeText(course.fieldOfStudy, 'Field not specified');
+          const riasecText = Array.isArray(course.riasecCodes) && course.riasecCodes.length > 0
+            ? course.riasecCodes.join(', ')
+            : 'Not tagged';
+          const description = normalizeText(course.description, 'No course summary provided.');
+          const requirements = (course.requirements || []).slice(0, 6).map((requirement) => {
+            const suffix = requirement.isMandatory === false ? 'recommended' : 'required';
+            return `${normalizeText(requirement.subject)} (${normalizeText(requirement.minimumGrade)} - ${suffix})`;
+          });
+          const institutions = (course.courseInstitutions || [])
+            .map((entry) => entry.institution?.name)
+            .filter(Boolean)
+            .slice(0, 6);
 
-          if (qualType) {
-            const qw = doc.widthOfString(qualType) + 12;
-            doc.rect(leftMargin, crsY, qw, 14).strokeColor(border).lineWidth(0.5).stroke();
-            doc.fillColor(text).fontSize(7).font('Helvetica-Bold').text(qualType, leftMargin + 6, crsY + 3);
+          const metaText = `Duration: ${durationText}   |   Field: ${fieldText}   |   RIASEC: ${riasecText}`;
+          const requirementsText = requirements.length > 0
+            ? requirements.map((item) => `- ${item}`).join('\n')
+            : 'Entry requirements should be confirmed with the institution.';
+          const institutionsText = institutions.length > 0
+            ? institutions.map((name) => `- ${name}`).join('\n')
+            : 'Institution links are not available for this course yet.';
+          const fullTextWidth = pageWidth - 20;
+          const detailTextWidth = pageWidth - 126;
+          const metaHeight = measureText(metaText, fullTextWidth, 'Helvetica', 8.1, { lineGap: 1 });
+          const descriptionHeight = measureText(description, fullTextWidth, 'Helvetica', 8.1, { lineGap: 1 });
+          const requirementsHeight = measureText(requirementsText, detailTextWidth, 'Helvetica', 7.9, { lineGap: 1 });
+          const institutionsHeight = measureText(institutionsText, detailTextWidth, 'Helvetica', 7.9, { lineGap: 1 });
+
+          const blockHeight = 72 + metaHeight + descriptionHeight + requirementsHeight + institutionsHeight + 14;
+          ensureSpace(blockHeight + 10);
+
+          doc.rect(leftMargin, cursorY, pageWidth, blockHeight).strokeColor(border).lineWidth(0.6).stroke();
+
+          doc.font('Helvetica-Bold').fontSize(7.2);
+          const qualTagWidth = doc.widthOfString(qualification.toUpperCase()) + 14;
+          doc.rect(leftMargin + 10, cursorY + 10, qualTagWidth, 14).strokeColor(border).lineWidth(0.5).stroke();
+          doc.fillColor(text).text(qualification.toUpperCase(), leftMargin + 17, cursorY + 14, { width: qualTagWidth - 8, align: 'center' });
+
+          if (course.fundingPriority) {
+            drawDemandTag('SLAS Priority', 'high', leftMargin + pageWidth - 86, cursorY + 10);
           }
 
-          doc.fillColor(govBlue).fontSize(9.5).font('Helvetica-Bold')
-            .text(course.name, leftMargin + (qualType ? doc.widthOfString(qualType) + 18 : 0), crsY + 1);
+          doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(9.6)
+            .text(normalizeText(course.name, 'Course'), leftMargin + qualTagWidth + 16, cursorY + 11, { width: pageWidth - qualTagWidth - 110, ellipsis: true });
 
-          crsY += 18;
+          doc.fillColor(muted).font('Helvetica').fontSize(8.1)
+            .text(metaText, leftMargin + 10, cursorY + 30, { width: fullTextWidth, lineGap: 1 });
 
-          if (course.description) {
-            doc.fillColor('#374151').fontSize(8).font('Helvetica')
-              .text(course.description, leftMargin + 10, crsY, { width: pageWidth - 20 });
-            crsY += doc.heightOfString(course.description, { width: pageWidth - 20, fontSize: 8 }) + 4;
-          }
+          let blockY = cursorY + 30 + metaHeight + 4;
+          doc.fillColor('#374151').font('Helvetica').fontSize(8.1)
+            .text(description, leftMargin + 10, blockY, { width: fullTextWidth, lineGap: 1 });
+          blockY += descriptionHeight + 6;
 
-          const insts = (course.courseInstitutions || []).map(ci => ci.institution?.name).filter(Boolean);
-          if (insts.length > 0) {
-            doc.fillColor('#2563eb').fontSize(8).font('Helvetica-Bold').text('Offered at:', leftMargin + 10, crsY);
-            crsY += 12;
-            let instX = leftMargin + 20;
-            insts.forEach(name => {
-              const tw = doc.widthOfString(name) + 14;
-              if (instX + tw > leftMargin + pageWidth) { instX = leftMargin + 20; crsY += 16; }
-              doc.rect(instX, crsY, tw, 14).strokeColor(border).lineWidth(0.5).stroke();
-              doc.fillColor(text).fontSize(7).font('Helvetica-Bold').text(name, instX + 7, crsY + 3);
-              instX += tw + 4;
-            });
-            crsY += 20;
-          }
+          doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(8)
+            .text('Entry requirements:', leftMargin + 10, blockY, { width: 110 });
+          doc.fillColor(text).font('Helvetica').fontSize(7.9)
+            .text(requirementsText, leftMargin + 116, blockY, { width: detailTextWidth, lineGap: 1 });
+          blockY += requirementsHeight + 6;
 
-          doc.moveTo(leftMargin, crsY).lineTo(leftMargin + pageWidth, crsY)
-            .strokeColor('#f3f4f6').lineWidth(0.5).stroke();
-          crsY += 10;
+          doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(8)
+            .text('Institutions:', leftMargin + 10, blockY, { width: 110 });
+          doc.fillColor(text).font('Helvetica').fontSize(7.9)
+            .text(institutionsText, leftMargin + 116, blockY, { width: detailTextWidth, lineGap: 1 });
+
+          cursorY += blockHeight + 10;
         });
+      }
+
+      // Page 4 - Subjects, funding, and next steps
+      startPage('NEXT STEPS AND SUPPORT', 'Actionable guidance after your assessment.');
+
+      sectionHeading('Suggested School Subjects', 'Subjects that support your profile and career direction.');
+      if (subjects.length === 0) {
+        ensureSpace(22);
+        doc.fillColor(muted).font('Helvetica').fontSize(8.2)
+          .text('No subject recommendations are currently available for this profile.', leftMargin, cursorY, { width: pageWidth });
+        cursorY += 20;
+      } else {
+        ensureSpace(56);
+        let pillX = leftMargin;
+        let pillY = cursorY;
+        doc.font('Helvetica-Bold').fontSize(7.9);
+        subjects.slice(0, 16).forEach((subject) => {
+          const label = normalizeText(subject);
+          const width = doc.widthOfString(label) + 16;
+          if (pillX + width > leftMargin + pageWidth) {
+            pillX = leftMargin;
+            pillY += 18;
+          }
+          if (pillY + 18 > bottomY) {
+            cursorY = pillY;
+            startPage(pageContext.title, pageContext.subtitle);
+            sectionHeading('Suggested School Subjects', 'Subjects that support your profile and career direction.');
+            pillX = leftMargin;
+            pillY = cursorY;
+          }
+          doc.rect(pillX, pillY, width, 14).strokeColor(border).lineWidth(0.5).stroke();
+          doc.fillColor(text).font('Helvetica-Bold').fontSize(7.8).text(label, pillX + 8, pillY + 4, { width: width - 8 });
+          pillX += width + 6;
+        });
+        cursorY = pillY + 20;
+      }
+
+      sectionHeading('Government Funding Priority Alignment');
+      if (!fundingAlignment) {
+        ensureSpace(24);
+        doc.fillColor(muted).font('Helvetica').fontSize(8.2)
+          .text('Funding alignment analysis is not available for this result.', leftMargin, cursorY, { width: pageWidth });
+        cursorY += 20;
+      } else {
+        ensureSpace(84);
+        doc.rect(leftMargin, cursorY, pageWidth, 78).strokeColor(border).lineWidth(0.6).stroke();
+        const alignment = normalizeText(fundingAlignment.overall, 'LOW').toUpperCase();
+        const alignmentColor = alignment === 'HIGH' ? '#166534' : alignment === 'MEDIUM' ? '#92400e' : '#991b1b';
+        doc.fillColor(alignmentColor).font('Helvetica-Bold').fontSize(11)
+          .text(`Overall alignment: ${alignment}`, leftMargin + 12, cursorY + 10, { width: pageWidth - 24 });
+        doc.fillColor(muted).font('Helvetica').fontSize(8.1)
+          .text(
+            `${fundingAlignment.priorityFieldCount || 0} priority field(s) matched, ${fundingAlignment.nonPriorityFieldCount || 0} non-priority field(s).`,
+            leftMargin + 12,
+            cursorY + 28,
+            { width: pageWidth - 24 }
+          );
+        const interpretation = normalizeText(fundingAlignment.interpretation, 'No interpretation available.');
+        doc.fillColor(text).font('Helvetica').fontSize(8.1)
+          .text(interpretation, leftMargin + 12, cursorY + 42, { width: pageWidth - 24 });
+        cursorY += 86;
+
+        const alignedFields = (fundingAlignment.fields || []).slice(0, 6);
+        if (alignedFields.length > 0) {
+          ensureSpace(26 + alignedFields.length * 16);
+          doc.fillColor(govBlue).font('Helvetica-Bold').fontSize(8.4)
+            .text('Priority fields identified:', leftMargin, cursorY, { width: pageWidth });
+          cursorY += 14;
+          alignedFields.forEach((field, index) => {
+            doc.fillColor(text).font('Helvetica').fontSize(8.1)
+              .text(`${index + 1}. ${normalizeText(field.field)} (${normalizeText(field.alignment, 'LOW')})`, leftMargin + 6, cursorY, { width: pageWidth - 12 });
+            cursorY += 14;
+          });
+          cursorY += 2;
+        }
+      }
+
+      sectionHeading('Recommended Next Steps', 'Use these steps to turn your results into a clear plan.');
+      const nextSteps = [
+        `Review your top profile areas: ${topThree.map((row) => `${row.label} (${row.key})`).join(', ')}.`,
+        subjects.length > 0
+          ? `Prioritize these subjects in your learning plan: ${subjects.slice(0, 5).join(', ')}.`
+          : 'Ask your counselor for subject combinations that support your target career paths.',
+        occupations.length > 0
+          ? `Research your top career options: ${occupations.slice(0, 3).map((occ) => normalizeText(occ.name)).join(', ')}.`
+          : 'Research occupation options related to your Holland profile with a counselor.',
+        courses.length > 0
+          ? 'Compare course entry requirements and institutions before applying.'
+          : 'Compile qualification pathways from accredited institutions and review entry requirements.',
+        'Book a counselor session to validate your final study and career action plan.'
+      ];
+      nextSteps.forEach((step, index) => {
+        const stepHeight = measureText(step, pageWidth - 28, 'Helvetica', 8.2);
+        ensureSpace(stepHeight + 8);
+        doc.fillColor(text).font('Helvetica-Bold').fontSize(8.2)
+          .text(`${index + 1}.`, leftMargin, cursorY, { width: 14 });
+        doc.fillColor(text).font('Helvetica').fontSize(8.2)
+          .text(step, leftMargin + 14, cursorY, { width: pageWidth - 14 });
+        cursorY += stepHeight + 6;
+      });
+
+      ensureSpace(42);
+      doc.rect(leftMargin, cursorY + 4, pageWidth, 34).strokeColor(border).lineWidth(0.5).stroke();
+      doc.fillColor(muted).font('Helvetica').fontSize(7.6)
+        .text(
+          'This SDS report is guidance material and should be used with counselor support, institution prospectuses, and updated labor market information before final decisions are made.',
+          leftMargin + 8,
+          cursorY + 14,
+          { width: pageWidth - 16 }
+        );
+
+      const pages = doc.bufferedPageRange();
+      for (let pageIndex = 0; pageIndex < pages.count; pageIndex += 1) {
+        doc.switchToPage(pageIndex);
+        doc.font('Helvetica').fontSize(8).fillColor(muted)
+          .text(`Page ${pageIndex + 1} of ${pages.count}`, leftMargin, doc.page.height - 28, { width: pageWidth, align: 'right' });
       }
 
       doc.end();

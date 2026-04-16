@@ -51,40 +51,39 @@ const capFirst = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1)
 function drawPageHeader(doc, reportLabel, dateStr, preparedBy, filterSummary) {
   doc.rect(0, 0, PW, PH).fill(WHITE);
   doc.font('Helvetica-Bold').fontSize(18).fillColor(TEXT);
-  doc.text('GOVERNMENT', LM + 10, 28);
-  doc.text('OF   ESWATINI', LM, 28, { width: CW - 10, align: 'right' });
+  doc.text('GOVERNMENT OF ESWATINI', LM, 30, { width: CW, align: 'center' });
 
   const logoPath = resolveLogoPath();
   if (logoPath) {
     try {
-      doc.image(logoPath, (PW - 72) / 2, 18, { width: 72 });
+      doc.image(logoPath, (PW - 50) / 2, 50, { width: 50 });
     } catch (_) {}
   }
 
   doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT);
-  doc.text('Tel:  +268 4041971/2/3', LM, 74);
-  doc.text('Fax: +268 4049889', LM, 86);
-  doc.text('Email: mkhaliphi@gov.sz', LM, 98);
+  doc.text('Tel:  +268 4041971/2/3', LM, 96);
+  doc.text('Fax: +268 4049889', LM, 108);
+  doc.text('Email: mkhaliphi@gov.sz', LM, 120);
 
-  doc.text('Principal Secretary\'s Office', LM, 74, { width: CW, align: 'right' });
+  doc.text('Principal Secretary\'s Office', LM, 96, { width: CW, align: 'right' });
   doc.font('Helvetica').fontSize(8);
-  doc.text('Ministry of Labour & Social Security', LM, 86, { width: CW, align: 'right' });
-  doc.text('P.O. Box 198, Mbabane H100', LM, 98, { width: CW, align: 'right' });
+  doc.text('Ministry of Labour & Social Security', LM, 108, { width: CW, align: 'right' });
+  doc.text('P.O. Box 198, Mbabane H100', LM, 120, { width: CW, align: 'right' });
 
-  doc.moveTo(LM, 116).lineTo(PW - RM, 116).strokeColor('#000000').lineWidth(0.7).stroke();
+  doc.moveTo(LM, 136).lineTo(PW - RM, 136).strokeColor('#000000').lineWidth(0.7).stroke();
   doc.font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
-    .text(reportLabel.toUpperCase(), LM, 128, { width: CW, align: 'center' });
+    .text(reportLabel.toUpperCase(), LM, 146, { width: CW, align: 'center' });
   doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-    .text(`Generated: ${dateStr}  ·  Prepared by: ${preparedBy}`, LM, 144, { width: CW, align: 'center' });
+    .text(`Generated: ${dateStr}  |  Prepared by: ${preparedBy}`, LM, 160, { width: CW, align: 'center' });
 
-  doc.rect(LM, 160, CW, 24).lineWidth(0.5).strokeColor(BORDER).stroke();
+  doc.rect(LM, 174, CW, 24).lineWidth(0.5).strokeColor(BORDER).stroke();
   doc.fillColor(MUTED).font('Helvetica-Bold').fontSize(6.5)
-    .text('ACTIVE FILTERS', LM + 8, 168, { width: 70 });
+    .text('ACTIVE FILTERS', LM + 8, 182, { width: 70 });
   doc.fillColor(TEXT).font('Helvetica').fontSize(6.5)
-    .text(filterSummary, LM + 80, 168, { width: CW - 88, ellipsis: true });
+    .text(filterSummary, LM + 80, 182, { width: CW - 88, ellipsis: true });
 
-  doc.moveTo(LM, 192).lineTo(PW - RM, 192).strokeColor(BORDER).lineWidth(0.6).stroke();
-  return 206;
+  doc.moveTo(LM, 206).lineTo(PW - RM, 206).strokeColor(BORDER).lineWidth(0.6).stroke();
+  return 220;
 }
 
 /* drawContinuationHeader ──────────────────────────────────────────── */
@@ -94,7 +93,7 @@ function drawContinuationHeader(doc, reportLabel) {
   doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(8)
     .text(reportLabel.toUpperCase(), LM, 24, { width: Math.round(CW * 0.65) });
   doc.fillColor(MUTED).font('Helvetica').fontSize(6.5)
-    .text('Ministry of Labour & Social Security · Kingdom of Eswatini', LM, 24, { width: CW, align: 'right' });
+    .text('Ministry of Labour & Social Security | Kingdom of Eswatini', LM, 24, { width: CW, align: 'right' });
   return 54;
 }
 
@@ -253,6 +252,14 @@ function drawGradeBadge(doc, x, y, rate) {
 
 /* drawPageFooters ────────────────────────────────────────────────────── */
 function drawPageFooters(doc, reportLabel) {
+  const pages = doc.bufferedPageRange();
+  for (let pageIndex = 0; pageIndex < pages.count; pageIndex += 1) {
+    doc.switchToPage(pageIndex);
+    const footerText = `Page ${pageIndex + 1} of ${pages.count}`;
+    doc.moveTo(LM, PH - 36).lineTo(PW - RM, PH - 36).strokeColor(BORDER).lineWidth(0.4).stroke();
+    doc.fillColor(MUTED).font('Helvetica').fontSize(7)
+      .text(footerText, LM, PH - 30, { width: CW, align: 'right' });
+  }
   return reportLabel;
 }
 

@@ -17,3 +17,8 @@
 - Fixed corrupted mojibake icon/text bytes in the results UI (for example `ðŸ“ˆ`, `ðŸ“Š`, `ðŸ”§`, `ðŸ”¬`).
 - Restored proper result icons (`📈`, `📊`, `🔧`, `🔬`, `🎨`, `🤝`) and cleaned corrupted separators/bullets/labels.
 - Cleaned corrupted helper text characters in occupation search input messaging.
+
+### PDF Report and Tie-Code Output
+- Updated Holland code scoring/output to preserve ties using `/` (for example `R/I A S`) for both API display and generated reports.
+- Updated assessment PDF generation to render tied Holland code groups exactly as displayed in results, with cleaner layout and page numbering.
+- Updated certificate and analytics/admin PDF headers to a consistent centered government header format and added page number footers.

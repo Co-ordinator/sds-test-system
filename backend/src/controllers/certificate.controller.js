@@ -33,27 +33,22 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   const border = '#6b7280';
 
   // ── HEADER ─────────────────────────────────────────────────────────────
-  // "GOVERNMENT" on left
+  // Centered national header
   doc.font('Helvetica-Bold').fontSize(18).fillColor('#000000');
-  doc.text('GOVERNMENT', lm + 8, 48);
-
-  // "OF   ESWATINI" on right (right-aligned)
-  const rightHeaderText = 'OF   ESWATINI';
-  doc.font('Helvetica-Bold').fontSize(18).fillColor('#000000');
-  doc.text(rightHeaderText, lm, 48, { width: contentW - 8, align: 'right' });
+  doc.text('GOVERNMENT OF ESWATINI', lm, 40, { width: contentW, align: 'center' });
 
   // Logo in center
   const logoPath = resolveLogoPath();
   if (logoPath) {
     try {
-      const logoWidth = 78;
+      const logoWidth = 56;
       const logoCenterX = (pageW - logoWidth) / 2;
-      doc.image(logoPath, logoCenterX, 38, { width: logoWidth });
+      doc.image(logoPath, logoCenterX, 60, { width: logoWidth });
     } catch (_) {}
   }
 
   // Contact info below header
-  const subY = 94;
+  const subY = 112;
   doc.font('Helvetica').fontSize(7.5).fillColor('#000000');
   doc.text('Tel:  +268 4041971/2/3', lm, subY);
   doc.text('Fax: +268 4049889', lm, subY + 10);
@@ -69,7 +64,7 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   doc.text('Email: mkhaliphi@gov.sz', lm, subY + 32);
 
   // Horizontal rule
-  const ruleY = subY + 48;
+  const ruleY = subY + 44;
   doc.moveTo(lm, ruleY).lineTo(pageW - rm, ruleY).strokeColor('#000000').lineWidth(0.8).stroke();
 
   // ── TITLE ──────────────────────────────────────────────────────────────
@@ -195,6 +190,13 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
 
   // Simple signature line (underline style)
   doc.moveTo(lm, sigY + 22).lineTo(lm + 140, sigY + 22).strokeColor('#000000').lineWidth(0.5).stroke();
+
+  const pages = doc.bufferedPageRange();
+  for (let pageIndex = 0; pageIndex < pages.count; pageIndex += 1) {
+    doc.switchToPage(pageIndex);
+    doc.font('Helvetica').fontSize(8).fillColor('#6b7280')
+      .text(`Page ${pageIndex + 1} of ${pages.count}`, lm, pageH - 28, { width: contentW, align: 'right' });
+  }
 
   doc.end();
 }
