@@ -69,13 +69,26 @@ export const AuthProvider = ({ children }) => {
     }
   }, [navigate]);
 
+  const refreshPermissions = useCallback(async () => {
+    try {
+      const response = await api.get('/api/v1/auth/me');
+      const userData = response.data?.data?.user ?? response.data?.user;
+      setUser(userData || null);
+      return userData;
+    } catch (err) {
+      console.error('Failed to refresh permissions:', err);
+      throw err;
+    }
+  }, []);
+
   const value = {
     user,
     isAuthenticated,
     loading,
     login,
     logout,
-    setSession
+    setSession,
+    refreshPermissions
   };
 
   return (

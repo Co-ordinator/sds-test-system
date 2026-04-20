@@ -39,7 +39,7 @@ const importStudents = async (req, res, next) => {
 
 const deleteStudent = async (req, res, next) => {
   try {
-    await counselorService.deleteStudent(req.user.id, req.user.role, req.user.institutionId, req.params.studentId);
+    await counselorService.deleteStudent(req.user.id, req.params.studentId);
     logger.info({ actionType: 'STUDENT_DELETED', message: `Student ${req.params.studentId} deleted by ${req.user.role} ${req.user.id}`, req });
     return res.status(200).json({ status: 'success', message: 'Student deleted' });
   } catch (error) {
@@ -50,7 +50,7 @@ const deleteStudent = async (req, res, next) => {
 
 const updateStudent = async (req, res, next) => {
   try {
-    const updated = await counselorService.updateStudent(req.user.role, req.user.institutionId, req.params.studentId, req.body);
+    const updated = await counselorService.updateStudent(req.params.studentId, req.body);
     return res.status(200).json({ status: 'success', data: { student: updated } });
   } catch (error) {
     logger.error({ actionType: 'STUDENT_UPDATE_FAILED', message: 'Failed to update student', req, details: { error: error.message } });
@@ -60,7 +60,7 @@ const updateStudent = async (req, res, next) => {
 
 const getStudentResults = async (req, res, next) => {
   try {
-    const { student, assessments, recommendations } = await counselorService.getStudentResults(req.user.role, req.user.institutionId, req.params.studentId);
+    const { student, assessments, recommendations } = await counselorService.getStudentResults(req.params.studentId);
     return res.status(200).json({
       status: 'success',
       data: { student: { id: student.id, firstName: student.firstName, lastName: student.lastName, email: student.email }, assessments, recommendations }
@@ -79,7 +79,7 @@ const getStudentResults = async (req, res, next) => {
 const generateLoginCards = async (req, res, next) => {
   try {
     const { students, institution, actor } = await counselorService.getLoginCardsData(
-      req.user.id, req.user.role, req.user.institutionId, req.query.institutionId, req.query.grade
+      req.user.id, req.query.institutionId, req.query.grade
     );
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });

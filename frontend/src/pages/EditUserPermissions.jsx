@@ -4,11 +4,13 @@ import { ArrowLeft, Shield, Save, X, Check } from 'lucide-react';
 import { GOV, TYPO } from '../theme/government';
 import { RoleBadge, useToast, Toast, LoadingState, ErrorBanner } from '../components/ui/StatusIndicators';
 import { adminService } from '../services/adminService';
+import { useAuth } from '../context/AuthContext';
 
 const EditUserPermissions = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { toast, showToast, Toast: ToastComp } = useToast();
+  const { user: currentUser, refreshPermissions } = useAuth();
 
   const [user, setUser] = useState(null);
   const [allPermissions, setAllPermissions] = useState([]);
@@ -56,6 +58,11 @@ const EditUserPermissions = () => {
       showToast('Permissions updated successfully');
       setInitialPerms(new Set(selectedPerms));
       setHasChanges(false);
+
+      // Refresh current user's permissions if editing own account
+      if (currentUser?.id === userId) {
+        await refreshPermissions();
+      }
     } catch (err) {
       showToast(err.response?.data?.message || 'Failed to update permissions', 'error');
     } finally {

@@ -45,6 +45,8 @@ const upload = multer({
 });
 
 // All routes require authentication
+// Note: Qualifications are self-service (users manage their own data), similar to auth/me endpoints
+// Permission checks are not applied here - users can view/upload/delete their own qualifications
 router.use(verifyToken);
 
 router.get('/', listQualifications);

@@ -10,7 +10,7 @@ The Online Self-Directed Search (SDS) Test System database is designed to suppor
 - **Multi-language Support** - English and siSwati
 - **Comprehensive Audit Trail** - Complete logging for compliance
 - **Data Protection Compliant** - Aligned with Eswatini Data Protection Act 2022
-- **Role-Based Access Control** - System Administrator, Test Administrator, Test Taker roles with 49 granular permissions
+- **Role-Based Access Control** - System Administrator, Test Administrator, Test Taker roles with 56 granular permissions
 - **Scalable Architecture** - Supports 500+ concurrent users
 - **Career Resources Integration** - Links to local institutions and opportunities
 
@@ -130,14 +130,14 @@ Academic certificates and qualification documents uploaded by users.
 ---
 
 #### **permissions**
-Granular permission system (49 permissions across 13 modules)
+Granular permission system (56 permissions across 15 modules)
 
 **Key Fields:**
 - `id` (UUID) - Primary key
 - `code` (string, unique) - Permission code (e.g., `users.create`, `analytics.view`)
 - `name` (string) - Human-readable name
 - `description` (string, nullable) - Permission description
-- `module` (string) - Module grouping (users, institutions, questions, occupations, subjects, assessments, results, analytics, audit, notifications, certificates, permissions, test_takers)
+- `module` (string) - Module grouping (users, institutions, questions, occupations, subjects, courses, qualifications, assessments, results, analytics, audit, notifications, certificates, glossary, permissions, test_takers)
 
 **Timestamps:**
 - `createdAt`, `updatedAt`
@@ -148,14 +148,17 @@ Granular permission system (49 permissions across 13 modules)
 - **questions**: view, create, update, delete, import, export
 - **occupations**: view, create, update, delete, import, export
 - **subjects**: view, create, update, delete, import, export
-- **assessments**: view, create, update, delete, export
-- **results**: view, export
+- **courses**: view, create, update, delete, export, import
+- **qualifications**: view, create, delete (self-service)
+- **assessments**: view, export
+- **results**: view, export, download_pdf
 - **analytics**: view, export
 - **audit**: view
 - **notifications**: view, manage
 - **certificates**: view, generate, download
+- **glossary**: view, create, update, delete
 - **permissions**: view, manage
-- **test_takers**: manage
+- **test_takers**: view, create, import, manage, login_cards
 
 #### **user_permissions**
 Many-to-many junction table linking users to permissions

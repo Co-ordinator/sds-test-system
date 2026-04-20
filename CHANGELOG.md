@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.15.0] - 2026-04-20
+
+### Added - New permission modules
+
+- Added `qualifications` module permissions (view, create, delete) to permission seeder
+- Added `glossary` module permissions (view, create, update, delete) to permission seeder
+- Total permissions increased from 49 to 56 across 15 modules
+
+### Changed - Glossary routes to permission-based auth
+
+- Replaced role-based `authorize(['System Administrator'])` with `requirePermission` for glossary CRUD operations
+- Glossary routes now use granular permissions: `glossary.create`, `glossary.update`, `glossary.delete`
+- Public read endpoints (GET /, GET /:id) remain unauthenticated
+- Applied in `backend/src/routes/glossary.routes.js`
+
+### Changed - Report types endpoint permission check
+
+- Added `requirePermission('analytics.view')` to GET /api/v1/reports/types endpoint
+- Added comment documenting that reports module uses analytics permissions (reports are subset of analytics exports)
+- Applied in `backend/src/routes/report.routes.js`
+
+### Changed - Documentation for permission patterns
+
+- Added comment to `qualification.routes.js` explaining qualifications are self-service (no permission checks)
+- Added comment to `auth.routes.js` explaining /me endpoints are self-only by design
+- Added comment to `assessment.routes.js` explaining use of `restrictTo` instead of permission system (test taker workflow)
+
+### Added - Frontend permission refresh mechanism
+
+- Added `refreshPermissions()` function to `AuthContext` to reload user permissions from /api/v1/auth/me
+- Added 403 handler to API interceptor that dispatches `auth:permission-denied` event
+- Updated `EditUserPermissions.jsx` to call `refreshPermissions()` after updating own permissions
+- Applied in:
+  - `frontend/src/context/AuthContext.js`
+  - `frontend/src/services/api.js`
+  - `frontend/src/pages/EditUserPermissions.jsx`
+
+### Migration Notes
+
+- Run `npm run seed` to update permissions in database
+- New permissions (qualifications.*, glossary.*) will be unassigned to existing users
+- System Administrators will automatically receive all new permissions on next seeder run
+- Test Administrators will need to be explicitly granted new permissions if needed
+
+---
+
 ## [2.14.3] - 2026-04-14
 
 ### Fixed - Role-specific dashboard routing

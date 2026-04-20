@@ -9,6 +9,9 @@ import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
+import OccupationSearchInput from '../components/ui/OccupationSearchInput';
+import InstitutionSearchInput from '../components/ui/InstitutionSearchInput';
+import DistrictSearchInput from '../components/ui/DistrictSearchInput';
 import AccessibilityDialog from '../components/ui/AccessibilityDialog';
 import { Monitor } from 'lucide-react';
 
@@ -34,6 +37,11 @@ export default function Profile() {
   const [saveStatus, setSaveStatus] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [workplace, setWorkplace] = useState({ name: '', institutionId: null });
+  const [occupation, setOccupation] = useState({ name: '', occupationId: null });
+  const [institution, setInstitution] = useState({ name: '', institutionId: null });
+  const [district, setDistrict] = useState('');
+  const [educationLevels, setEducationLevels] = useState([]);
+  const [educationLevelsLoading, setEducationLevelsLoading] = useState(false);
   const [phoneError, setPhoneError] = useState('');
   const phoneInputRef = useRef(null);
   const phoneDigitsRef = useRef('');
@@ -50,21 +58,21 @@ export default function Profile() {
   });
   const [dragOver, setDragOver] = useState(false);
 
-  // Extended schema for profile fields
+  // Extended schema for profile fields - all fields are optional
   const schema = Joi.object({
-    region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').allow('', null).label('Region'),
-    district: Joi.string().allow('', null).label('District'),
-    address: Joi.string().allow('', null).label('Address'),
+    region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').optional().allow('', null).label('Region'),
+    district: Joi.string().optional().allow('', null).label('District'),
+    address: Joi.string().optional().allow('', null).label('Address'),
     // Keep this flexible to avoid blocking profile saves for legacy UUID-based values.
-    educationLevel: Joi.string().allow('', null).label('Education Level'),
-    currentInstitution: Joi.string().allow('', null).label('Current Institution'),
+    educationLevel: Joi.string().optional().allow('', null).label('Education Level'),
+    currentInstitution: Joi.string().optional().allow('', null).label('Current Institution'),
     employmentStatus: Joi.string().valid(
       'student', 'employed', 'unemployed', 'self_employed', 'other'
-    ).allow('', null).label('Employment Status'),
-    currentOccupation: Joi.string().allow('', null).label('Current Occupation'),
-    preferredLanguage: Joi.string().valid('en', 'ss').allow('', null).label('Preferred Language'),
-    requiresAccessibility: Joi.boolean().allow(null).label('Requires Accessibility'),
-    accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).allow(null).label('Accessibility Needs')
+    ).optional().allow('', null).label('Employment Status'),
+    currentOccupation: Joi.string().optional().allow('', null).label('Current Occupation'),
+    preferredLanguage: Joi.string().valid('en', 'ss').optional().allow('', null).label('Preferred Language'),
+    requiresAccessibility: Joi.boolean().optional().allow(null).label('Requires Accessibility'),
+    accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).optional().allow(null).label('Accessibility Needs')
   });
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm({
@@ -109,6 +117,15 @@ export default function Profile() {
             name: user.workplaceName || '',
             institutionId: user.workplaceInstitutionId || null,
           });
+          setOccupation({
+            name: user.currentOccupation || '',
+            occupationId: user.currentOccupationId || null,
+          });
+          setInstitution({
+            name: user.currentInstitution || '',
+            institutionId: user.institutionId || null,
+          });
+          setDistrict(user.district || '');
         }
       } catch (err) {
         setUserData({});
@@ -127,6 +144,18 @@ export default function Profile() {
       finally { setQualLoading(false); }
     };
     fetchQualifications();
+  }, []);
+
+  useEffect(() => {
+    const fetchEducationLevels = async () => {
+      setEducationLevelsLoading(true);
+      try {
+        const res = await api.get('/api/v1/education-levels');
+        setEducationLevels(res.data?.data?.educationLevels || []);
+      } catch { /* silent */ }
+      finally { setEducationLevelsLoading(false); }
+    };
+    fetchEducationLevels();
   }, []);
 
   const handleQualFileSelect = (file) => {
@@ -219,13 +248,14 @@ export default function Profile() {
     }
     const payload = {
       region: data.region || null,
-      district: normalizeText(data.district),
+      district: normalizeText(district),
       address: normalizeText(data.address),
       educationLevel: data.educationLevel || null,
-      currentInstitution: normalizeText(data.currentInstitution),
+      currentInstitution: normalizeText(institution.name),
+      institutionId: institution.institutionId || null,
       employmentStatus: data.employmentStatus || null,
-      currentOccupation: normalizedOccupation || null,
-      currentOccupationId: null,
+      currentOccupation: normalizeText(occupation.name),
+      currentOccupationId: occupation.occupationId || null,
       preferredLanguage: data.preferredLanguage || 'en',
       requiresAccessibility: Boolean(data.requiresAccessibility),
       accessibilityNeeds: data.accessibilityNeeds || {},
@@ -451,11 +481,12 @@ export default function Profile() {
               </div>
 
               <div>
-                <FieldLabel>District</FieldLabel>
-                <input
-                  {...register('district')}
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.district ? errorInputStyle : {}) }}
+                <FieldLabel>District / Town</FieldLabel>
+                <DistrictSearchInput
+                  value={district}
+                  onChange={(name) => setDistrict(name)}
+                  placeholder="Search for district or town..."
+                  error={!!errors.district}
                 />
                 <FieldError error={errors.district} />
               </div>
@@ -481,26 +512,26 @@ export default function Profile() {
                   {...register('educationLevel')}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.educationLevel ? errorInputStyle : {}) }}
+                  disabled={educationLevelsLoading}
                 >
                   <option value="">Select Education Level</option>
-                  <option value="primary">Primary</option>
-                  <option value="junior_secondary">Junior Secondary</option>
-                  <option value="senior_secondary">Senior Secondary</option>
-                  <option value="tvet">TVET</option>
-                  <option value="diploma">Diploma</option>
-                  <option value="undergraduate">Undergraduate</option>
-                  <option value="postgraduate">Postgraduate</option>
-                  <option value="other">Other</option>
+                  {educationLevels.map((level) => (
+                    <option key={level.id} value={level.id}>
+                      {level.description}
+                    </option>
+                  ))}
                 </select>
                 <FieldError error={errors.educationLevel} />
               </div>
 
               <div>
                 <FieldLabel>Current Institution</FieldLabel>
-                <input
-                  {...register('currentInstitution')}
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.currentInstitution ? errorInputStyle : {}) }}
+                <InstitutionSearchInput
+                  value={institution.name}
+                  institutionId={institution.institutionId}
+                  onChange={(name, id) => setInstitution({ name, institutionId: id })}
+                  placeholder="Search for your institution..."
+                  error={!!errors.currentInstitution}
                 />
                 <FieldError error={errors.currentInstitution} />
               </div>
@@ -529,11 +560,12 @@ export default function Profile() {
 
               <div>
                 <FieldLabel>Current Occupation</FieldLabel>
-                <input
-                  {...register('currentOccupation')}
-                  placeholder="Type your current occupation"
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.currentOccupation ? errorInputStyle : {}) }}
+                <OccupationSearchInput
+                  value={occupation.name}
+                  occupationId={occupation.occupationId}
+                  onChange={(name, id) => setOccupation({ name, occupationId: id })}
+                  placeholder="Search for your occupation..."
+                  error={!!errors.currentOccupation}
                 />
                 <FieldError error={errors.currentOccupation} />
               </div>

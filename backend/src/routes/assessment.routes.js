@@ -5,6 +5,9 @@ const CertificateController = require('../controllers/certificate.controller');
 
 const router = express.Router();
 
+// Note: Assessment routes use role-based auth (restrictTo) instead of permission system
+// This is intentional - the test-taking workflow is role-specific by design
+// Permissions are for administrative operations, not for test taker actions
 router.use(verifyToken);
 
 router.post('/', restrictTo('Test Taker'), AssessmentController.startAssessment);

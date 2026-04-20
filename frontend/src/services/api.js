@@ -56,7 +56,14 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
-    
+
+    // Handle 403 Forbidden - permission denied
+    if (error.response?.status === 403) {
+      window.dispatchEvent(new CustomEvent('auth:permission-denied', {
+        detail: { url: requestUrl, message: error.response?.data?.message }
+      }));
+    }
+
     if (
       error.response?.status === 401
       && originalRequest

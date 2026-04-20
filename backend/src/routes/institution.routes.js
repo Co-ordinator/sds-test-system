@@ -1,7 +1,7 @@
 const express = require('express');
 const { verifyToken } = require('../middleware/authentication.middleware');
+const { requirePermission } = require('../middleware/permission.middleware');
 const { listInstitutions, searchInstitutions, createInstitution, updateInstitution, reviewInstitution, bulkDeleteInstitutions, bulkApproveInstitutions, deleteInstitution, exportInstitutions, importInstitutions } = require('../controllers/institution.controller');
-const { authorize } = require('../middleware/authorization.middleware');
 const router = express.Router();
 
 // Public list for registration dropdown
@@ -11,19 +11,19 @@ router.get('/', listInstitutions);
 router.get('/search', searchInstitutions);
 
 // Admin-only mutations
-router.post('/', verifyToken, authorize(['System Administrator', 'Test Administrator']), createInstitution);
-router.patch('/:id', verifyToken, authorize(['System Administrator', 'Test Administrator']), updateInstitution);
-router.patch('/:id/review', verifyToken, authorize(['System Administrator', 'Test Administrator']), reviewInstitution);
-router.delete('/:id', verifyToken, authorize(['System Administrator', 'Test Administrator']), deleteInstitution);
-router.post('/bulk-delete', verifyToken, authorize(['System Administrator', 'Test Administrator']), bulkDeleteInstitutions);
-router.post('/bulk-approve', verifyToken, authorize(['System Administrator', 'Test Administrator']), bulkApproveInstitutions);
+router.post('/', verifyToken, requirePermission('institutions.create'), createInstitution);
+router.patch('/:id', verifyToken, requirePermission('institutions.update'), updateInstitution);
+router.patch('/:id/review', verifyToken, requirePermission('institutions.update'), reviewInstitution);
+router.delete('/:id', verifyToken, requirePermission('institutions.delete'), deleteInstitution);
+router.post('/bulk-delete', verifyToken, requirePermission('institutions.delete'), bulkDeleteInstitutions);
+router.post('/bulk-approve', verifyToken, requirePermission('institutions.update'), bulkApproveInstitutions);
 
 // Admin import/export
-router.get('/export', verifyToken, authorize(['System Administrator', 'Test Administrator']), exportInstitutions);
+router.get('/export', verifyToken, requirePermission('institutions.export'), exportInstitutions);
 router.post(
   '/import',
   verifyToken,
-  authorize(['System Administrator', 'Test Administrator']),
+  requirePermission('institutions.import'),
   express.text({ type: 'text/csv', limit: '5mb' }),
   importInstitutions
 );

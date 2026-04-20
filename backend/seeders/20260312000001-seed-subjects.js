@@ -50,7 +50,7 @@ module.exports = {
       updated_at: now
     }));
 
-    await queryInterface.bulkInsert('subjects', subjectsWithTimestamps);
+    await queryInterface.bulkInsert('subjects', subjectsWithTimestamps, { ignoreDuplicates: true });
   },
 
   down: async (queryInterface, Sequelize) => {

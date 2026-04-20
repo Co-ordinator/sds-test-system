@@ -57,6 +57,11 @@ const PERMISSIONS = [
   { code: 'courses.export', name: 'Export Courses', description: 'Export courses data', module: 'courses' },
   { code: 'courses.import', name: 'Import Courses', description: 'Bulk import courses', module: 'courses' },
 
+  // Qualifications
+  { code: 'qualifications.view', name: 'View Qualifications', description: 'View user qualifications', module: 'qualifications' },
+  { code: 'qualifications.create', name: 'Upload Qualifications', description: 'Upload qualification documents', module: 'qualifications' },
+  { code: 'qualifications.delete', name: 'Delete Qualifications', description: 'Remove qualification documents', module: 'qualifications' },
+
   // Assessments
   { code: 'assessments.view', name: 'View Assessments', description: 'View all assessments', module: 'assessments' },
   { code: 'assessments.export', name: 'Export Assessments', description: 'Export assessment data', module: 'assessments' },
@@ -81,6 +86,12 @@ const PERMISSIONS = [
   { code: 'certificates.view', name: 'View Certificates', description: 'View certificates list', module: 'certificates' },
   { code: 'certificates.generate', name: 'Generate Certificates', description: 'Generate new certificates', module: 'certificates' },
   { code: 'certificates.download', name: 'Download Certificates', description: 'Download certificates', module: 'certificates' },
+
+  // Glossary
+  { code: 'glossary.view', name: 'View Glossary', description: 'View glossary terms', module: 'glossary' },
+  { code: 'glossary.create', name: 'Create Glossary Terms', description: 'Create glossary terms', module: 'glossary' },
+  { code: 'glossary.update', name: 'Update Glossary Terms', description: 'Edit glossary terms', module: 'glossary' },
+  { code: 'glossary.delete', name: 'Delete Glossary Terms', description: 'Remove glossary terms', module: 'glossary' },
 
   // Permissions (meta)
   { code: 'permissions.view', name: 'View Permissions', description: 'View permissions list', module: 'permissions' },

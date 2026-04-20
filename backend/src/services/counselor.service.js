@@ -7,8 +7,9 @@ const scoringService = require('./scoring.service');
 const { BadRequestError, NotFoundError, ForbiddenError } = require('../utils/errors/appError');
 
 const resolveInstitutionId = (actor, queryParam) => {
-  if (actor.role === 'System Administrator') return queryParam || null;
-  return actor.institutionId || null;
+  // Permission-based access: users can access any institution if they pass a query parameter
+  // Otherwise, fall back to their own institution
+  return queryParam || actor.institutionId || null;
 };
 
 module.exports = {
@@ -120,25 +121,17 @@ module.exports = {
     return { importReport, actor, institutionId };
   },
 
-  deleteStudent: async (actorId, actorRole, actorInstitutionId, studentId) => {
+  deleteStudent: async (actorId, studentId) => {
     const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
     if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
-
-    if (actorRole === 'Test Administrator' && student.institutionId !== actorInstitutionId) {
-      throw new ForbiddenError('Not authorized to manage this student', 'STUDENT_NOT_AUTHORIZED');
-    }
 
     await student.destroy();
     return student;
   },
 
-  updateStudent: async (actorRole, actorInstitutionId, studentId, body) => {
+  updateStudent: async (studentId, body) => {
     const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
     if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
-
-    if (actorRole === 'Test Administrator' && student.institutionId !== actorInstitutionId) {
-      throw new ForbiddenError('Not authorized to manage this student', 'STUDENT_NOT_AUTHORIZED');
-    }
 
     const allowed = ['firstName', 'lastName', 'gradeLevel', 'email', 'institutionId'];
     const updates = {};
@@ -153,13 +146,9 @@ module.exports = {
     return updated;
   },
 
-  getStudentResults: async (actorRole, actorInstitutionId, studentId) => {
+  getStudentResults: async (studentId) => {
     const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
     if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
-
-    if (actorRole === 'Test Administrator' && student.institutionId !== actorInstitutionId) {
-      throw new ForbiddenError('Not authorized to view this student', 'STUDENT_RESULTS_NOT_AUTHORIZED');
-    }
 
     const assessments = await Assessment.findAll({
       where: { userId: student.id },
@@ -202,7 +191,7 @@ module.exports = {
 
   /* ─── Login Cards ─────────────────────────────────────────────────────── */
 
-  getLoginCardsData: async (actorId, actorRole, actorInstitutionId, queryInstitutionId, grade) => {
+  getLoginCardsData: async (actorId, queryInstitutionId, grade) => {
     const actor = await User.findByPk(actorId);
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
 

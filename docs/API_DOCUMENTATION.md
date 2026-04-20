@@ -39,20 +39,23 @@ Authorization: Bearer <token>
 
 ### Permission System
 
-Granular permissions across 13 modules (49 total permissions):
+Granular permissions across 15 modules (56 total permissions):
 - **users**: view, create, update, delete, export
 - **institutions**: view, create, update, delete, export, import
 - **questions**: view, create, update, delete, import, export
 - **occupations**: view, create, update, delete, import, export
 - **subjects**: view, create, update, delete, import, export
+- **courses**: view, create, update, delete, export, import
+- **qualifications**: view, create, delete (self-service)
 - **assessments**: view, create, update, delete, export
-- **results**: view, export
+- **results**: view, export, download_pdf
 - **analytics**: view, export
 - **audit**: view
 - **notifications**: view, manage
 - **certificates**: view, generate, download
+- **glossary**: view, create, update, delete
 - **permissions**: view, manage
-- **test_takers**: manage
+- **test_takers**: view, create, import, manage, login_cards
 
 ## Endpoints
 
@@ -178,6 +181,14 @@ GET    /analytics/segmentation      Segmentation analytics (analytics.view)
 GET    /analytics/skills-pipeline   Skills pipeline data (analytics.view)
 GET    /analytics/export            Export analytics (analytics.export)
 ```
+
+**Reports:**
+```
+GET    /reports/types               List available report types (analytics.view)
+GET    /reports/preview/:type       Preview report (analytics.view)
+POST   /reports/generate            Generate report (analytics.export)
+```
+*Note: Reports module uses analytics permissions (reports are a subset of analytics exports)*
 
 **Assessments (Admin View):**
 ```
@@ -865,6 +876,42 @@ POST /attempts/:id/responses
   }
 }
 ```
+
+### POST /api/v1/glossary
+
+**Description:** Create a new glossary term
+
+**Authentication:** Required
+**Permission:** `glossary.create`
+
+**Request Body:**
+```json
+{
+  "term": "Example Term",
+  "definition": "Term definition",
+  "example": "Usage example",
+  "category": "riasec",
+  "section": "personality",
+  "difficulty": "low",
+  "related": ["related", "terms"]
+}
+```
+
+### PUT /api/v1/glossary/:id
+
+**Description:** Update an existing glossary term
+
+**Authentication:** Required
+**Permission:** `glossary.update`
+
+**Request Body:** Same as POST
+
+### DELETE /api/v1/glossary/:id
+
+**Description:** Delete a glossary term
+
+**Authentication:** Required
+**Permission:** `glossary.delete`
 
 ---
 

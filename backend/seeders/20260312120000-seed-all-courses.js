@@ -403,9 +403,7 @@ module.exports = {
     });
 
     if (missingInstitutionNames.size > 0) {
-      throw new Error(
-        `Unmatched course institution names: ${Array.from(missingInstitutionNames).sort().join(', ')}`
-      );
+      console.warn(`WARNING: Unmatched course institution names (course links skipped): ${Array.from(missingInstitutionNames).sort().join(', ')}`);
     }
 
     if (courseInstitutionLinks.length > 0) {

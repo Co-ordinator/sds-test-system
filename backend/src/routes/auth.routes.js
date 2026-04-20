@@ -6,6 +6,9 @@ const authController = require('../controllers/auth.controller');
 const { authLimiter } = require('../middleware/rateLimiting.middleware');
 const { verifyToken } = require('../middleware/authentication.middleware');
 
+// Note: /me endpoints are self-only by design (no resourceId param for selfOnly middleware)
+// Controllers use req.user.id to operate on the authenticated user's data only
+
 // Register route
 router.post('/register', authLimiter, validate(authValidation.register), authController.register);
 
