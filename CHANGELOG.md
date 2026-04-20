@@ -15,6 +15,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `glossary` module permissions (view, create, update, delete) to permission seeder
 - Total permissions increased from 49 to 56 across 15 modules
 
+### Added - CSV template download for student import
+
+- Added "Download Template" button in student import panel
+- Template includes proper headers and 3 sample rows with Eswatini student data
+- Sample data includes valid 13-digit national IDs and realistic school information
+- Template filename: `student_import_template.csv`
+- Implemented in `frontend/src/features/counselor/CounselorImportPanel.jsx`
+
+### Changed - Institution selection moved from dropdown to CSV
+
+- Removed institution dropdown from student import interface
+- Institution now specified directly in CSV via `institution` column (required)
+- Updated CSV template to include institution column with sample school names
+- Backend validates institution exists in system before creating students
+- Supports mixed imports: single CSV can contain students from multiple institutions
+- Updated validation logic in `studentImport.service.js` to resolve institutions by name
+- Frontend validation simplified - no longer requires institution selection
+
 ### Changed - Glossary routes to permission-based auth
 
 - Replaced role-based `authorize(['System Administrator'])` with `requirePermission` for glossary CRUD operations

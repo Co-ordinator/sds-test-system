@@ -38,10 +38,11 @@ const generateUniqueUsername = async (base, transaction) => {
  *   grade          | gradeLevel                   — e.g. Form5, Grade 11
  *   class          | class_name | className        — e.g. A, Blue
  *   gender                                         — male|female|other
+ *   institution    | institutionName             — school name (required, must match existing institution)
  *
  * Returns non-sensitive import details.
  */
-const bulkCreateStudents = async (csvData, institutionId) => {
+const bulkCreateStudents = async (csvData) => {
   const records = parse(csvData, {
     columns: true,
     skip_empty_lines: true,
@@ -78,6 +79,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
       const grade = col(['grade', 'gradeLevel', 'grade_level', 'Grade']) || null;
       const className = col(['class', 'class_name', 'className', 'Class']) || null;
       const gender = col(['gender', 'Gender']) || null;
+      const institutionName = col(['institution', 'institutionName', 'institution_name', 'Institution']) || null;
       const password = col(['password']) || generatePassword();
 
       if (!firstName && !lastName && !studentNumber) {
@@ -89,6 +91,21 @@ const bulkCreateStudents = async (csvData, institutionId) => {
       }
       if (!/^\d{13}$/.test(nationalId)) {
         throw new ValidationError('national_id must be exactly 13 digits');
+      }
+
+      if (!institutionName) {
+        throw new ValidationError('institution is required for each row');
+      }
+
+      // Find institution by exact name match
+      const { Institution } = require('../models');
+      const institution = await Institution.findOne({
+        where: { name: institutionName },
+        transaction
+      });
+
+      if (!institution) {
+        throw new ValidationError(`Institution "${institutionName}" not found. Please check the institution name and ensure it exists in the system.`);
       }
 
       // Preferred username = student_number; fallback to name-based slug
@@ -115,7 +132,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
         role: 'Test Taker',
         userType: 'High School Student',
         employmentStatus: 'student',
-        institutionId,
+        institutionId: institution.id,
         gradeLevel: grade,
         className,
         studentNumber: studentNumber || null,
@@ -134,7 +151,7 @@ const bulkCreateStudents = async (csvData, institutionId) => {
       if (studentNumber || grade || className) {
         await SchoolStudent.create({
           userId: user.id,
-          institutionId,
+          institutionId: institution.id,
           studentNumber: studentNumber || username,
           grade: grade || null,
           className: className || null,

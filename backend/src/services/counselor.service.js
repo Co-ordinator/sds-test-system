@@ -110,15 +110,13 @@ module.exports = {
 
   importStudents: async (actorId, csvData, queryInstitutionId) => {
     const actor = await User.findByPk(actorId);
-    const institutionId = resolveInstitutionId(actor, queryInstitutionId);
 
     if (!csvData || typeof csvData !== 'string' || !csvData.trim()) {
       throw new BadRequestError('CSV data is required', 'CSV_REQUIRED');
     }
-    if (!institutionId) throw new BadRequestError('Institution is required', 'INSTITUTION_REQUIRED');
 
-    const importReport = await bulkCreateStudents(csvData, institutionId);
-    return { importReport, actor, institutionId };
+    const importReport = await bulkCreateStudents(csvData);
+    return { importReport, actor };
   },
 
   deleteStudent: async (actorId, studentId) => {

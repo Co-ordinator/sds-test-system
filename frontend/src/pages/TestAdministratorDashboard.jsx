@@ -24,7 +24,7 @@ const TestAdministratorDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [instFilter, setInstFilter] = useState('');
 
-  const isAdmin = user?.role === 'System Administrator';
+  const isAdmin = user?.role === 'System Administrator' || user?.role === 'Test Administrator';
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Counselor';
 
   const {
