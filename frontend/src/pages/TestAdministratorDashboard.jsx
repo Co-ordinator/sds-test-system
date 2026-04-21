@@ -24,8 +24,21 @@ const TestAdministratorDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [instFilter, setInstFilter] = useState('');
 
-  const isAdmin = user?.role === 'System Administrator' || user?.role === 'Test Administrator';
+  const role = user?.role || '';
+  const isSystemAdmin = role === 'System Administrator';
+  const isTestAdmin = role === 'Test Administrator';
+  const isAdmin = isSystemAdmin || isTestAdmin;
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Counselor';
+  const pageTitle = isSystemAdmin
+    ? 'System Administrator - Student Management'
+    : isTestAdmin
+      ? 'Test Administrator - Student Management'
+      : 'Counselor Dashboard';
+  const pageSubtitle = isSystemAdmin
+    ? `Welcome, ${displayName}. Full access across all institutions.`
+    : isTestAdmin
+      ? `Welcome, ${displayName}. Manage students for your institution.`
+      : `Welcome, ${displayName}. Manage your institution's students.`;
 
   const {
     students, allStudents, institutionStats, hollandDist, loading, error,
@@ -49,25 +62,27 @@ const TestAdministratorDashboard = () => {
     <AppShell>
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-8">
         {/* Header */}
-        <header className="flex items-center gap-4">
-          <div className="flex-1">
-            <h1 className={TYPO.pageTitle} style={{ color: GOV.text }}>
-              {isAdmin ? 'Admin — Student Management' : 'Counselor Dashboard'}
+        <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex-1 min-w-0">
+            <h1 className={`${TYPO.pageTitle} leading-tight`} style={{ color: GOV.text }}>
+              {pageTitle}
             </h1>
-            <p className={TYPO.body} style={{ color: GOV.textMuted }}>
-              Welcome, {displayName}.{isAdmin ? ' Full access across all institutions.' : " Manage your institution's students."}
+            <p className={`${TYPO.body} mt-1 max-w-3xl`} style={{ color: GOV.textMuted }}>
+              {pageSubtitle}
             </p>
           </div>
           {isAdmin && (
-            <select
-              className="form-control text-sm"
-              style={{ borderBottomColor: GOV.border, color: GOV.text }}
-              value={instFilter}
-              onChange={e => setInstFilter(e.target.value)}
-            >
-              <option value="">All institutions</option>
-              {allInstitutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
+            <div className="w-full sm:max-w-sm lg:max-w-md xl:max-w-lg shrink-0">
+              <select
+                className="form-control text-sm"
+                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                value={instFilter}
+                onChange={e => setInstFilter(e.target.value)}
+              >
+                <option value="">All institutions</option>
+                {allInstitutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
           )}
         </header>
 
