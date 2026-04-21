@@ -62,6 +62,15 @@ module.exports = {
         type: Sequelize.BOOLEAN,
         defaultValue: false
       },
+      status: {
+        type: Sequelize.ENUM("approved", "pending_review"),
+        allowNull: false,
+        defaultValue: "approved"
+      },
+      submitted_by: {
+        type: Sequelize.UUID,
+        allowNull: true
+      },
       programs: {
         type: Sequelize.JSONB,
         allowNull: true,
@@ -81,6 +90,13 @@ module.exports = {
         allowNull: false,
         defaultValue: Sequelize.literal("CURRENT_TIMESTAMP")
       }
+    });
+
+    await queryInterface.addIndex("institutions", ["status"]);
+    await queryInterface.addIndex("institutions", ["submitted_by"]);
+    await queryInterface.addIndex("institutions", ["name"], {
+      unique: true,
+      name: "institutions_name_unique"
     });
   },
 

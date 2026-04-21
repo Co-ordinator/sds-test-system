@@ -28,6 +28,12 @@ router.use(verifyToken, authorize(['System Administrator', 'Test Administrator']
 router.get('/users', requirePermission('users.view'), AdminController.getAllUsers);
 router.get('/users/:id', requirePermission('users.view'), AdminController.getUser);
 router.post('/users', requirePermission('users.create'), AdminController.createUser);
+router.post(
+  '/users/import-system-admins',
+  requirePermission('users.create'),
+  express.text({ type: 'text/csv', limit: '5mb' }),
+  AdminController.importSystemAdmins
+);
 router.patch('/users/:id', requirePermission('users.update'), AdminController.updateUser);
 router.delete('/users/:id', requirePermission('users.delete'), preventSelfDeletion, AdminController.deleteUser);
 router.post('/users/bulk-delete', requirePermission('users.delete'), AdminController.bulkDeleteUsers);

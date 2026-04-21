@@ -42,7 +42,7 @@ const generateUniqueUsername = async (base, transaction) => {
  *
  * Returns non-sensitive import details.
  */
-const bulkCreateStudents = async (csvData) => {
+const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
   const records = parse(csvData, {
     columns: true,
     skip_empty_lines: true,
@@ -53,7 +53,11 @@ const bulkCreateStudents = async (csvData) => {
     throw new ValidationError('No student records found in CSV');
   }
 
-  const defaultEduLevelId = await EducationLevel.min('id');
+  const defaultEducationLevel = await EducationLevel.findOne({
+    attributes: ['id'],
+    order: [['level', 'ASC']]
+  });
+  const defaultEduLevelId = defaultEducationLevel?.id || null;
   const currentYear = new Date().getFullYear();
 
   const importedStudents = [];
@@ -107,6 +111,11 @@ const bulkCreateStudents = async (csvData) => {
       if (!institution) {
         throw new ValidationError(`Institution "${institutionName}" not found. Please check the institution name and ensure it exists in the system.`);
       }
+      if (scopedInstitutionId && institution.id !== scopedInstitutionId) {
+        throw new ValidationError(
+          `Institution "${institutionName}" is outside your allowed import scope`
+        );
+      }
 
       // Preferred username = student_number; fallback to name-based slug
       const baseUsername = studentNumber
@@ -142,7 +151,7 @@ const bulkCreateStudents = async (csvData) => {
         isConsentGiven: true,
         consentDate: new Date(),
         isEmailVerified: true,
-        createdByCounselor: true,
+        createdByTestAdministrator: true,
         mustChangePassword: true,
         onboardingCompleted: true
       }, { transaction });

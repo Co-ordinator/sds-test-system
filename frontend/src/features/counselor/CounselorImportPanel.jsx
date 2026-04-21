@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Upload, Download } from 'lucide-react';
 import { GOV, TYPO } from '../../theme/government';
 import { useToast } from '../../components/ui/StatusIndicators';
@@ -11,6 +11,8 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
   const [importResult, setImportResult] = useState(null);
   const [importError, setImportError] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [institutionId, setInstitutionId] = useState('');
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -18,6 +20,10 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
     setImportFile(file);
     const reader = new FileReader();
     reader.onload = (ev) => setCsvText(ev.target.result || '');
+    reader.onerror = () => {
+      setCsvText('');
+      setImportError('Failed to read CSV file. Please try another file.');
+    };
     reader.readAsText(file);
     setImportResult(null);
     setImportError(null);
@@ -29,10 +35,11 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
     setImportError(null);
     setImportResult(null);
     try {
-      const report = await counselorService.importStudents(csvText);
+      const report = await counselorService.importStudents(csvText, institutionId);
       setImportResult(report);
       setCsvText('');
       setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       onImportComplete?.();
       showToast(`Imported ${report.importedCount} students`);
     } catch (err) {
@@ -42,9 +49,9 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
 
   const downloadTemplate = () => {
     const csvContent = `student_number,first_name,last_name,national_id,grade,class,gender,email,institution
-ST001,John,Doe,1234567890123,Form5,A,male,john.doe@school.org,"Manzini Secondary School"
-ST002,Jane,Smith,9876543210987,Form4,B,female,jane.smith@school.org,"Matsapha High School"
-ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Siphofaneni High School"`;
+ST001,John,Doe,1234567890123,Form5,A,male,john.doe@school.org,"Mbabane Government High School"
+ST002,Jane,Smith,9876543210987,Form4,B,female,jane.smith@school.org,"Manzini Central High School"
+ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Siteki High School"`;
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -55,6 +62,7 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sipho
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -73,6 +81,26 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sipho
             <p className="text-[11px]">· Passwords are auto-generated securely and are never shown in the UI/API</p>
           </div>
 
+          {isAdmin && (
+            <div className="mb-4">
+              <label className={`block ${TYPO.label} mb-2`} style={{ color: GOV.text }}>Import Scope Institution</label>
+              <select
+                value={institutionId}
+                onChange={(e) => setInstitutionId(e.target.value)}
+                className="form-control w-full text-sm"
+                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+              >
+                <option value="">Use institution from CSV rows</option>
+                {institutions.map((institution) => (
+                  <option key={institution.id} value={institution.id}>{institution.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] mt-1" style={{ color: GOV.textHint }}>
+                When set, all imported rows must belong to this institution.
+              </p>
+            </div>
+          )}
+
           
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
@@ -87,19 +115,19 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sipho
                   backgroundColor: 'transparent'
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = GOV.blueLightAlt;
-                  e.target.style.color = GOV.text;
+                  e.currentTarget.style.backgroundColor = GOV.blueLightAlt;
+                  e.currentTarget.style.color = GOV.text;
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = 'transparent';
-                  e.target.style.color = GOV.textMuted;
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = GOV.textMuted;
                 }}
               >
                 <Download className="w-3 h-3" />
                 Download Template
               </button>
             </div>
-            <input type="file" accept=".csv,text/csv" onChange={handleFileChange} className="block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:text-white file:bg-blue-600" />
+            <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleFileChange} className="block w-full text-sm file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:text-white file:bg-blue-600" />
             {importFile && <p className="mt-1 text-xs" style={{ color: GOV.textMuted }}>Selected: {importFile.name}</p>}
           </div>
 
@@ -131,7 +159,7 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sipho
                   </tr>
                 </thead>
                 <tbody>
-                  {importResult.students.map((c, idx) => (
+                  {(Array.isArray(importResult.students) ? importResult.students : []).map((c, idx) => (
                     <tr key={idx} className="border-b" style={{ borderColor: GOV.borderLight }}>
                       <td className="px-4 py-2" style={{ color: GOV.text }}>{`${c.firstName || ''} ${c.lastName || ''}`.trim() || '–'}</td>
                       <td className="px-4 py-2 font-mono font-semibold" style={{ color: GOV.blue }}>{c.studentCode || '–'}</td>

@@ -1,0 +1,84 @@
+"use strict";
+
+const { v4: uuidv4 } = require('uuid');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const now = new Date();
+
+/**
+ * Users Seeder
+ * Creates only a bootstrap System Administrator account.
+ *
+ * NOTE: bulkInsert bypasses model hooks, so passwords are pre-hashed here.
+ */
+
+module.exports = {
+  async up(queryInterface) {
+    // ── Lookup reference IDs ──────────────────────────────────────
+    const [eduLevels] = await queryInterface.sequelize.query(
+      'SELECT id, level FROM education_levels ORDER BY level'
+    );
+    const byLevel = (n) => {
+      const f = eduLevels.find(l => parseInt(l.level) === n);
+      return f ? f.id : null;
+    };
+
+    // ── Pre-hash passwords ────────────────────────────────────────
+    const seededPassword = (envKey) => process.env[envKey] || crypto.randomBytes(12).toString('base64url');
+    const hash = (plain) => bcrypt.hashSync(plain, 10);
+
+    const users = [
+      // ── System Administrator ──────────────────────────────────
+      {
+        id: uuidv4(),
+        username: 'thembinkosimthembu',
+        email: 'thembinkosi@labor.gov.sz',
+        password: hash(seededPassword('SEED_ADMIN_PASSWORD')),
+        first_name: 'Thembinkosi',
+        last_name: 'Mthembu',
+        gender: 'male',
+        date_of_birth: '1975-08-20',
+        phone_number: '+268 7600 1001',
+        region: 'hhohho',
+        district: 'Mbabane',
+        role: 'System Administrator',
+        user_type: 'System Administrator',
+        education_level: byLevel(5),
+        employment_status: 'employed',
+        is_active: true,
+        is_email_verified: true,
+        created_by_test_administrator: false,
+        is_consent_given: true,
+        consent_date: now,
+        organization: 'Ministry of Labour and Social Security',
+        preferred_language: 'en',
+        requires_accessibility: false,
+        accessibility_needs: JSON.stringify({}),
+        last_login: now,
+        created_at: now,
+        updated_at: now
+      }
+    ];
+
+    await queryInterface.bulkInsert('users', users, { ignoreDuplicates: true });
+    console.log(`Inserted ${users.length} users.`);
+
+  },
+
+  async down(queryInterface) {
+    const emails = ['thembinkosi@labor.gov.sz'];
+    const usernames = [];
+
+    if (usernames.length > 0) {
+      await queryInterface.sequelize.query(
+        `DELETE FROM users WHERE email IN (:emails) OR username IN (:usernames)`,
+        { replacements: { emails, usernames } }
+      );
+    } else {
+      await queryInterface.sequelize.query(
+        `DELETE FROM users WHERE email IN (:emails)`,
+        { replacements: { emails } }
+      );
+    }
+  }
+};

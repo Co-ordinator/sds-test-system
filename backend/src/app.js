@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -6,7 +8,6 @@ const morganMiddleware = require('./middleware/logging.middleware');
 const errorHandler = require('./middleware/errorHandling.middleware');
 const { apiLimiter } = require('./middleware/rateLimiting.middleware');
 const requestIdMiddleware = require('./middleware/requestId.middleware');
-require('dotenv').config();
 
 const app = express();
 const normalizeOrigin = (origin) => String(origin || '').trim().replace(/\/$/, '');

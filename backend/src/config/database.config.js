@@ -1,15 +1,33 @@
 const { Sequelize } = require('sequelize');
 const config = require('./config');
 
-const isTest = process.env.NODE_ENV === 'test';
+const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
+
+const getHostFromUrl = (url) => {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch (_) {
+    return '';
+  }
+};
+
 const shouldUseSSL = (() => {
+  if (isTest) {
+    if (process.env.TEST_DB_SSL === 'true') return true;
+    if (process.env.TEST_DB_SSL === 'false') return false;
+    return false;
+  }
   if (process.env.DB_SSL === 'true') return true;
   if (process.env.DB_SSL === 'false') return false;
   const host = (process.env.DB_HOST || '').toLowerCase();
-  const url = (process.env.DATABASE_URL || '').toLowerCase();
-  return host.includes('render.com') || url.includes('render.com') || process.env.NODE_ENV === 'production';
+  const urlHost = getHostFromUrl(process.env.DATABASE_URL);
+  const usesManagedHost = host.includes('render.com') || urlHost.includes('render.com');
+  return usesManagedHost || process.env.NODE_ENV === 'production';
 })();
-const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
+const sslRejectUnauthorized = isTest
+  ? process.env.TEST_DB_SSL_REJECT_UNAUTHORIZED === 'true'
+  : process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
 const sequelizeOptions = {
   dialect: 'postgres',
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
@@ -23,8 +41,8 @@ const sequelizeOptions = {
 };
 
 let connectionUrl = null;
-if (isTest && process.env.TEST_DATABASE_URL) {
-  connectionUrl = process.env.TEST_DATABASE_URL;
+if (isTest) {
+  connectionUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || null;
 } else if (process.env.DATABASE_URL) {
   // Use as-is if URL already has a path (e.g. .../sds_test_db), else append database name
   const url = process.env.DATABASE_URL;
@@ -32,7 +50,7 @@ if (isTest && process.env.TEST_DATABASE_URL) {
   connectionUrl = /\/[^/]+\/?$/.test(url) ? url.replace(/\/?$/, '') : `${url.replace(/\/?$/, '')}/${dbName}`;
 }
 
-const sequelize = connectionUrl
+const sequelize = (typeof connectionUrl === 'string' && connectionUrl.trim())
   ? new Sequelize(connectionUrl, sequelizeOptions)
   : new Sequelize(
       config.db.database,

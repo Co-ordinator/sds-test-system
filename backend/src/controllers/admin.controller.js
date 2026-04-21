@@ -232,6 +232,65 @@ module.exports = {
     }
   },
 
+  importSystemAdmins: async (req, res, next) => {
+    try {
+      const report = await adminService.importSystemAdmins(req.body);
+
+      for (const credential of report.credentials) {
+        try {
+          await sendEmail({
+            email: credential.email,
+            subject: 'Welcome to SDS - Your System Administrator Account',
+            template: 'user-welcome',
+            context: {
+              email: credential.email,
+              tempPassword: credential.tempPassword,
+              role: 'System Administrator',
+              loginUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`,
+              organization: 'SDS System'
+            }
+          });
+        } catch (emailError) {
+          logger.error({
+            actionType: 'EMAIL_FAILED',
+            message: `Failed to send welcome email to ${credential.email}`,
+            req,
+            details: { error: emailError.message }
+          });
+        }
+      }
+
+      await AuditLog.create({
+        userId: req.user?.id,
+        actionType: 'USER_IMPORT',
+        description: `Imported ${report.createdCount} system administrator(s)`,
+        details: {
+          createdCount: report.createdCount,
+          failedCount: report.failedCount
+        },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
+
+      return res.status(201).json({
+        status: 'success',
+        data: {
+          report: {
+            createdCount: report.createdCount,
+            failedCount: report.failedCount,
+            users: report.users,
+            errors: report.errors
+          }
+        }
+      });
+    } catch (error) {
+      if (['CSV_REQUIRED', 'CSV_EMPTY'].includes(error.code)) {
+        return res.status(400).json({ status: 'error', message: error.message });
+      }
+      next(error);
+    }
+  },
+
   getAllPermissions: async (req, res, next) => {
     try {
       const permissions = await adminService.getAllPermissions();

@@ -1,6 +1,7 @@
 "use strict";
 
 const { v4: uuidv4 } = require('uuid');
+const { Op } = require('sequelize');
 const now = new Date();
 
 /**
@@ -347,9 +348,6 @@ function buildSelfRating(startOrder) {
 
 module.exports = {
   async up(queryInterface) {
-    // Clear any existing questions so we always seed the canonical set
-    await queryInterface.bulkDelete('questions', null, {});
-
     const questions = [
       ...buildGroupedSection('activities',   ACTIVITIES,    1),   // orders 1–66
       ...buildGroupedSection('competencies', COMPETENCIES, 67),   // orders 67–132
@@ -357,11 +355,15 @@ module.exports = {
       ...buildSelfRating(217)                                     // orders 217–228
     ];
 
-    await queryInterface.bulkInsert('questions', questions, {});
+    await queryInterface.bulkInsert('questions', questions, { ignoreDuplicates: true });
     console.log(`Inserted ${questions.length} SDS questions from master CSV.`);
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('questions', null, {});
+    await queryInterface.bulkDelete('questions', {
+      order: {
+        [Op.between]: [1, 228]
+      }
+    }, {});
   }
 };

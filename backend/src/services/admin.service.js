@@ -3,6 +3,7 @@
 const { User, AuditLog, Assessment, Institution } = require('../models');
 const { Op } = require('sequelize');
 const { Parser } = require('json2csv');
+const { parse } = require('csv-parse/sync');
 const crypto = require('crypto');
 const { NotFoundError, BadRequestError, ConflictError } = require('../utils/errors/appError');
 
@@ -10,10 +11,10 @@ module.exports = {
 
   /* ─── User Management ─────────────────────────────────────────────────── */
 
-  getAllUsers: async ({ role, educationLevel, search }) => {
+  getAllUsers: async ({ role, educationLevel, education_level: educationLevelSnake, search }) => {
     const where = {};
     if (role) where.role = role;
-    if (educationLevel) where.educationLevel = educationLevel;
+    if (educationLevel || educationLevelSnake) where.educationLevel = educationLevel || educationLevelSnake;
     if (search) {
       where[Op.or] = [
         { email: { [Op.iLike]: `%${search}%` } },
@@ -151,6 +152,65 @@ module.exports = {
     });
 
     return { user: created, tempPassword, assignedRole };
+  },
+
+  importSystemAdmins: async (csvData) => {
+    if (!csvData || typeof csvData !== 'string' || !csvData.trim()) {
+      throw new BadRequestError('CSV data is required', 'CSV_REQUIRED');
+    }
+
+    const records = parse(csvData, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true
+    });
+    if (records.length === 0) {
+      throw new BadRequestError('No rows found in CSV', 'CSV_EMPTY');
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const row = records[i];
+      const firstName = String(row.first_name || row.firstName || '').trim();
+      const lastName = String(row.last_name || row.lastName || '').trim();
+      const email = String(row.email || '').trim().toLowerCase();
+      const organization = String(row.organization || '').trim() || null;
+
+      try {
+        const result = await module.exports.createUser({
+          firstName,
+          lastName,
+          email,
+          role: 'System Administrator',
+          organization
+        });
+        created.push(result);
+      } catch (error) {
+        errors.push({
+          row: i + 2,
+          email,
+          message: error.message
+        });
+      }
+    }
+
+    return {
+      createdCount: created.length,
+      failedCount: errors.length,
+      users: created.map((entry) => ({
+        id: entry.user.id,
+        email: entry.user.email,
+        firstName: entry.user.firstName,
+        lastName: entry.user.lastName
+      })),
+      credentials: created.map((entry) => ({
+        email: entry.user.email,
+        tempPassword: entry.tempPassword
+      })),
+      errors
+    };
   },
 
   exportUsers: async ({ role, institutionId }) => {

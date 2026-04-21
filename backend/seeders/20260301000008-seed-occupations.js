@@ -64,6 +64,25 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('occupations', null, {});
+    const csvPath = path.join(__dirname, '..', '..', 'docs', 'Holland-codes-and-occupations-master.csv');
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const lines = csvContent.split('\n');
+    const occupationNames = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const match = line.match(/"([^"]*)","([^"]*)","([^"]*)","([^"]*)"/);
+      if (!match) continue;
+      const occupation = match[3];
+      const normalizedCode = normalizeHollandCode(match[2]);
+      if (occupation && normalizedCode.length === 3) {
+        occupationNames.push(occupation);
+      }
+    }
+
+    await queryInterface.bulkDelete('occupations', {
+      name: occupationNames
+    }, {});
   }
 };

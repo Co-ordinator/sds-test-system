@@ -189,7 +189,21 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('user_permissions', null, {});
-    await queryInterface.bulkDelete('permissions', null, {});
+    const permissionCodes = PERMISSIONS.map((permission) => permission.code);
+    const [permissions] = await queryInterface.sequelize.query(
+      "SELECT id FROM permissions WHERE code = ANY(:permissionCodes)",
+      { replacements: { permissionCodes } }
+    );
+    const permissionIds = permissions.map((permission) => permission.id);
+
+    if (permissionIds.length > 0) {
+      await queryInterface.bulkDelete('user_permissions', {
+        permission_id: permissionIds
+      }, {});
+    }
+
+    await queryInterface.bulkDelete('permissions', {
+      code: permissionCodes
+    }, {});
   }
 };

@@ -1,9 +1,14 @@
 require('dotenv').config();
 
 const useSSL = process.env.DB_SSL === 'true';
+const testUseSSL = process.env.TEST_DB_SSL === 'true';
 const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED === 'true';
+const testSslRejectUnauthorized = process.env.TEST_DB_SSL_REJECT_UNAUTHORIZED === 'true';
 const sslDialectOptions = useSSL
   ? { ssl: { require: true, rejectUnauthorized: sslRejectUnauthorized } }
+  : undefined;
+const testSslDialectOptions = testUseSSL
+  ? { ssl: { require: true, rejectUnauthorized: testSslRejectUnauthorized } }
   : undefined;
 
 module.exports = {
@@ -24,7 +29,7 @@ module.exports = {
     host: process.env.TEST_DB_HOST || process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.TEST_DB_PORT || process.env.DB_PORT || '5432', 10),
     dialect: 'postgres',
-    ...(sslDialectOptions ? { dialectOptions: sslDialectOptions } : {}),
+    ...(testSslDialectOptions ? { dialectOptions: testSslDialectOptions } : {}),
     logging: false
   },
   production: {

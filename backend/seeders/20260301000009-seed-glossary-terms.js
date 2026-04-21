@@ -111,20 +111,40 @@ const terms = [
 module.exports = {
   async up(queryInterface) {
     const now = new Date();
+    // Read enum labels from the live DB so this seeder works even if
+    // the enum was created earlier with different casing.
+    const [enumRows] = await queryInterface.sequelize.query(`
+      SELECT e.enumlabel AS value
+      FROM pg_type t
+      JOIN pg_enum e ON t.oid = e.enumtypid
+      WHERE t.typname = 'enum_glossary_terms_section'
+      ORDER BY e.enumsortorder
+    `);
+    const enumValues = enumRows.map(r => r.value);
+    const toEnumSection = (section) => {
+      const exact = enumValues.find(v => v === section);
+      if (exact) return exact;
+      const ci = enumValues.find(v => String(v).toLowerCase() === String(section).toLowerCase());
+      if (ci) return ci;
+      return enumValues.includes('general') ? 'general' : enumValues[0] || section;
+    };
     const rows = terms.map(t => ({
       id: uuidv4(),
       term: t.term,
       definition: t.definition,
-      section: t.section,
+      section: toEnumSection(t.section),
       example: t.example || null,
       is_active: true,
       created_at: now,
       updated_at: now,
     }));
-    await queryInterface.bulkInsert('glossary_terms', rows);
+    await queryInterface.bulkInsert('glossary_terms', rows, { ignoreDuplicates: true });
   },
 
   async down(queryInterface) {
-    await queryInterface.bulkDelete('glossary_terms', null, {});
+    const termNames = terms.map((entry) => entry.term);
+    await queryInterface.bulkDelete('glossary_terms', {
+      term: termNames
+    }, {});
   },
 };

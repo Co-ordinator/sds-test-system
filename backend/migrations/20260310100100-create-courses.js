@@ -57,6 +57,11 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: true
       },
+      funding_priority: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       is_active: {
         type: Sequelize.BOOLEAN,
         allowNull: false,
@@ -76,7 +81,12 @@ module.exports = {
 
     await queryInterface.addIndex("courses", ["qualification_type"]);
     await queryInterface.addIndex("courses", ["field_of_study"]);
+    await queryInterface.addIndex("courses", ["funding_priority"]);
     await queryInterface.addIndex("courses", ["is_active"]);
+    await queryInterface.addIndex("courses", ["name"], {
+      unique: true,
+      name: "courses_name_unique"
+    });
   },
 
   async down(queryInterface) {

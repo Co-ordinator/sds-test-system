@@ -43,6 +43,10 @@ module.exports = {
     });
 
     await queryInterface.addIndex("course_requirements", ["course_id"]);
+    await queryInterface.addIndex("course_requirements", ["course_id", "subject"], {
+      unique: true,
+      name: "course_requirements_course_subject_unique"
+    });
   },
 
   async down(queryInterface) {

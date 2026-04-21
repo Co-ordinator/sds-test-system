@@ -54,6 +54,14 @@ module.exports = {
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.bulkDelete('subjects', null, {});
+    const subjectNames = [
+      'Mathematics', 'Physical Science', 'Technical Drawing', 'Agricultural Science', 'Computer Science',
+      'Biology', 'Chemistry', 'Physics', 'Art', 'Music', 'English Language', 'Literature', 'Drama',
+      'Design & Technology', 'History', 'Religious Education', 'Home Economics', 'Geography', 'SiSwati',
+      'Business Studies', 'Economics', 'Accounting', 'Commerce', 'Information Technology', 'Statistics'
+    ];
+    await queryInterface.bulkDelete('subjects', {
+      name: { [Sequelize.Op.in]: subjectNames }
+    }, {});
   }
 };

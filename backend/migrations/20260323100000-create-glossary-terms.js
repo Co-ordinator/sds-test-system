@@ -5,7 +5,7 @@ module.exports = {
     await queryInterface.createTable('glossary_terms', {
       id: {
         type: Sequelize.UUID,
-        defaultValue: Sequelize.literal('gen_random_uuid()'),
+        defaultValue: Sequelize.literal('uuid_generate_v4()'),
         primaryKey: true,
       },
       term: {
@@ -45,6 +45,10 @@ module.exports = {
     await queryInterface.addIndex('glossary_terms', ['term']);
     await queryInterface.addIndex('glossary_terms', ['section']);
     await queryInterface.addIndex('glossary_terms', ['is_active']);
+    await queryInterface.addIndex('glossary_terms', ['term', 'section'], {
+      unique: true,
+      name: 'glossary_terms_term_section_unique',
+    });
   },
 
   async down(queryInterface) {

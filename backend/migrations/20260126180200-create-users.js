@@ -34,16 +34,19 @@ module.exports = {
       },
       first_name: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: true
       },
       last_name: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: true
       },
       national_id: {
         type: Sequelize.STRING,
-        allowNull: true,
-        unique: true
+        allowNull: true
+      },
+      national_id_hash: {
+        type: Sequelize.STRING,
+        allowNull: true
       },
       date_of_birth: {
         type: Sequelize.DATEONLY,
@@ -90,6 +93,10 @@ module.exports = {
       },
       current_occupation: {
         type: Sequelize.STRING,
+        allowNull: true
+      },
+      current_occupation_id: {
+        type: Sequelize.UUID,
         allowNull: true
       },
       institution_id: {
@@ -217,6 +224,11 @@ module.exports = {
         defaultValue: false,
         allowNull: false
       },
+      onboarding_completed: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -236,6 +248,12 @@ module.exports = {
     await queryInterface.addIndex("users", ["education_level"]);
     await queryInterface.addIndex("users", ["is_active"]);
     await queryInterface.addIndex("users", ["is_email_verified"]);
+    await queryInterface.addIndex("users", ["current_occupation_id"]);
+    await queryInterface.addIndex("users", ["onboarding_completed"]);
+    await queryInterface.addIndex("users", ["national_id_hash"], {
+      unique: true,
+      name: "users_national_id_hash_unique"
+    });
   },
 
   async down(queryInterface) {

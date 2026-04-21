@@ -380,6 +380,16 @@ module.exports = {
     await queryInterface.bulkInsert('courses', coursesWithTimestamps, { ignoreDuplicates: true });
     console.log(`Inserted ${coursesWithTimestamps.length} courses.`);
 
+    const courseNames = courses.map((course) => course.name);
+    const [dbCourses] = await queryInterface.sequelize.query(
+      "SELECT id, name FROM courses WHERE name IN (:courseNames)",
+      { replacements: { courseNames } }
+    );
+    const courseIdByName = {};
+    dbCourses.forEach((course) => {
+      courseIdByName[course.name] = course.id;
+    });
+
     // Create course-institution mappings
     const courseInstitutionLinks = [];
     const missingInstitutionNames = new Set();
@@ -387,10 +397,14 @@ module.exports = {
       if (course.institutions && course.institutions.length > 0) {
         course.institutions.forEach(instName => {
           const institutionId = institutionMap[normalizeName(instName)];
+          const courseId = courseIdByName[course.name];
+          if (!courseId) {
+            throw new Error(`Unable to resolve course ID for: ${course.name}`);
+          }
           if (institutionId) {
             courseInstitutionLinks.push({
               id: uuidv4(),
-              course_id: course.id,
+              course_id: courseId,
               institution_id: institutionId,
               created_at: now,
               updated_at: now
@@ -403,7 +417,9 @@ module.exports = {
     });
 
     if (missingInstitutionNames.size > 0) {
-      console.warn(`WARNING: Unmatched course institution names (course links skipped): ${Array.from(missingInstitutionNames).sort().join(', ')}`);
+      throw new Error(
+        `Unmatched course institution names: ${Array.from(missingInstitutionNames).sort().join(', ')}`
+      );
     }
 
     if (courseInstitutionLinks.length > 0) {
@@ -469,8 +485,8 @@ module.exports = {
         courseName: 'Bachelor of Education (Secondary)',
         requirements: [
           { subject: 'English Language', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Subject Major', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Subject Minor', minimum_grade: 'C', is_mandatory: false }
+          { subject: 'History', minimum_grade: 'C', is_mandatory: true },
+          { subject: 'Geography', minimum_grade: 'C', is_mandatory: false }
         ]
       },
       {
@@ -495,7 +511,7 @@ module.exports = {
         courseName: 'Bachelor of Arts in Journalism and Mass Communication',
         requirements: [
           { subject: 'English Language', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Literature in English', minimum_grade: 'C', is_mandatory: false },
+          { subject: 'Literature', minimum_grade: 'C', is_mandatory: false },
           { subject: 'History', minimum_grade: 'C', is_mandatory: false }
         ]
       },
@@ -606,7 +622,7 @@ module.exports = {
         requirements: [
           { subject: 'English Language', minimum_grade: 'C', is_mandatory: true },
           { subject: 'Art', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Design and Technology', minimum_grade: 'C', is_mandatory: false }
+          { subject: 'Design & Technology', minimum_grade: 'C', is_mandatory: false }
         ]
       },
       {
@@ -614,7 +630,7 @@ module.exports = {
         requirements: [
           { subject: 'English Language', minimum_grade: 'C', is_mandatory: true },
           { subject: 'Art', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Design and Technology', minimum_grade: 'C', is_mandatory: false }
+          { subject: 'Design & Technology', minimum_grade: 'C', is_mandatory: false }
         ]
       },
       {
@@ -697,15 +713,16 @@ module.exports = {
         courseName: 'Primary Teachers Diploma (PTD)',
         requirements: [
           { subject: 'English Language', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Mathematics', minimum_grade: 'C', is_mandatory: true }
+          { subject: 'Mathematics', minimum_grade: 'C', is_mandatory: true },
+          { subject: 'Biology', minimum_grade: 'C', is_mandatory: false }
         ]
       },
       {
         courseName: 'Secondary Teachers Diploma (STD)',
         requirements: [
           { subject: 'English Language', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Subject Major', minimum_grade: 'C', is_mandatory: true },
-          { subject: 'Subject Minor', minimum_grade: 'C', is_mandatory: false }
+          { subject: 'History', minimum_grade: 'C', is_mandatory: true },
+          { subject: 'Geography', minimum_grade: 'C', is_mandatory: false }
         ]
       },
       {
@@ -726,17 +743,19 @@ module.exports = {
 
     const courseRequirements = [];
     requirementsData.forEach(({ courseName, requirements }) => {
-      const course = courses.find(c => c.name === courseName);
-      if (course) {
+      const courseId = courseIdByName[courseName];
+      if (courseId) {
         requirements.forEach(req => {
           courseRequirements.push({
             id: uuidv4(),
-            course_id: course.id,
+            course_id: courseId,
             ...req,
             created_at: now,
             updated_at: now
           });
         });
+      } else {
+        throw new Error(`Missing course in database while building requirements: ${courseName}`);
       }
     });
 
@@ -747,9 +766,19 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    const courseIds = courses.map(c => c.id);
+    const courseNames = courses.map((course) => course.name);
+    const [dbCourses] = await queryInterface.sequelize.query(
+      "SELECT id FROM courses WHERE name IN (:courseNames)",
+      { replacements: { courseNames } }
+    );
+    const courseIds = dbCourses.map((course) => course.id);
+
+    if (courseIds.length === 0) {
+      return;
+    }
+
     await queryInterface.bulkDelete('course_requirements', { course_id: courseIds }, {});
     await queryInterface.bulkDelete('course_institutions', { course_id: courseIds }, {});
-    await queryInterface.bulkDelete('courses', { id: courseIds }, {});
+    await queryInterface.bulkDelete('courses', { name: courseNames }, {});
   }
 };

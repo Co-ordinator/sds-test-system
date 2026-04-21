@@ -7,9 +7,35 @@ const scoringService = require('./scoring.service');
 const { BadRequestError, NotFoundError, ForbiddenError } = require('../utils/errors/appError');
 
 const resolveInstitutionId = (actor, queryParam) => {
-  // Permission-based access: users can access any institution if they pass a query parameter
-  // Otherwise, fall back to their own institution
-  return queryParam || actor.institutionId || null;
+  if (!actor) {
+    return null;
+  }
+  // System Administrators can scope to any institution explicitly.
+  if (actor.role === 'System Administrator') {
+    return queryParam || actor.institutionId || null;
+  }
+  // Test Administrators are always scoped to their assigned institution.
+  return actor.institutionId || null;
+};
+
+const resolveScopedStudent = async (actorId, studentId) => {
+  const actor = await User.findByPk(actorId);
+  if (!actor) {
+    throw new NotFoundError('Actor not found', 'ACTOR_NOT_FOUND');
+  }
+  const institutionId = resolveInstitutionId(actor, null);
+
+  const where = { id: studentId, role: 'Test Taker' };
+  if (actor.role !== 'System Administrator') {
+    where.institutionId = institutionId;
+  }
+
+  const student = await User.findOne({ where });
+  if (!student) {
+    throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
+  }
+
+  return { student, actor, institutionId };
 };
 
 module.exports = {
@@ -115,26 +141,32 @@ module.exports = {
       throw new BadRequestError('CSV data is required', 'CSV_REQUIRED');
     }
 
-    const importReport = await bulkCreateStudents(csvData);
-    return { importReport, actor };
+    const institutionId = resolveInstitutionId(actor, queryInstitutionId);
+    if (!institutionId) {
+      throw new BadRequestError('Institution is required for student import', 'INSTITUTION_REQUIRED');
+    }
+
+    const importReport = await bulkCreateStudents(csvData, institutionId);
+    return { importReport, actor, institutionId };
   },
 
   deleteStudent: async (actorId, studentId) => {
-    const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
-    if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
+    const { student } = await resolveScopedStudent(actorId, studentId);
 
     await student.destroy();
     return student;
   },
 
-  updateStudent: async (studentId, body) => {
-    const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
-    if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
+  updateStudent: async (actorId, studentId, body) => {
+    const { student, actor } = await resolveScopedStudent(actorId, studentId);
 
     const allowed = ['firstName', 'lastName', 'gradeLevel', 'email', 'institutionId'];
     const updates = {};
     for (const key of allowed) {
       if (body[key] !== undefined) updates[key] = body[key];
+    }
+    if (actor.role !== 'System Administrator') {
+      delete updates.institutionId;
     }
 
     await student.update(updates);
@@ -208,7 +240,7 @@ module.exports = {
       attributes: ['id', 'firstName', 'lastName', 'username', 'gradeLevel', 'className', 'studentNumber', 'studentCode', 'createdAt'],
       include: [{
         model: SchoolStudent, as: 'schoolStudent', required: false,
-        attributes: ['studentNumber', 'grade', 'className', 'loginCardPrinted']
+        attributes: ['id', 'studentNumber', 'grade', 'className', 'loginCardPrinted']
       }],
       order: [['lastName', 'ASC'], ['firstName', 'ASC']]
     });

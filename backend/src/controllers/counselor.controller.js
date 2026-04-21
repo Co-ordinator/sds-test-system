@@ -50,7 +50,7 @@ const deleteStudent = async (req, res, next) => {
 
 const updateStudent = async (req, res, next) => {
   try {
-    const updated = await counselorService.updateStudent(req.params.studentId, req.body);
+    const updated = await counselorService.updateStudent(req.user.id, req.params.studentId, req.body);
     return res.status(200).json({ status: 'success', data: { student: updated } });
   } catch (error) {
     logger.error({ actionType: 'STUDENT_UPDATE_FAILED', message: 'Failed to update student', req, details: { error: error.message } });

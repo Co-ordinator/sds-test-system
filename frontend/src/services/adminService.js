@@ -64,6 +64,8 @@ export const adminService = {
 
   // ── User Creation ─────────────────────────────────────────────────────
   createUser: (payload) => api.post('/api/v1/admin/users', payload).then(r => r.data),
+  importSystemAdmins: (csvText) =>
+    api.post('/api/v1/admin/users/import-system-admins', csvText, { headers: { 'Content-Type': 'text/csv' } }).then(r => r.data?.data?.report),
 
   // ── Permissions ──────────────────────────────────────────────────────
   getPermissions: () => api.get('/api/v1/admin/permissions').then(r => r.data?.data?.permissions || []),

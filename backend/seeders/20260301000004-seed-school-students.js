@@ -5,20 +5,18 @@ const now = new Date();
 
 /**
  * School Students Seeder
- * Creates school_students records for users with user_type='school_student'.
+ * Creates school_students records for seeded high-school users.
  * Matches users by student_number (username) and institution by name.
  */
 
 const studentData = [
-  { username: '20250101', institutionName: 'Mbabane Government High School', studentNumber: '20250101', grade: 'Form 4', className: 'A', academicYear: 2025 },
-  { username: '20250102', institutionName: 'Mbabane Government High School', studentNumber: '20250102', grade: 'Form 4', className: 'A', academicYear: 2025 },
-  { username: '20250201', institutionName: 'Manzini Central High School',    studentNumber: '20250201', grade: 'Form 5', className: 'B', academicYear: 2025 },
-  { username: '20250202', institutionName: 'Manzini Central High School',    studentNumber: '20250202', grade: 'Form 5', className: 'B', academicYear: 2025 },
-  { username: '20250301', institutionName: 'Siteki High School',             studentNumber: '20250301', grade: 'Form 4', className: 'C', academicYear: 2025 }
 ];
 
 module.exports = {
   async up(queryInterface) {
+    if (studentData.length === 0) {
+      return;
+    }
     const [users] = await queryInterface.sequelize.query(
       `SELECT id, username FROM users WHERE username IN (${studentData.map(() => '?').join(',')})`,
       { replacements: studentData.map(s => s.username) }
@@ -33,8 +31,7 @@ module.exports = {
       const user = users.find(u => u.username === sd.username);
       const inst = institutions.find(i => i.name.toLowerCase() === sd.institutionName.toLowerCase());
       if (!user || !inst) {
-        console.warn(`Skipping school_student for ${sd.username}: user or institution not found`);
-        continue;
+        throw new Error(`Cannot seed school_student for ${sd.username}: user or institution not found`);
       }
       rows.push({
         id: uuidv4(),
@@ -58,6 +55,9 @@ module.exports = {
   },
 
   async down(queryInterface) {
+    if (studentData.length === 0) {
+      return;
+    }
     const usernames = studentData.map(s => s.username);
     await queryInterface.sequelize.query(
       `DELETE FROM school_students WHERE user_id IN (

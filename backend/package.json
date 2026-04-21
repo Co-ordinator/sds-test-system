@@ -13,7 +13,11 @@
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "seed": "sequelize-cli db:seed:all",
-    "seed:undo": "sequelize-cli db:seed:undo:all"
+    "seed:undo": "sequelize-cli db:seed:undo:all",
+    "db:bootstrap": "sequelize-cli db:migrate && sequelize-cli db:seed:all",
+    "db:reset": "sequelize-cli db:migrate:undo:all && sequelize-cli db:migrate && sequelize-cli db:seed:all",
+    "db:verify": "node scripts/validate-seed-integrity.js",
+    "db:smoke": "npm run db:reset && npm run db:verify"
   },
   "keywords": [],
   "author": "",
@@ -23,7 +27,6 @@
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "crypto": "^1.0.1",
     "csv-parse": "^5.5.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

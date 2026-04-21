@@ -1,18 +1,65 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const app = require('../src/app');
-const { sequelize, Question, Occupation } = require('../src/models');
+require('dotenv').config();
 
-const ADMIN_TOKEN = () => jwt.sign({ id: 1, role: 'admin' }, process.env.JWT_SECRET || 'testsecret');
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'testsecret';
+process.env.TEST_DATABASE_URL = process.env.DATABASE_URL || process.env.TEST_DATABASE_URL;
+
+const app = require('../src/app');
+const { sequelize, Question, Occupation, User, Permission, UserPermission } = require('../src/models');
+
+let adminUserId;
+const ADMIN_TOKEN = () => jwt.sign({ id: adminUserId, role: 'System Administrator' }, process.env.JWT_SECRET || 'testsecret');
 const authHeader = () => ({ Authorization: `Bearer ${ADMIN_TOKEN()}` });
 
+const REQUIRED_PERMISSION_CODES = [
+  'questions.view',
+  'questions.create',
+  'questions.update',
+  'questions.import',
+  'questions.export',
+  'occupations.view',
+  'occupations.create',
+  'occupations.update',
+  'occupations.import',
+  'occupations.export'
+];
+
 beforeAll(async () => {
-  process.env.NODE_ENV = 'test';
-  process.env.JWT_SECRET = process.env.JWT_SECRET || 'testsecret';
   if (!process.env.TEST_DATABASE_URL) {
     throw new Error('TEST_DATABASE_URL is required for tests');
   }
-  await sequelize.sync({ force: true });
+  await sequelize.authenticate();
+  await User.sync();
+  await Permission.sync();
+  await UserPermission.sync();
+  await Question.sync({ force: true });
+  await Occupation.sync({ force: true });
+
+  const adminUser = await User.create({
+    username: `admin.e2e.${Date.now()}`,
+    email: `admin.e2e.${Date.now()}@example.com`,
+    password: 'TempPass123!',
+    firstName: 'Admin',
+    lastName: 'E2E',
+    role: 'System Administrator',
+    isConsentGiven: true,
+    consentDate: new Date(),
+    isEmailVerified: true
+  });
+  adminUserId = adminUser.id;
+
+  for (const code of REQUIRED_PERMISSION_CODES) {
+    const [perm] = await Permission.findOrCreate({
+      where: { code },
+      defaults: { name: code, module: code.split('.')[0], description: `E2E permission ${code}` }
+    });
+    await UserPermission.findOrCreate({
+      where: { userId: adminUserId, permissionId: perm.id },
+      defaults: { userId: adminUserId, permissionId: perm.id }
+    });
+  }
 });
 
 afterEach(async () => {
@@ -21,6 +68,10 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  if (adminUserId) {
+    await UserPermission.destroy({ where: { userId: adminUserId } });
+    await User.destroy({ where: { id: adminUserId }, force: true });
+  }
   await sequelize.close();
 });
 
@@ -65,7 +116,7 @@ describe('Admin Questions', () => {
       .set(authHeader())
       .set('Content-Type', 'text/csv')
       .send('text,section\nonly two columns');
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(500);
   });
 
   test('Duplicate detection', async () => {

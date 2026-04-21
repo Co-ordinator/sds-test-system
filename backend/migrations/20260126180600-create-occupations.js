@@ -10,8 +10,8 @@ module.exports = {
         primaryKey: true
       },
       code: {
-        type: Sequelize.STRING(3),
-        allowNull: false
+        type: Sequelize.STRING(10),
+        allowNull: true
       },
       name: {
         type: Sequelize.STRING,
@@ -65,6 +65,18 @@ module.exports = {
         type: Sequelize.ARRAY(Sequelize.STRING),
         allowNull: true
       },
+      status: {
+        type: Sequelize.ENUM("approved", "pending_review"),
+        allowNull: false,
+        defaultValue: "approved"
+      },
+      submitted_by: {
+        type: Sequelize.UUID,
+        allowNull: true,
+        references: { model: "users", key: "id" },
+        onUpdate: "CASCADE",
+        onDelete: "SET NULL"
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -76,9 +88,44 @@ module.exports = {
         defaultValue: Sequelize.literal("CURRENT_TIMESTAMP")
       }
     });
+
+    await queryInterface.addIndex("occupations", ["status"]);
+    await queryInterface.addIndex("occupations", ["submitted_by"]);
+    await queryInterface.addIndex("occupations", ["name"], {
+      unique: true,
+      name: "occupations_name_unique"
+    });
+
+    await queryInterface.addConstraint("institutions", {
+      fields: ["submitted_by"],
+      type: "foreign key",
+      name: "institutions_submitted_by_fkey",
+      references: { table: "users", field: "id" },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL"
+    });
+
+    await queryInterface.addConstraint("users", {
+      fields: ["current_occupation_id"],
+      type: "foreign key",
+      name: "users_current_occupation_id_fkey",
+      references: { table: "occupations", field: "id" },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL"
+    });
   },
 
   async down(queryInterface) {
+    try {
+      await queryInterface.removeConstraint("users", "users_current_occupation_id_fkey");
+    } catch (_) {
+      // Constraint may not exist in some dev DB states.
+    }
+    try {
+      await queryInterface.removeConstraint("institutions", "institutions_submitted_by_fkey");
+    } catch (_) {
+      // Constraint may not exist in some dev DB states.
+    }
     await queryInterface.dropTable("occupations");
   }
 };
