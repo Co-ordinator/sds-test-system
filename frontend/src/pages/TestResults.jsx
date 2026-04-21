@@ -198,12 +198,27 @@ const TestResults = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const queryParams = new URLSearchParams(location.search);
+  const assessmentIdFromQuery = queryParams.get('assessmentId');
+  const isTestTaker = user?.role === 'Test Taker';
   const assessmentIdFromState = location.state?.assessmentId;
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-  const [assessmentId, setAssessmentId] = useState(assessmentIdFromState);
+  const [assessmentId, setAssessmentId] = useState(assessmentIdFromState || assessmentIdFromQuery);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+
+  const getResultsEndpoint = (id) => (
+    isTestTaker
+      ? `/api/v1/assessments/${id}/results`
+      : `/api/v1/results/${id}`
+  );
+
+  const getResultsPdfEndpoint = (id) => (
+    isTestTaker
+      ? `/api/v1/assessments/${id}/pdf`
+      : `/api/v1/results/${id}/pdf`
+  );
 
   const getDashboardPath = () => {
     if (user?.role === 'System Administrator') return '/admin/dashboard';
@@ -212,7 +227,7 @@ const TestResults = () => {
   };
 
   useEffect(() => {
-    let id = assessmentIdFromState;
+    let id = assessmentIdFromState || assessmentIdFromQuery;
     const fetchResults = async () => {
       try {
         if (!id) {
@@ -223,22 +238,22 @@ const TestResults = () => {
           id = completed.id;
           setAssessmentId(id);
         }
-        const res = await api.get(`/api/v1/results/${id}`);
+        const res = await api.get(getResultsEndpoint(id));
         const payload = res.data?.data;
         if (payload) setData(payload);
         else setError('Results not found.');
       } catch (e) {
-        setError(e.response?.data?.message || 'Failed to load results.');
+        setError(e?.uiMessage || e?.response?.data?.message || e?.message || 'Failed to load results.');
       } finally { setLoading(false); }
     };
     fetchResults();
-  }, [assessmentIdFromState]);
+  }, [assessmentIdFromState, assessmentIdFromQuery, isTestTaker]);
 
   const handleDownloadPdf = async () => {
     if (!assessmentId) return;
     setDownloadingPdf(true);
     try {
-      const res = await api.get(`/api/v1/results/${assessmentId}/pdf`, { responseType: 'blob' });
+      const res = await api.get(getResultsPdfEndpoint(assessmentId), { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a'); a.href = url;
       a.download = `CareerReport_${assessmentId}.pdf`;
