@@ -93,23 +93,12 @@ const mapSequelizeImportError = (error, rowNumber) => {
  * Returns non-sensitive import details.
  */
 const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
-  const records = parse(csvData, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true
-  });
-const bulkCreateStudents = async (csvData) => {
   const records = parseCsvRecords(csvData);
 
   if (!records.length) {
     throw new ValidationError('No student records found in CSV');
   }
 
-  const defaultEducationLevel = await EducationLevel.findOne({
-    attributes: ['id'],
-    order: [['level', 'ASC']]
-  });
-  const defaultEduLevelId = defaultEducationLevel?.id || null;
   const defaultEducationLevel = await EducationLevel.findOne({
     attributes: ['id'],
     order: [['level', 'ASC']]
@@ -190,30 +179,6 @@ const bulkCreateStudents = async (csvData) => {
       // Generate universal login number for this student
       const studentCode = await generateStudentCode(transaction);
 
-      const user = await User.create({
-        username,
-        email: email || null,
-        password,
-        firstName,
-        lastName,
-        nationalId,
-        role: 'Test Taker',
-        userType: 'High School Student',
-        employmentStatus: 'student',
-        institutionId: institution.id,
-        gradeLevel: grade,
-        className,
-        studentNumber: studentNumber || null,
-        studentCode,
-        gender: normalizedGender,
-        educationLevel: defaultEduLevelId || null,
-        isConsentGiven: true,
-        consentDate: new Date(),
-        isEmailVerified: true,
-        createdByTestAdministrator: true,
-        mustChangePassword: true,
-        onboardingCompleted: true
-      }, { transaction });
       let user;
       try {
         user = await User.create({
