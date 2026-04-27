@@ -112,6 +112,20 @@ const GENDER_LBL = { male:'Male', female:'Female', other:'Other', prefer_not_to_
 const UTYPE_LBL = { 'High School Student':'High School', 'University Student':'University', Professional:'Professional', 'Test Administrator':'Test Admin', 'System Administrator':'Sys Admin' };
 const fmtN = n => Number(n || 0).toLocaleString();
 const capF = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '—';
+const getReportCode = row => row?.hollandCode || row?.holland_code || row?.hollandCodeDisplay || '';
+const parseHollandCodeGroups = code => String(code || '')
+  .toUpperCase()
+  .trim()
+  .split(/\s+/)
+  .flatMap(group => {
+    const cleaned = group.replace(/[^RIASEC/]/g, '');
+    if (!cleaned) return [];
+    if (!cleaned.includes('/')) return cleaned.split('').map(letter => [letter]);
+    return [cleaned.split('/').filter(Boolean)];
+  });
+const describeHollandCode = code => parseHollandCodeGroups(code)
+  .map(group => group.map(letter => RIASEC_NAME[letter] || letter).join('/'))
+  .join(' / ');
 
 /* ── Reusable report preview primitives — clean formal style ────────────── */
 const KpiCard = ({ label, value, sub }) => (
@@ -364,8 +378,8 @@ const AdminReportsPanel = () => {
               <thead><THead cols={['Code', 'Personality Profile', 'Frequency', 'Count']} /></thead>
               <tbody>
                 {(preview.hollandDist || []).map((row, i) => {
-                  const code = row.holland_code || '', cnt = Number(row.count);
-                  const desc = code.split('').map(c => RIASEC_NAME[c] || c).join(' / ');
+                  const code = getReportCode(row), cnt = Number(row.count);
+                  const desc = describeHollandCode(code);
                   return (
                     <tr key={i} style={{ backgroundColor: i % 2 === 1 ? C.STRIPE : C.WHITE }}>
                       <td className="px-2 py-1 border-b font-bold" style={{ borderColor: C.BORDER, color: C.TEXT }}>{code}</td>
@@ -553,8 +567,8 @@ const AdminReportsPanel = () => {
               <thead><THead cols={['Code', 'Personality Profile', 'Frequency', 'Count']} /></thead>
               <tbody>
                 {(preview.hollandDist || []).map((row, i) => {
-                  const code = row.holland_code || '', cnt = Number(row.count);
-                  const desc = code.split('').map(c => RIASEC_NAME[c] || c).join(' / ');
+                  const code = getReportCode(row), cnt = Number(row.count);
+                  const desc = describeHollandCode(code);
                   return (
                     <tr key={i} style={{ backgroundColor: i % 2 === 1 ? C.STRIPE : C.WHITE }}>
                       <td className="px-2 py-1 border-b font-bold" style={{ borderColor: C.BORDER, color: C.TEXT }}>{code}</td>

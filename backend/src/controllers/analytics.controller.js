@@ -5,6 +5,8 @@ const logger = require('../utils/logger');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 
+const getHollandDisplayCode = (row) => row?.hollandCode || row?.holland_code || row?.hollandCodeDisplay || '';
+
 /**
  * Analytics Controller — HTTP layer only.
  * All query logic lives in analytics.service.js.
@@ -156,7 +158,7 @@ const AnalyticsController = {
         doc.moveDown(0.8);
         doc.fontSize(11).font('Helvetica-Bold').fillColor('#111827').text('Top Holland Codes');
         doc.fontSize(9).font('Helvetica').fillColor('#374151');
-        hollandDist.slice(0, 10).forEach(row => doc.text(`${row.hollandCode}: ${row.count}`));
+        hollandDist.slice(0, 10).forEach(row => doc.text(`${getHollandDisplayCode(row)}: ${row.count}`));
         doc.moveDown(0.8);
         doc.fontSize(11).font('Helvetica-Bold').fillColor('#111827').text('Regional Completions');
         doc.fontSize(9).font('Helvetica').fillColor('#374151');
@@ -186,7 +188,7 @@ const AnalyticsController = {
           startDate: filters.startDate || '',
           endDate: filters.endDate || ''
         },
-        ...hollandDist.map(row => ({ section: 'holland_distribution', hollandCode: row.hollandCode, count: row.count })),
+        ...hollandDist.map(row => ({ section: 'holland_distribution', hollandCode: getHollandDisplayCode(row), count: row.count })),
         ...regionalDist.map(row => ({ section: 'regional_completion', region: row.region, completedAssessments: row.completedAssessments }))
       ];
 

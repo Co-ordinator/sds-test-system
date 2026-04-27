@@ -6,6 +6,25 @@ const { Parser } = require('json2csv');
 const { parse } = require('csv-parse/sync');
 const crypto = require('crypto');
 const { NotFoundError, BadRequestError, ConflictError } = require('../utils/errors/appError');
+const scoringService = require('./scoring.service');
+
+const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
+
+const getAssessmentDisplayCode = (assessment) => {
+  if (!assessment || (assessment.status !== 'completed' && !assessment.hollandCode)) return null;
+  if (assessment.hollandCode) return assessment.hollandCode;
+  const totals = SCORE_KEYS.reduce((acc, key) => {
+    acc[key] = Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
+    return acc;
+  }, {});
+  if (!SCORE_KEYS.some((key) => totals[key] > 0)) return assessment.hollandCode || null;
+  return scoringService.buildHollandCodes(totals, 0).primaryCode || assessment.hollandCode || null;
+};
+
+const attachAssessmentDisplayCode = (assessment) => {
+  assessment?.setDataValue?.('hollandCodeDisplay', getAssessmentDisplayCode(assessment));
+  return assessment;
+};
 
 module.exports = {
 
@@ -340,7 +359,7 @@ module.exports = {
       include: Object.keys(userWhere).length > 0 ? [{ model: User, as: 'user', required: true, where: userWhere }] : []
     });
 
-    return { assessments, total };
+    return { assessments: assessments.map(attachAssessmentDisplayCode), total };
   },
 
   exportAssessments: async ({ institutionId, status }) => {
@@ -367,7 +386,7 @@ module.exports = {
       email: a.user?.email || '',
       institution: a.user?.institution?.name || '',
       status: a.status,
-      hollandCode: a.hollandCode || '',
+      hollandCode: getAssessmentDisplayCode(a) || a.hollandCode || '',
       scoreR: a.scoreR,
       scoreI: a.scoreI,
       scoreA: a.scoreA,

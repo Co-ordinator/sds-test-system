@@ -14,6 +14,20 @@ const RIASEC_DESC = {
   E: 'Ambitious and leadership-oriented. Enjoys business, management, and persuading others.',
   C: 'Organized and detail-oriented. Enjoys working with data, numbers, and structured processes.'
 };
+const normalizePrimaryHollandCode = (code) => String(code || '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 3);
+const parseHollandDisplayGroups = (code) => String(code || '')
+  .toUpperCase()
+  .trim()
+  .split(/\s+/)
+  .flatMap((group) => {
+    const cleaned = group.replace(/[^RIASEC/]/g, '');
+    if (!cleaned) return [];
+    if (!cleaned.includes('/')) {
+      return cleaned.split('').filter((letter) => RIASEC_LABELS[letter]).map((letter) => [letter]);
+    }
+    return [cleaned.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_LABELS[letter])];
+  })
+  .filter((group) => group.length > 0);
 const DEMAND_LABELS = { critical: 'Critical', very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low' };
 const DEMAND_PDF_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };
 const LOGO_PATHS = [
@@ -101,7 +115,7 @@ class AssessmentController {
         status: 'success',
         data: {
           hollandCode: results.hollandCode,
-          hollandCodeDisplay: results.hollandCodeDisplay || results.hollandCode,
+          hollandCodeDisplay: results.hollandCode || results.hollandCodeDisplay,
           scores: results.scores,
           recommendations: results.recommendations
         }
@@ -129,7 +143,9 @@ class AssessmentController {
 
       const student = assessment.user || {};
       const studentName = [student.firstName, student.lastName].filter(Boolean).join(' ') || 'Student';
-      const hollandCode = assessment.hollandCodeDisplay || assessment.hollandCode || '';
+      const rawHollandCode = assessment.hollandCode || assessment.hollandCodeDisplay || '';
+      const primaryHollandCode = normalizePrimaryHollandCode(rawHollandCode);
+      const hollandCode = primaryHollandCode || rawHollandCode;
       const scores = {
         R: assessment.scoreR ?? 0,
         I: assessment.scoreI ?? 0,
@@ -169,17 +185,14 @@ class AssessmentController {
           scoreRankGroups.push([row]);
         }
       });
-      const parsedDisplayGroups = String(hollandCode || '')
-        .toUpperCase()
-        .trim()
-        .split(/\s+/)
-        .map((group) => group.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_LABELS[letter]))
-        .filter((group) => group.length > 0);
+      const parsedDisplayGroups = primaryHollandCode
+        ? primaryHollandCode.split('').map((letter) => [letter])
+        : parseHollandDisplayGroups(rawHollandCode);
       const hollandDisplayGroups = (parsedDisplayGroups.length > 0
         ? parsedDisplayGroups
         : scoreRankGroups.map((group) => group.map((row) => row.key)))
         .slice(0, 3);
-      const hollandCodeDisplayText = hollandDisplayGroups.map((group) => group.join('/')).join(' ');
+      const hollandCodeDisplayText = primaryHollandCode || hollandDisplayGroups.map((group) => group.join('/')).join(' ');
       const hollandCodeLabelText = hollandDisplayGroups
         .map((group) => group.map((letter) => RIASEC_LABELS[letter]).join('/'))
         .join(' - ');

@@ -1,12 +1,76 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, CheckCircle2, ChevronRight, Clock, Users, AlertCircle } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronRight, Clock, Users, AlertCircle, Volume2 } from 'lucide-react';
 import AssessmentShell from '../components/layout/AssessmentShell';
 import GlossaryTooltip from '../components/ui/GlossaryTooltip';
 import { GOV, TYPO } from '../theme/government';
 
+const introSpeechText = `
+About the Self-Directed Search.
+The Self-Directed Search, or SDS, is a career interest questionnaire. Its purpose is to help determine your career interests, because these interests are important when you make a career decision.
+
+Important Note.
+This is a questionnaire and not a test. There are therefore no correct or incorrect answers. Your honest responses help the system give you career guidance that better reflects your real interests and abilities.
+
+How the SDS Works.
+The questionnaire looks for patterns in the kinds of activities, abilities, and work environments that fit you. Those patterns are converted into an SDS code, also called a Holland code, which is used as a starting point for career guidance.
+
+How to Answer.
+Read each instruction screen carefully before you begin that part of the questionnaire. Answer every item by clicking the response that best represents you.
+
+Answering Rules.
+All questions must be answered. Each question requires only one response. Questions should not be skipped. Answer honestly based on what is true for you, not what other people may expect.
+
+Before You Begin.
+Find a quiet place where you can focus without interruptions. The questionnaire takes approximately 30 to 40 minutes to complete. You can pause and resume at any time; your progress will be saved. Answer honestly based on your true interests and abilities. Do not worry about what others might think. Be yourself. Use the help button if you need clarification on terms.
+`.trim();
+
 const QuestionnaireIntro = () => {
   const navigate = useNavigate();
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+
+  useEffect(() => {
+    setSpeechSupported('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window);
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleReadAloud = useCallback(() => {
+    if (!speechSupported) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(introSpeechText);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }, [isSpeaking, speechSupported]);
+
+  const readAloudButton = speechSupported ? (
+    <button
+      type="button"
+      onClick={handleReadAloud}
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-offset-2"
+      style={{ borderColor: GOV.border, color: GOV.blue, backgroundColor: '#fff' }}
+      aria-label={isSpeaking ? 'Stop reading questionnaire instructions aloud' : 'Read questionnaire instructions aloud'}
+    >
+      <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
+      {isSpeaking ? 'Stop Audio' : 'Read Aloud'}
+    </button>
+  ) : null;
 
   return (
     <>
@@ -18,10 +82,12 @@ const QuestionnaireIntro = () => {
       <AssessmentShell
         title="Self-Directed Search (SDS)"
         subtitle="Career Interest Assessment"
+        actions={readAloudButton}
         contentClassName="max-w-5xl mx-auto px-6 space-y-6"
       >
         <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 text-left space-y-6 flex-1">
+
         {/* Main Orientation Content */}
         <div className="bg-white rounded-md border p-6" style={{ borderColor: GOV.border }}>
           <div className="flex items-start gap-4 mb-4">
@@ -33,11 +99,12 @@ const QuestionnaireIntro = () => {
             </div>
             <div>
               <h2 className="text-xl font-bold mb-2" style={{ color: GOV.text }}>
-                Purpose of this Questionnaire
+                About the Self-Directed Search
               </h2>
               <p className={TYPO.body} style={{ color: GOV.textMuted }}>
-                The purpose of this <GlossaryTooltip term="Questionnaire">questionnaire</GlossaryTooltip> is to determine your 
-                <GlossaryTooltip term="Career Interest">career interests</GlossaryTooltip>, as they will be of importance when you make a career decision.
+                The Self-Directed Search (SDS) is a career interest <GlossaryTooltip term="Questionnaire">questionnaire</GlossaryTooltip>.
+                Its purpose is to determine your <GlossaryTooltip term="Career Interest">career interests</GlossaryTooltip>,
+                because these interests are important when you make a career decision.
               </p>
             </div>
           </div>
@@ -50,20 +117,18 @@ const QuestionnaireIntro = () => {
               </p>
               <p className={TYPO.bodySmall} style={{ color: GOV.text }}>
                 This is a questionnaire and not a test. There are therefore <strong>no correct or incorrect answers</strong>. 
-                Your honest responses will help us provide you with the most accurate <GlossaryTooltip term="Career Guidance">career guidance</GlossaryTooltip>.
+                Your honest responses help the system provide <GlossaryTooltip term="Career Guidance">career guidance</GlossaryTooltip> that better reflects you.
               </p>
             </div>
 
             <div>
               <h3 className="font-semibold mb-3" style={{ color: GOV.text }}>
-                What This Questionnaire Contains
+                How the SDS Works
               </h3>
               <p className={TYPO.body} style={{ color: GOV.textMuted }}>
-                This questionnaire contains a number of questions relating to your 
-                <GlossaryTooltip term="Activities">activities</GlossaryTooltip>, 
-                <GlossaryTooltip term="Competencies">competencies</GlossaryTooltip>, 
-                interests in <GlossaryTooltip term="Occupation">occupations</GlossaryTooltip>, 
-                as well as questions in which you are asked to rate your abilities/skills.
+                The SDS looks for patterns in the kinds of <GlossaryTooltip term="Activities">activities</GlossaryTooltip>, abilities,
+                and work environments that fit you. Those patterns are converted into an SDS code, also called a Holland code,
+                which is used as a starting point for career guidance.
               </p>
             </div>
 
@@ -72,82 +137,21 @@ const QuestionnaireIntro = () => {
                 How to Answer
               </h3>
               <p className={`${TYPO.body} mb-3`} style={{ color: GOV.textMuted }}>
-                The instructions for answering the questions are given at the top of each section. Read the instructions carefully 
-                and then answer the questions that follow. Answer all questions on the questionnaire page by clicking the specific 
-                answer you choose.
+                Read each instruction screen carefully before you begin that part of the questionnaire. Answer every item by clicking
+                the response that best represents you.
               </p>
               <div className="p-3 rounded-md" style={{ backgroundColor: '#fef3c7' }}>
                 <p className="text-sm font-medium mb-2" style={{ color: '#d97706' }}>
-                  ⚠️ Special Requirements
+                  Special Requirements
                 </p>
                 <ul className="text-sm space-y-1" style={{ color: GOV.text }}>
-                  <li>• All questions must be answered</li>
-                  <li>• Each question requires only one response</li>
-                  <li>• Questions should not be skipped</li>
-                  <li>• For Sections I-III: Select YES or NO</li>
-                  <li>• For Section IV: Rate yourself on a scale of 1 to 6</li>
+                  <li>- All questions must be answered</li>
+                  <li>- Each question requires only one response</li>
+                  <li>- Questions should not be skipped</li>
+                  <li>- Answer honestly based on what is true for you</li>
+                  <li>- Each part will explain how to answer before it starts</li>
                 </ul>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-md border p-6" style={{ borderColor: GOV.border }}>
-          <h2 className="text-lg font-bold mb-4" style={{ color: GOV.text }}>
-            Section Instructions
-          </h2>
-
-          <div className="space-y-5">
-            <div className="border-l-4 pl-4" style={{ borderColor: '#dc2626' }}>
-              <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ color: GOV.text }}>
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#dc2626' }}>I</span>
-                Section I: Activities
-              </h3>
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                Click <strong>YES</strong> for the activities you <strong>LIKE TO DO</strong> or think you <strong>WOULD LIKE TO DO</strong>.
-                <br />
-                Click <strong>NO</strong> for the activities you are <strong>INDIFFERENT TO</strong>, <strong>HAVE NEVER DONE</strong>, or <strong>DO NOT LIKE TO DO</strong>.
-              </p>
-            </div>
-
-            <div className="border-l-4 pl-4" style={{ borderColor: '#2563eb' }}>
-              <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ color: GOV.text }}>
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#2563eb' }}>II</span>
-                Section II: Competencies
-              </h3>
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                Click <strong>YES</strong> for those activities that you <strong>HAVE KNOWLEDGE of</strong> or that you <strong>CAN DO WELL</strong> or <strong>COMPETENTLY</strong>.
-                <br />
-                Click <strong>NO</strong> for those activities that you <strong>HAVE LITTLE or NO KNOWLEDGE of</strong> or that you <strong>HAVE NEVER PERFORMED</strong> or <strong>PERFORM POORLY</strong>.
-              </p>
-            </div>
-
-            <div className="border-l-4 pl-4" style={{ borderColor: '#7c3aed' }}>
-              <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ color: GOV.text }}>
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#7c3aed' }}>III</span>
-                Section III: Occupations
-              </h3>
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                This section concerns your feelings and attitudes regarding many kinds of work. Show the occupations/jobs that <strong>INTEREST or APPEAL TO you</strong> by clicking <strong>YES</strong>.
-                <br />
-                Show the occupations/jobs that you <strong>DISLIKE or FIND UNINTERESTING</strong> by clicking <strong>NO</strong>.
-              </p>
-            </div>
-
-            <div className="border-l-4 pl-4" style={{ borderColor: '#059669' }}>
-              <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ color: GOV.text }}>
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#059669' }}>IV</span>
-                Section IV: Rating of Your Abilities and Skills
-              </h3>
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                This section consists of two groups (GROUP I and GROUP II) of six abilities/skills each on which you must rate yourself.
-              </p>
-              <ul className="list-disc list-inside mt-2 space-y-1" style={{ color: GOV.textMuted }}>
-                <li className={TYPO.bodySmall}>Rate yourself on a scale of <strong>1 to 6</strong> on each of these abilities or skills</li>
-                <li className={TYPO.bodySmall}>Rate yourself as you really think you are when <strong>compared with other persons of your own age</strong></li>
-                <li className={TYPO.bodySmall}>Give the most <strong>accurate estimate</strong> of how you see yourself</li>
-                <li className={TYPO.bodySmall}>Avoid giving yourself the same rating for each ability/skill</li>
-              </ul>
             </div>
           </div>
         </div>
@@ -216,7 +220,7 @@ const QuestionnaireIntro = () => {
           {/* Accessibility Notice */}
           <div className="mt-4 p-3 rounded-md" style={{ backgroundColor: GOV.blueLightAlt }}>
             <p className="text-sm" style={{ color: GOV.blue }}>
-              ♿ This assessment is designed to be accessible. You can adjust accessibility settings in your Profile page. 
+              This assessment is designed to be accessible. You can adjust accessibility settings in your Profile page.
               Screen reader users can navigate using standard keyboard controls.
             </p>
           </div>
@@ -228,9 +232,9 @@ const QuestionnaireIntro = () => {
             onClick={() => navigate('/questionnaire')}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-md text-base font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2"
             style={{ backgroundColor: GOV.blue }}
-            aria-label="Begin the Self-Directed Search questionnaire"
+            aria-label="Continue to Section 1 instructions"
           >
-            Begin Questionnaire
+            Next: Section I Instructions
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>

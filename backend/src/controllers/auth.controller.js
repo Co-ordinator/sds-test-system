@@ -45,13 +45,15 @@ const resolveFrontendBaseUrl = (req) => {
 
 const register = async (req, res, next) => {
   try {
-    const { user, token, refreshToken, emailToken } = await authService.register(req.body);
+    const { user, emailToken } = await authService.register(req.body);
     logger.info({ actionType: 'REGISTER', message: `User registered: ${user.email}`, req, details: { email: user.email, role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
-    setRefreshTokenCookie(res, refreshToken);
-    setAccessTokenCookie(res, token);
-
-    res.status(201).json({ status: 'success', token, data: { user: user.toJSON() } });
+    res.status(201).json({
+      status: 'success',
+      message: 'Account created. Please verify your email to continue.',
+      requiresEmailVerification: true,
+      data: { user: user.toJSON() }
+    });
 
     if (user.email) {
       const frontendBaseUrl = resolveFrontendBaseUrl(req);

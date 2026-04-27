@@ -12,14 +12,12 @@ module.exports = (sequelize, DataTypes) => {
     },
     section: {
       type: DataTypes.ENUM('activities', 'competencies', 'occupations', 'self_estimates'),
-      allowNull: false,
-      comment: 'Mapped to Sections I through IV of the SDS'
+      allowNull: false
     },
     riasecType: {
       type: DataTypes.ENUM('R', 'I', 'A', 'S', 'E', 'C'),
       allowNull: false,
-      field: 'riasec_type',
-      comment: 'The Holland personality type this question measures'
+      field: 'riasec_type'
     },
     order: {
       type: DataTypes.INTEGER,

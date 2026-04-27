@@ -60,7 +60,11 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/onboarding" element={
+            <ProtectedRoute allowedRoles={['Test Taker']}>
+              <Onboarding />
+            </ProtectedRoute>
+          } />
           <Route path="/change-password" element={
             <ProtectedRoute allowedRoles={['Test Taker', 'System Administrator', 'Test Administrator']}>
               <ChangePassword />

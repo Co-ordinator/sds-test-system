@@ -14,6 +14,8 @@ const ChartCard = ({ title, subtitle, children }) => (
   </div>
 );
 
+const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+
 const KnowledgeGraphFlow = ({ kgData }) => {
   if (!kgData) return null;
   const { summary, riasecCareerFlow } = kgData;
@@ -99,7 +101,7 @@ const AnalyticsGraphSection = ({ kgData }) => (
       <ChartCard title="Top Holland Code Matches" subtitle="Most frequently assigned Holland codes">
         {(kgData?.topHollandCareerMatches || []).length > 0 ? (
           <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={kgData.topHollandCareerMatches.slice(0, 10).map(d => ({ code: d.hollandCode, count: Number(d.assessmentCount) }))}>
+            <BarChart data={kgData.topHollandCareerMatches.slice(0, 10).map(d => ({ code: getHollandDisplayCode(d), count: Number(d.assessmentCount) }))}>
               <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
               <XAxis dataKey="code" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 10 }} />

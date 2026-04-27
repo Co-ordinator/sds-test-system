@@ -28,6 +28,7 @@ import {
 import { PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../features/analytics/analyticsConstants';
 
 const normalizeRegion = (value) => (value || '').toString().trim().toLowerCase();
+const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -163,7 +164,7 @@ const AdminDashboard = () => {
   );
 
   const pieData = useMemo(
-    () => hollandDist.slice(0, 8).map(d => ({ name: d.hollandCode, value: Number(d.count) })),
+    () => hollandDist.slice(0, 8).map(d => ({ name: getHollandDisplayCode(d), value: Number(d.count) })),
     [hollandDist]
   );
 
@@ -203,8 +204,9 @@ const AdminDashboard = () => {
       const row = map.get(key);
       row.tested += 1;
       if (a.status === 'completed') row.completed += 1;
-      if (a.hollandCode) {
-        row.codes[a.hollandCode] = (row.codes[a.hollandCode] || 0) + 1;
+      const hollandCode = getHollandDisplayCode(a);
+      if (hollandCode) {
+        row.codes[hollandCode] = (row.codes[hollandCode] || 0) + 1;
       }
     });
 

@@ -15,34 +15,54 @@ export default function VerifyEmail() {
   const [showResend, setShowResend] = useState(false);
 
   useEffect(() => {
+    let redirectTimer = null;
+    let cancelled = false;
+
+    const redirectAfterDelay = (path) => {
+      redirectTimer = setTimeout(() => {
+        if (!cancelled) navigate(path, { replace: true });
+      }, 1200);
+    };
+
+    const hydrateSession = async (fallbackUser) => {
+      try {
+        const meRes = await api.get('/api/v1/auth/me', { skipAuthRetry: true });
+        return meRes.data?.data?.user ?? meRes.data?.user ?? fallbackUser ?? null;
+      } catch (_) {
+        return fallbackUser ?? null;
+      }
+    };
+
     const verifyEmail = async () => {
       try {
         const res = await api.get(`/api/v1/auth/verify-email/${token}`);
-        const authToken = res.data?.token;
         const userData = res.data?.data?.user;
         const message = res.data?.message;
-        
-        if (authToken && userData) {
-          setSession(authToken, userData);
-          setStatus('success');
-          // Auto-navigate to onboarding after successful verification
-          setTimeout(() => navigate('/onboarding'), 1500);
-        } else if (message?.includes('already verified')) {
-          // Email is already verified but no login token provided
-          setStatus('alreadyVerified');
-          // Redirect to onboarding to complete profile
-          setTimeout(() => navigate('/onboarding'), 1500);
-        } else {
-          setStatus('success');
-          setTimeout(() => navigate('/onboarding'), 1500);
+
+        const alreadyVerified = String(message || '').toLowerCase().includes('already verified');
+        if (!cancelled) setStatus(alreadyVerified ? 'alreadyVerified' : 'success');
+
+        const authenticatedUser = await hydrateSession(userData);
+        if (authenticatedUser) {
+          setSession(null, authenticatedUser);
+          redirectAfterDelay('/onboarding');
+          return;
         }
+
+        redirectAfterDelay('/login');
       } catch (err) {
-        setStatus('error');
-        setError(err?.uiMessage || err?.response?.data?.message || 'Link expired or invalid');
+        if (!cancelled) {
+          setStatus('error');
+          setError(err?.uiMessage || err?.response?.data?.message || 'Link expired or invalid');
+        }
       }
     };
     verifyEmail();
-  }, [token, navigate]);
+    return () => {
+      cancelled = true;
+      if (redirectTimer) clearTimeout(redirectTimer);
+    };
+  }, [token, navigate, setSession]);
 
   return (
     <OnboardingLayout>
@@ -77,7 +97,7 @@ export default function VerifyEmail() {
                 Email verified
               </h2>
               <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                Redirecting to complete your profile...
+                Redirecting to onboarding...
               </p>
               <div className="flex justify-center">
                 <div
@@ -102,7 +122,7 @@ export default function VerifyEmail() {
                 Email already verified
               </h2>
               <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                Your email is already verified. Redirecting to complete your profile...
+                Your email is already verified. Redirecting to onboarding...
               </p>
               <div className="flex justify-center">
                 <div

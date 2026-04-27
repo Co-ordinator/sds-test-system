@@ -46,6 +46,20 @@ const CONTENT_BOTTOM = PH - 55;
 
 const fmtNum   = n => Number(n || 0).toLocaleString();
 const capFirst = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '—';
+const getReportCode = row => row?.hollandCode || row?.holland_code || row?.hollandCodeDisplay || '';
+const parseHollandCodeGroups = (code) => String(code || '')
+  .toUpperCase()
+  .trim()
+  .split(/\s+/)
+  .flatMap(group => {
+    const cleaned = group.replace(/[^RIASEC/]/g, '');
+    if (!cleaned) return [];
+    if (!cleaned.includes('/')) return cleaned.split('').map(letter => [letter]);
+    return [cleaned.split('/').filter(Boolean)];
+  });
+const describeHollandCode = (code, names) => parseHollandCodeGroups(code)
+  .map(group => group.map(letter => names[letter] || letter).join('/'))
+  .join(' / ');
 
 /* drawPageHeader ──────────────────────────────────────────────────────── */
 function drawPageHeader(doc, reportLabel, dateStr, preparedBy, filterSummary) {
@@ -283,8 +297,8 @@ function renderExecutiveSummary(doc, data, y, lbl) {
   y = tableRow(doc, y, [hC0, hC1, hC2, hC3], ['Code', 'Personality Profile', 'Frequency', 'Count'], { isHeader: true });
   (data.hollandDist || []).forEach((row, idx) => {
     y = checkPage(doc, y, 20, lbl);
-    const code = row.holland_code || '', cnt = Number(row.count);
-    const desc = code.split('').map(c => HDESC[c] || c).join(' / ');
+    const code = getReportCode(row), cnt = Number(row.count);
+    const desc = describeHollandCode(code, HDESC);
     const bg   = idx % 2 === 1 ? STRIPE : WHITE;
     doc.rect(LM, y, CW, 20).fill(bg).rect(LM, y, CW, 20).lineWidth(0.2).strokeColor(BORDER).stroke();
     drawHBar(doc, LM + hC0 + hC1 + 3, y + 5, hC2 - 6, 10, cnt, hMax, NAVY);
@@ -421,8 +435,8 @@ function renderCareerIntelligence(doc, data, y, lbl) {
   y = tableRow(doc, y, [hD0, hD1, hD2, hD3], ['Code', 'Personality Profile', 'Frequency', 'Count'], { isHeader: true });
   (data.hollandDist || []).forEach((row, idx) => {
     y = checkPage(doc, y, 20, lbl);
-    const code = row.holland_code || '', cnt = Number(row.count);
-    const desc = code.split('').map(c => HFULL[c] || c).join(' / ');
+    const code = getReportCode(row), cnt = Number(row.count);
+    const desc = describeHollandCode(code, HFULL);
     const bg   = idx % 2 === 1 ? STRIPE : WHITE;
     doc.rect(LM, y, CW, 20).fill(bg).rect(LM, y, CW, 20).lineWidth(0.2).strokeColor(BORDER).stroke();
     drawHBar(doc, LM + hD0 + hD1 + 3, y + 5, hD2 - 6, 10, cnt, hMax2, NAVY);

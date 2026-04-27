@@ -1,8 +1,8 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Download, BookOpen, Building2, Award, ChevronDown, ChevronUp,
-  CheckCircle2, Briefcase, GraduationCap, Loader2, FileText, Mail, TrendingUp
+  CheckCircle2, Briefcase, GraduationCap, Loader2, FileText, Mail, TrendingUp, Volume2
 } from 'lucide-react';
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -64,6 +64,75 @@ const QUAL_LABELS = {
 const DEMAND_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };
 const DEMAND_LABELS = { critical: 'Critical', very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low' };
 const RIASEC_ORDER = ['R', 'I', 'A', 'S', 'E', 'C'];
+
+const normalizePrimaryHollandCode = (code) => String(code || '').toUpperCase().replace(/[^RIASEC]/g, '').slice(0, 3);
+
+const parseHollandDisplayGroups = (code) => String(code || '')
+  .toUpperCase()
+  .trim()
+  .split(/\s+/)
+  .flatMap((group) => {
+    const cleaned = group.replace(/[^RIASEC/]/g, '');
+    if (!cleaned) return [];
+    if (!cleaned.includes('/')) {
+      return cleaned.split('').filter((letter) => RIASEC_META[letter]).map((letter) => [letter]);
+    }
+    return [cleaned.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_META[letter])];
+  })
+  .filter((group) => group.length > 0);
+
+const SDS_CODE_GUIDE = [
+  {
+    code: 'R',
+    label: 'Realistic',
+    meaning: 'Realistic interests point to practical work with tools, objects, machines, animals, plants, building, repairing, and other hands-on tasks.',
+    workStyle: 'Manual, mechanical, agricultural, electrical, technical, and outdoor skills.',
+    paths: ['Motor mechanic', 'Carpenter or joiner', 'Electrician', 'Engineering technician', 'Machine operator', 'Agriculture or wildlife work']
+  },
+  {
+    code: 'I',
+    label: 'Investigative',
+    meaning: 'Investigative interests point to learning, observing, researching, and solving problems in science, medicine, mathematics, and technical fields.',
+    workStyle: 'Scientific thinking, mathematics, analysis, research, curiosity, and independent study.',
+    paths: ['Scientist', 'Laboratory technician', 'Doctor or surgeon', 'Biologist', 'Chemist', 'Mathematician or statistician']
+  },
+  {
+    code: 'A',
+    label: 'Artistic',
+    meaning: 'Artistic interests point to creative work where you can use imagination, language, music, drama, design, art, and original expression.',
+    workStyle: 'Creative freedom, writing, performance, visual art, music, drama, and design.',
+    paths: ['Musician', 'Writer', 'Designer', 'Editor', 'Photographer', 'Artist or performer']
+  },
+  {
+    code: 'S',
+    label: 'Social',
+    meaning: 'Social interests point to work that involves helping, teaching, training, understanding, supporting, and caring for other people.',
+    workStyle: 'Communication, care, teaching, counselling, teamwork, and service to people.',
+    paths: ['Teacher', 'Nurse', 'Counsellor', 'Psychologist', 'Social worker', 'Community or welfare worker']
+  },
+  {
+    code: 'E',
+    label: 'Enterprising',
+    meaning: 'Enterprising interests point to work that involves leading, persuading, selling, managing, influencing people, and taking initiative.',
+    workStyle: 'Leadership, persuasion, business, public life, management, confidence, and goal-focused action.',
+    paths: ['Manager', 'Sales representative', 'Business owner', 'Marketing officer', 'Advertising executive', 'Hotel or project manager']
+  },
+  {
+    code: 'C',
+    label: 'Conventional',
+    meaning: 'Conventional interests point to organized work with information, numbers, records, office systems, filing, data, and clear procedures.',
+    workStyle: 'Order, accuracy, clerical skills, computation, record keeping, administration, and dependable routines.',
+    paths: ['Accountant', 'Bookkeeper', 'Bank official', 'Administrative officer', 'Payroll clerk', 'Data or records clerk']
+  }
+];
+
+const SDS_CODE_GUIDE_TEXT = [
+  'Before you view your results, here is how to read the SDS codes.',
+  'Your SDS result is based on six Holland interest areas: Realistic, Investigative, Artistic, Social, Enterprising, and Conventional.',
+  'The letters with the highest scores form your Holland code. The first letter is usually your strongest interest area, while the second and third letters add detail about the environments and career paths likely to fit you.',
+  ...SDS_CODE_GUIDE.map((item) => `${item.code} means ${item.label}. ${item.meaning} Common career paths include ${item.paths.join(', ')}.`),
+  'Use these codes as a career guidance starting point. They show patterns in your interests and abilities, but they should be considered together with your subjects, qualifications, values, opportunities, and advice from a counsellor.'
+].join(' ');
 
 /* Sub-components */
 const DemandBadge = ({ level }) => {
@@ -193,6 +262,134 @@ const CourseCard = ({ course }) => {
   );
 };
 
+const SdsCodeGuideModal = ({ speechSupported, isSpeaking, onToggleAudio, onContinue }) => (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center px-3 py-4 sm:px-6"
+    style={{ backgroundColor: 'rgba(15, 23, 42, 0.64)' }}
+    role="presentation"
+  >
+    <div
+      className="w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-lg bg-white shadow-2xl flex flex-col"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sds-code-guide-title"
+      style={{ border: `1px solid ${GOV.border}` }}
+    >
+      <div className="shrink-0 border-b px-4 py-4 sm:px-6" style={{ borderColor: GOV.borderLight }}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: GOV.textMuted }}>
+              Before Your Results
+            </p>
+            <h2 id="sds-code-guide-title" className="text-xl sm:text-2xl font-bold" style={{ color: GOV.text }}>
+              Understanding Your SDS Codes
+            </h2>
+            <p className="text-sm mt-2 max-w-3xl" style={{ color: GOV.textMuted }}>
+              The Self-Directed Search uses six interest codes. Your highest letters form your Holland Code and help connect your interests to possible career environments.
+            </p>
+          </div>
+
+          {speechSupported && (
+            <button
+              type="button"
+              onClick={onToggleAudio}
+              className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style={{ borderColor: GOV.border, color: GOV.blue, backgroundColor: '#fff' }}
+              aria-label={isSpeaking ? 'Stop reading SDS code guide aloud' : 'Read SDS code guide aloud'}
+            >
+              <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} aria-hidden="true" />
+              {isSpeaking ? 'Stop Audio' : 'Read Aloud'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {SDS_CODE_GUIDE.map((item) => {
+            const meta = RIASEC_META[item.code];
+            return (
+              <section
+                key={item.code}
+                className="rounded-lg border p-4"
+                style={{ borderColor: `${meta.color}35`, backgroundColor: meta.lightBg }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-10 h-10 rounded-md flex items-center justify-center text-base font-bold text-white shrink-0"
+                    style={{ backgroundColor: meta.color }}
+                    aria-hidden="true"
+                  >
+                    {item.code}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold" style={{ color: meta.color }}>{item.label}</h3>
+                    <p className="text-xs leading-relaxed mt-1" style={{ color: GOV.text }}>{item.meaning}</p>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-md bg-white px-3 py-2" style={{ border: `1px solid ${GOV.borderLight}` }}>
+                  <p className="text-xs font-semibold mb-1" style={{ color: GOV.text }}>Typical strengths</p>
+                  <p className="text-xs leading-relaxed" style={{ color: GOV.textMuted }}>{item.workStyle}</p>
+                </div>
+
+                <div className="mt-3">
+                  <p className="text-xs font-semibold mb-2" style={{ color: GOV.text }}>Career path examples</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {item.paths.map((path) => (
+                      <span
+                        key={path}
+                        className="rounded-full bg-white px-2 py-1 text-[11px] font-medium"
+                        style={{ color: GOV.text, border: `1px solid ${GOV.borderLight}` }}
+                      >
+                        {path}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 rounded-lg border p-4" style={{ borderColor: GOV.borderLight, backgroundColor: '#f8fafc' }}>
+          <h3 className="text-sm font-bold mb-2" style={{ color: GOV.text }}>How to read a three-letter Holland Code</h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <p className="text-xs leading-relaxed" style={{ color: GOV.textMuted }}>
+              <strong style={{ color: GOV.text }}>First letter:</strong> your strongest interest area.
+            </p>
+            <p className="text-xs leading-relaxed" style={{ color: GOV.textMuted }}>
+              <strong style={{ color: GOV.text }}>Second letter:</strong> an important supporting interest area.
+            </p>
+            <p className="text-xs leading-relaxed" style={{ color: GOV.textMuted }}>
+              <strong style={{ color: GOV.text }}>Third letter:</strong> another area that helps refine career matches.
+            </p>
+          </div>
+          <p className="text-xs leading-relaxed mt-3" style={{ color: GOV.textMuted }}>
+            A slash between letters means those letters are tied or very close in rank. Use the code as guidance, then compare it with your subjects, qualifications, values, opportunities, and counsellor advice.
+          </p>
+        </div>
+      </div>
+
+      <div className="shrink-0 border-t px-4 py-3 sm:px-6" style={{ borderColor: GOV.borderLight }}>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-relaxed" style={{ color: GOV.textHint }}>
+            These descriptions are based on the SDS booklet's RIASEC career environments.
+          </p>
+          <button
+            type="button"
+            onClick={onContinue}
+            className="inline-flex items-center justify-center rounded-md px-5 py-2.5 text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            style={{ backgroundColor: GOV.blue }}
+          >
+            View My Results
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 /* Main component */
 const TestResults = () => {
   const navigate = useNavigate();
@@ -207,6 +404,12 @@ const TestResults = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [showCodeGuide, setShowCodeGuide] = useState(Boolean(location.state?.showSdsCodeGuide));
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [codeGuideSpeaking, setCodeGuideSpeaking] = useState(false);
+  const [certificateInfo, setCertificateInfo] = useState(null);
+  const [generatingCertificate, setGeneratingCertificate] = useState(false);
+  const [downloadingCertificate, setDownloadingCertificate] = useState(false);
 
   const getResultsEndpoint = (id) => (
     isTestTaker
@@ -225,6 +428,51 @@ const TestResults = () => {
     if (user?.role === 'Test Administrator') return '/test-administrator';
     return '/dashboard';
   };
+
+  useEffect(() => {
+    setSpeechSupported('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window);
+
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const stopCodeGuideAudio = useCallback(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setCodeGuideSpeaking(false);
+  }, []);
+
+  const handleCodeGuideAudio = useCallback(() => {
+    if (!speechSupported) return;
+
+    if (codeGuideSpeaking) {
+      stopCodeGuideAudio();
+      return;
+    }
+
+    stopCodeGuideAudio();
+    const utterance = new SpeechSynthesisUtterance(SDS_CODE_GUIDE_TEXT);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.onend = () => setCodeGuideSpeaking(false);
+    utterance.onerror = () => setCodeGuideSpeaking(false);
+
+    setCodeGuideSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }, [codeGuideSpeaking, speechSupported, stopCodeGuideAudio]);
+
+  const handleCodeGuideContinue = useCallback(() => {
+    stopCodeGuideAudio();
+    setShowCodeGuide(false);
+    navigate(`${location.pathname}${location.search}`, {
+      replace: true,
+      state: { ...(location.state || {}), showSdsCodeGuide: false }
+    });
+  }, [location.pathname, location.search, location.state, navigate, stopCodeGuideAudio]);
 
   useEffect(() => {
     let id = assessmentIdFromState || assessmentIdFromQuery;
@@ -249,6 +497,19 @@ const TestResults = () => {
     fetchResults();
   }, [assessmentIdFromState, assessmentIdFromQuery, isTestTaker]);
 
+  useEffect(() => {
+    if (!isTestTaker || !assessmentId) return;
+    let mounted = true;
+    api.get(`/api/v1/assessments/${assessmentId}/certificate/check`)
+      .then((res) => {
+        if (mounted) setCertificateInfo(res.data?.data || { available: false });
+      })
+      .catch(() => {
+        if (mounted) setCertificateInfo({ available: false });
+      });
+    return () => { mounted = false; };
+  }, [assessmentId, isTestTaker]);
+
   const handleDownloadPdf = async () => {
     if (!assessmentId) return;
     setDownloadingPdf(true);
@@ -261,6 +522,51 @@ const TestResults = () => {
       window.URL.revokeObjectURL(url);
     } catch { alert('Failed to download PDF. Please try again.'); }
     finally { setDownloadingPdf(false); }
+  };
+
+  const downloadCertificatePdf = useCallback(async (certData = certificateInfo) => {
+    if (!assessmentId) return;
+    setDownloadingCertificate(true);
+    try {
+      const res = await api.get(`/api/v1/assessments/${assessmentId}/certificate/download`, { responseType: 'blob' });
+      const certNumber = certData?.certNumber || certData?.certificateNumber || assessmentId;
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SDS_Certificate_${String(certNumber).replace(/\//g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch {
+      alert('Failed to download certificate. Please try again.');
+    } finally {
+      setDownloadingCertificate(false);
+    }
+  }, [assessmentId, certificateInfo]);
+
+  const handleCertificateAction = async () => {
+    if (!assessmentId || generatingCertificate || downloadingCertificate) return;
+
+    if (certificateInfo?.available) {
+      await downloadCertificatePdf(certificateInfo);
+      return;
+    }
+
+    setGeneratingCertificate(true);
+    try {
+      const res = await api.post(`/api/v1/assessments/${assessmentId}/certificate/generate`);
+      const certData = {
+        ...(res.data?.data || {}),
+        available: true
+      };
+      setCertificateInfo(certData);
+      await downloadCertificatePdf(certData);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to generate certificate. Please try again.');
+    } finally {
+      setGeneratingCertificate(false);
+    }
   };
 
   const handleEmailResults = () => {
@@ -316,13 +622,11 @@ const TestResults = () => {
     S: assessment.scoreS ?? 0, E: assessment.scoreE ?? 0, C: assessment.scoreC ?? 0
   };
   const maxScore = Math.max(...Object.values(scores), 1);
-  const hollandCode = assessment.hollandCodeDisplay || assessment.hollandCode || '';
-  const parsedDisplayGroups = String(hollandCode || '')
-    .toUpperCase()
-    .trim()
-    .split(/\s+/)
-    .map((group) => group.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_META[letter]))
-    .filter((group) => group.length > 0);
+  const rawHollandCode = assessment.hollandCode || assessment.hollandCodeDisplay || '';
+  const primaryHollandCode = normalizePrimaryHollandCode(rawHollandCode);
+  const parsedDisplayGroups = primaryHollandCode
+    ? primaryHollandCode.split('').map((letter) => [letter])
+    : parseHollandDisplayGroups(rawHollandCode);
 
   const sortedScoreEntries = Object.entries(scores)
     .map(([key, score]) => [key, Number(score || 0)])
@@ -347,7 +651,7 @@ const TestResults = () => {
     : scoreRankGroups.map((group) => group.map((entry) => entry.letter)))
     .slice(0, 3);
 
-  const hollandDisplayCode = hollandDisplayGroups.map((group) => group.join('/')).join(' ') || hollandCode;
+  const hollandDisplayCode = primaryHollandCode || hollandDisplayGroups.map((group) => group.join('/')).join(' ') || rawHollandCode;
   const hollandDisplayLabel = hollandDisplayGroups
     .map((group) => group.map((letter) => RIASEC_META[letter]?.label).filter(Boolean).join('/'))
     .join(' - ');
@@ -374,6 +678,17 @@ const TestResults = () => {
     ? new Date(assessment.completedAt).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
     : new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  if (isTestTaker && showCodeGuide) {
+    return (
+      <SdsCodeGuideModal
+        speechSupported={speechSupported}
+        isSpeaking={codeGuideSpeaking}
+        onToggleAudio={handleCodeGuideAudio}
+        onContinue={handleCodeGuideContinue}
+      />
+    );
+  }
+
   /* Render */
   return (
     <AssessmentShell
@@ -386,6 +701,19 @@ const TestResults = () => {
             {downloadingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             {downloadingPdf ? 'Generating...' : 'Download PDF Report'}
           </button>
+          {isTestTaker && (
+            <button type="button" onClick={handleCertificateAction} disabled={generatingCertificate || downloadingCertificate}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: '#d97706' }}>
+              {generatingCertificate || downloadingCertificate ? <Loader2 className="w-4 h-4 animate-spin" /> : certificateInfo?.available ? <Download className="w-4 h-4" /> : <Award className="w-4 h-4" />}
+              {generatingCertificate
+                ? 'Generating Certificate...'
+                : downloadingCertificate
+                  ? 'Downloading Certificate...'
+                  : certificateInfo?.available
+                    ? 'Download Certificate'
+                    : 'Generate Certificate'}
+            </button>
+          )}
           <button type="button" onClick={() => navigate(getDashboardPath())}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
             Dashboard

@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 
 export const AuthContext = createContext();
 
@@ -15,7 +14,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await api.get('/api/v1/auth/me');
+        const response = await api.get('/api/v1/auth/me', { skipAuthRetry: true });
         const userData = response.data?.data?.user ?? response.data?.user;
         setUser(userData || null);
         setIsAuthenticated(!!userData);
@@ -106,14 +105,10 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Require email verification only when user has an email (phone-only users have no email to verify)
-  const needsEmailVerification = user?.email && !user?.isEmailVerified;
+  // Require email verification only for self-registered accounts.
+  const needsEmailVerification = user?.email && !user?.isEmailVerified && !user?.createdByTestAdministrator;
   const isOnVerifyPage = window.location.pathname.includes('/verify-email');
   
-  // Test Takers: server sets onboardingCompleted when required profile data is saved
-  const needsOnboarding = user && profileNeedsOnboarding(user);
-  const isOnOnboardingPage = window.location.pathname === '/onboarding';
-
   const roleDashboard = (role) => {
     if (role === 'System Administrator') return '/admin';
     if (role === 'Test Administrator') return '/test-administrator';
@@ -124,22 +119,25 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
     if (!loading) {
       if (!isAuthenticated) {
         navigate('/login');
-      } else if (needsOnboarding && !isOnOnboardingPage) {
-        navigate('/onboarding');
-      } else if (allowedRoles && !allowedRoles.includes(user?.role)) {
-        navigate(roleDashboard(user?.role));
       } else if (needsEmailVerification && !isOnVerifyPage) {
-        navigate('/unauthorized', { 
-          state: { 
+        navigate('/unauthorized', {
+          state: {
             message: 'Please verify your email address to access this page',
             requiresVerification: true
           }
         });
+      } else if (allowedRoles && !allowedRoles.includes(user?.role)) {
+        navigate(roleDashboard(user?.role));
       }
     }
-  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage, needsOnboarding, isOnOnboardingPage]);
+  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage]);
 
-  if (loading || !isAuthenticated || needsOnboarding || (allowedRoles && !allowedRoles.includes(user?.role)) || (needsEmailVerification && !isOnVerifyPage)) {
+  if (
+    loading ||
+    !isAuthenticated ||
+    (allowedRoles && !allowedRoles.includes(user?.role)) ||
+    (needsEmailVerification && !isOnVerifyPage)
+  ) {
     return null;
   }
 

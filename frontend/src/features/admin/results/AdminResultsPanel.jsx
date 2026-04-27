@@ -8,6 +8,8 @@ import ActionMenu from '../../../components/ui/ActionMenu';
 import { adminService } from '../../../services/adminService';
 import { usePermissions } from '../../../context/PermissionContext';
 
+const getHollandDisplayCode = (assessment) => assessment?.hollandCode || assessment?.hollandCodeDisplay || '–';
+
 const AdminResultsPanel = () => {
   const navigate = useNavigate();
   const [assessments, setAssessments] = useState([]);
@@ -57,7 +59,7 @@ const AdminResultsPanel = () => {
     if (!search) return assessments;
     const q = search.toLowerCase();
     return assessments.filter(a =>
-      `${a.user?.firstName} ${a.user?.lastName} ${a.user?.email} ${a.hollandCode || ''} ${a.user?.institution?.name || ''}`
+      `${a.user?.firstName} ${a.user?.lastName} ${a.user?.email} ${getHollandDisplayCode(a)} ${a.user?.institution?.name || ''}`
         .toLowerCase().includes(q)
     );
   }, [assessments, search]);
@@ -89,7 +91,7 @@ const AdminResultsPanel = () => {
       key: 'hollandCode',
       header: 'Holland Code',
       sortable: true,
-      render: (a) => <span className="font-mono font-semibold text-sm" style={{ color: GOV.text }}>{a.hollandCode || '–'}</span>,
+      render: (a) => <span className="font-mono font-semibold text-sm" style={{ color: GOV.text }}>{getHollandDisplayCode(a)}</span>,
     },
     {
       key: 'completedAt',

@@ -12,6 +12,8 @@ import { adminService } from '../../services/adminService';
 import { PermissionGate } from '../../context/PermissionContext';
 import { adminUserDisplayName, adminUserInitials } from '../../utils/adminUserDisplay';
 
+const getHollandDisplayCode = (assessment) => assessment?.hollandCode || assessment?.hollandCodeDisplay || '—';
+
 const Field = ({ label, value, mono = false }) => (
   <div className="py-3 border-b last:border-b-0" style={{ borderColor: GOV.borderLight }}>
     <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: GOV.textMuted }}>{label}</p>
@@ -48,7 +50,11 @@ const AdminUserDetailPage = () => {
         const u = await adminService.getUser(userId);
         setUser(u);
         const allAssessments = await adminService.getAssessments(1000);
-        setAssessments(allAssessments.filter(a => a.userId === userId || a.user?.id === userId));
+        setAssessments(
+          allAssessments
+            .filter(a => a.userId === userId || a.user?.id === userId)
+            .map(a => ({ ...a, hollandCode: getHollandDisplayCode(a) }))
+        );
       } catch (e) {
         setError(e.response?.data?.message || 'Failed to load user');
       } finally {

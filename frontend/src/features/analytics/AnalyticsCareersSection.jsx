@@ -9,6 +9,7 @@ import DataTable from '../../components/data/DataTable';
 import { PIE_COLORS, DEMAND_COLORS, DEMAND_LABELS, RIASEC_COLORS, RIASEC_LABELS, QUAL_LABELS } from './analyticsConstants';
 
 const DEMAND_LEVEL_KEYS = Object.keys(DEMAND_LABELS);
+const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
 
 /* ── Shared Card (matches Overview) ── */
 const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' }) => (
@@ -67,7 +68,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
   /* Same aggregation as GET /analytics/holland-distribution (avoids duplicating query in skills-pipeline) */
   const allTimePipelineBar = useMemo(() => {
     if (!hollandDist?.length) return [];
-    return hollandDist.slice(0, 12).map((d) => ({ code: d.hollandCode, count: Number(d.count) }));
+    return hollandDist.slice(0, 12).map((d) => ({ code: getHollandDisplayCode(d), count: Number(d.count) }));
   }, [hollandDist]);
 
   const sortedEmergingCareers = useMemo(() => {

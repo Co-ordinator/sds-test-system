@@ -32,10 +32,17 @@ class ScoringService {
     if (!raw) return [];
     return raw
       .split(/\s+/)
-      .map((group) => group
-        .split('/')
-        .map((letter) => letter.trim())
-        .filter((letter) => RIASEC_KEYS.includes(letter)))
+      .flatMap((group) => {
+        const cleaned = group.replace(/[^RIASEC/]/g, '');
+        if (!cleaned) return [];
+        if (!cleaned.includes('/')) {
+          return cleaned.split('').filter((letter) => RIASEC_KEYS.includes(letter)).map((letter) => [letter]);
+        }
+        return [cleaned
+          .split('/')
+          .map((letter) => letter.trim())
+          .filter((letter) => RIASEC_KEYS.includes(letter))];
+      })
       .filter((group) => group.length > 0);
   }
 

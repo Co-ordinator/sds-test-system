@@ -5,6 +5,29 @@ const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
 
+const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
+
+const getScore = (assessment, key) => Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
+
+const attachHollandCodeDisplay = (assessment) => {
+  if (!assessment) return assessment;
+  if (assessment.status !== 'completed' && !assessment.hollandCode) {
+    assessment.setDataValue?.('hollandCodeDisplay', null);
+    return assessment;
+  }
+
+  const totals = SCORE_KEYS.reduce((acc, key) => {
+    acc[key] = getScore(assessment, key);
+    return acc;
+  }, {});
+  if (!SCORE_KEYS.some((key) => totals[key] > 0)) {
+    assessment.setDataValue?.('hollandCodeDisplay', assessment.hollandCode || null);
+    return assessment;
+  }
+  assessment.setDataValue?.('hollandCodeDisplay', assessment.hollandCode || null);
+  return assessment;
+};
+
 module.exports = {
 
   /* ─── Assessment Lifecycle ────────────────────────────────────────────── */
@@ -29,11 +52,16 @@ module.exports = {
   },
 
   listMyAssessments: async (userId) => {
-    return await Assessment.findAll({
+    const assessments = await Assessment.findAll({
       where: { userId },
       order: [['createdAt', 'DESC']],
-      attributes: ['id', 'status', 'progress', 'hollandCode', 'completedAt', 'createdAt', 'updatedAt']
+      attributes: [
+        'id', 'status', 'progress', 'hollandCode',
+        'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC',
+        'completedAt', 'createdAt', 'updatedAt'
+      ]
     });
+    return assessments.map(attachHollandCodeDisplay);
   },
 
   getAssessment: async (assessmentId, userId) => {
@@ -41,7 +69,7 @@ module.exports = {
       where: { id: assessmentId, userId }
     });
     if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
-    return assessment;
+    return attachHollandCodeDisplay(assessment);
   },
 
   /* ─── Progress Management ─────────────────────────────────────────────── */
@@ -187,7 +215,7 @@ module.exports = {
       E: assessment.scoreE,
       C: assessment.scoreC,
     }, 0);
-    assessment.setDataValue('hollandCodeDisplay', displayCode);
+    assessment.setDataValue('hollandCodeDisplay', assessment.hollandCode || displayCode);
 
     const recommendations = await scoringService.getRecommendations(
       assessment.hollandCode,
@@ -234,7 +262,7 @@ module.exports = {
       E: assessment.scoreE,
       C: assessment.scoreC,
     }, 0);
-    assessment.setDataValue('hollandCodeDisplay', displayCode);
+    assessment.setDataValue('hollandCodeDisplay', assessment.hollandCode || displayCode);
 
     try {
       recommendations = await scoringService.getRecommendations(

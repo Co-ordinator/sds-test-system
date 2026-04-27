@@ -28,6 +28,8 @@ const EMPTY_FILTERS = {
   institutionId: '', institutionType: '', region: '', userType: '', startDate: '', endDate: ''
 };
 
+const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+
 const QUICK_DATE_RANGES = [
   { key: '30d', label: 'Last 30 days', days: 30 },
   { key: '90d', label: 'Last 90 days', days: 90 },
@@ -149,7 +151,7 @@ const Analytics = () => {
     { name: 'C', full: RIASEC_LABELS.C, value: Number(analytics.riasecAverages.avgC || 0) },
   ] : [], [analytics]);
 
-  const pieData = useMemo(() => hollandDist.slice(0, 10).map(d => ({ name: d.hollandCode, value: Number(d.count) })), [hollandDist]);
+  const pieData = useMemo(() => hollandDist.slice(0, 10).map(d => ({ name: getHollandDisplayCode(d), value: Number(d.count) })), [hollandDist]);
 
   const trendData = useMemo(() => trend.map(t => ({
     month: t.month ? new Date(t.month).toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' }) : '',

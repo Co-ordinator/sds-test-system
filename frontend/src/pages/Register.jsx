@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
 import { GOV, TYPO } from '../theme/government';
 
@@ -11,7 +10,6 @@ const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 export default function Register() {
   const navigate = useNavigate();
-  const { setSession } = useAuth();
   const [serverError, setServerError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -26,12 +24,9 @@ export default function Register() {
       consent: true
     };
     try {
-      const response = await api.post('/api/v1/auth/register', payload);
-      const { token, data } = response.data;
-      // Hydrate auth context so onboarding can access user
-      if (token) setSession(token, data?.user);
+      await api.post('/api/v1/auth/register', payload);
       navigate('/registration-success', {
-        state: { email: payload.email, fromRegistration: true }
+        state: { email: payload.email }
       });
     } catch (err) {
       const uiMessage = err?.uiMessage || err?.response?.data?.message || 'Registration failed. Please try again.';
@@ -72,7 +67,7 @@ export default function Register() {
             <div className="mb-2">
               <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>Create your account</h1>
               <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
-                Complete your profile after registration.
+                Verify your email after registration to continue.
               </p>
             </div>
 

@@ -8,7 +8,6 @@ export default function RegistrationSuccess() {
   const navigate = useNavigate();
   const [showResendModal, setShowResendModal] = useState(false);
   const email = location.state?.email || '';
-  const fromRegistration = location.state?.fromRegistration || false;
 
   return (
     <div className="min-h-screen flex flex-col relative bg-white">
@@ -21,7 +20,7 @@ export default function RegistrationSuccess() {
         style={{ borderColor: GOV.border, backgroundColor: GOV.ministryBarBg }}
       >
         <p className={TYPO.hint} style={{ color: GOV.ministryBarText }}>
-          {MINISTRY_NAME} · {KINGDOM}
+          {MINISTRY_NAME} - {KINGDOM}
         </p>
       </div>
 
@@ -52,20 +51,10 @@ export default function RegistrationSuccess() {
               <span className="font-medium" style={{ color: GOV.text }}>{email || 'your email'}</span>.
             </p>
             <p className={`${TYPO.hint} mb-5`} style={{ color: GOV.textHint }}>
-              You can complete your profile now and verify your email later.
+              Check your inbox and verify your email before completing onboarding.
             </p>
 
             <div className="space-y-2">
-              {fromRegistration && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/onboarding')}
-                  className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
-                  style={{ backgroundColor: GOV.blue }}
-                >
-                  Complete your profile →
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => setShowResendModal(true)}
