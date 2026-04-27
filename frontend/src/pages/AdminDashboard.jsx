@@ -28,7 +28,7 @@ import {
 import { PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../features/analytics/analyticsConstants';
 
 const normalizeRegion = (value) => (value || '').toString().trim().toLowerCase();
-const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
 
 const AdminDashboard = () => {
   const { user } = useAuth();

@@ -622,11 +622,9 @@ const TestResults = () => {
     S: assessment.scoreS ?? 0, E: assessment.scoreE ?? 0, C: assessment.scoreC ?? 0
   };
   const maxScore = Math.max(...Object.values(scores), 1);
-  const rawHollandCode = assessment.hollandCode || assessment.hollandCodeDisplay || '';
-  const primaryHollandCode = normalizePrimaryHollandCode(rawHollandCode);
-  const parsedDisplayGroups = primaryHollandCode
-    ? primaryHollandCode.split('').map((letter) => [letter])
-    : parseHollandDisplayGroups(rawHollandCode);
+  const rawHollandCode = assessment.hollandCodeDisplay || assessment.hollandCode || '';
+  const primaryHollandCode = normalizePrimaryHollandCode(assessment.hollandCode || rawHollandCode);
+  const parsedDisplayGroups = parseHollandDisplayGroups(rawHollandCode);
 
   const sortedScoreEntries = Object.entries(scores)
     .map(([key, score]) => [key, Number(score || 0)])
@@ -651,7 +649,7 @@ const TestResults = () => {
     : scoreRankGroups.map((group) => group.map((entry) => entry.letter)))
     .slice(0, 3);
 
-  const hollandDisplayCode = primaryHollandCode || hollandDisplayGroups.map((group) => group.join('/')).join(' ') || rawHollandCode;
+  const hollandDisplayCode = hollandDisplayGroups.map((group) => group.join('/')).join(' ') || rawHollandCode || primaryHollandCode;
   const hollandDisplayLabel = hollandDisplayGroups
     .map((group) => group.map((letter) => RIASEC_META[letter]?.label).filter(Boolean).join('/'))
     .join(' - ');

@@ -115,7 +115,7 @@ class AssessmentController {
         status: 'success',
         data: {
           hollandCode: results.hollandCode,
-          hollandCodeDisplay: results.hollandCode || results.hollandCodeDisplay,
+          hollandCodeDisplay: results.hollandCodeDisplay || results.hollandCode,
           scores: results.scores,
           recommendations: results.recommendations
         }
@@ -143,8 +143,8 @@ class AssessmentController {
 
       const student = assessment.user || {};
       const studentName = [student.firstName, student.lastName].filter(Boolean).join(' ') || 'Student';
-      const rawHollandCode = assessment.hollandCode || assessment.hollandCodeDisplay || '';
-      const primaryHollandCode = normalizePrimaryHollandCode(rawHollandCode);
+      const rawHollandCode = assessment.hollandCodeDisplay || assessment.hollandCode || '';
+      const primaryHollandCode = normalizePrimaryHollandCode(assessment.hollandCode || rawHollandCode);
       const hollandCode = primaryHollandCode || rawHollandCode;
       const scores = {
         R: assessment.scoreR ?? 0,
@@ -185,17 +185,16 @@ class AssessmentController {
           scoreRankGroups.push([row]);
         }
       });
-      const parsedDisplayGroups = primaryHollandCode
-        ? primaryHollandCode.split('').map((letter) => [letter])
-        : parseHollandDisplayGroups(rawHollandCode);
+      const parsedDisplayGroups = parseHollandDisplayGroups(rawHollandCode);
       const hollandDisplayGroups = (parsedDisplayGroups.length > 0
         ? parsedDisplayGroups
         : scoreRankGroups.map((group) => group.map((row) => row.key)))
         .slice(0, 3);
-      const hollandCodeDisplayText = primaryHollandCode || hollandDisplayGroups.map((group) => group.join('/')).join(' ');
+      const hollandCodeDisplayText = hollandDisplayGroups.map((group) => group.join('/')).join(' ') || rawHollandCode || primaryHollandCode;
       const hollandCodeLabelText = hollandDisplayGroups
         .map((group) => group.map((letter) => RIASEC_LABELS[letter]).join('/'))
         .join(' - ');
+      const hollandLetters = Array.from(new Set(hollandDisplayGroups.flat().filter(Boolean)));
       const topRankGroups = scoreRankGroups.slice(0, 3);
       const topThree = sortedScores.slice(0, 3);
       const topFive = sortedScores.slice(0, 5);
@@ -357,7 +356,7 @@ class AssessmentController {
       ensureSpace(78);
       doc.rect(leftMargin, cursorY, pageWidth, 72).strokeColor(border).lineWidth(0.7).stroke();
       doc.fillColor(text).font('Helvetica-Bold').fontSize(9.3)
-        .text(`Primary code: ${hollandCodeDisplayText || hollandCode || 'Not generated'}`, leftMargin + 12, cursorY + 9, { width: pageWidth - 24 });
+        .text(`Holland code: ${hollandCodeDisplayText || hollandCode || 'Not generated'}`, leftMargin + 12, cursorY + 9, { width: pageWidth - 24 });
       topRankGroups.forEach((group, index) => {
         const scoreValue = Number(group[0]?.score || 0);
         const pct = totalScore > 0 ? Math.round((scoreValue / totalScore) * 100) : 0;

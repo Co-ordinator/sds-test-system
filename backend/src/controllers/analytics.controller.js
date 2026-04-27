@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 
-const getHollandDisplayCode = (row) => row?.hollandCode || row?.holland_code || row?.hollandCodeDisplay || '';
+const getHollandDisplayCode = (row) => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
 
 /**
  * Analytics Controller — HTTP layer only.

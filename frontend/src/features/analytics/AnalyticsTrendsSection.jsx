@@ -37,7 +37,7 @@ const parseSegmentAvg = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
 };
-const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
 const USER_TYPE_COLORS = {
   'High School Student': '#F44336',
   'University Student': '#2563eb',
@@ -283,7 +283,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
               const code = getHollandDisplayCode(d);
               const pct = hollandTotal > 0 ? (Number(d.count) / hollandTotal) * 100 : 0;
               return (
-                <div key={`${d.hollandCode ?? '—'}-${i}`} className="flex items-center gap-2">
+                <div key={`${code || '—'}-${i}`} className="flex items-center gap-2">
                   <span className="w-4 text-xs font-bold text-right" style={{ color: GOV.textHint }}>#{i + 1}</span>
                   <span className="min-w-[4.5rem] text-xs font-mono font-bold" style={{ color: GOV.blue }}>{code}</span>
                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>

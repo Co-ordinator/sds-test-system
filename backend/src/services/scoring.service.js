@@ -182,6 +182,34 @@ class ScoringService {
     return { primaryCode, displayCode, ranked };
   }
 
+  getScoreTotals(source = {}) {
+    return RIASEC_KEYS.reduce((acc, key) => {
+      const snakeKey = `score_${key.toLowerCase()}`;
+      acc[key] = Number(
+        source?.[`score${key}`] ??
+        source?.[snakeKey] ??
+        source?.get?.(`score${key}`) ??
+        source?.get?.(snakeKey) ??
+        0
+      );
+      return acc;
+    }, {});
+  }
+
+  getDisplayCodeFromScores(scores = {}, fallbackCode = '') {
+    const hasScores = RIASEC_KEYS.some((key) => Number(scores?.[key] || 0) > 0);
+    if (!hasScores) return fallbackCode || '';
+    return this.buildHollandCodes(scores, 0).displayCode || fallbackCode || '';
+  }
+
+  getAssessmentDisplayCode(assessment, fallbackCode = '') {
+    if (!assessment) return fallbackCode || '';
+    const totals = this.getScoreTotals(assessment);
+    const storedDisplay = assessment?.hollandCodeDisplay || assessment?.holland_code_display || assessment?.get?.('hollandCodeDisplay') || assessment?.get?.('holland_code_display');
+    const storedPrimary = assessment?.hollandCode || assessment?.holland_code || assessment?.get?.('hollandCode') || assessment?.get?.('holland_code');
+    return this.getDisplayCodeFromScores(totals, storedDisplay || storedPrimary || fallbackCode || '');
+  }
+
   /**
    * Main entry point to finalize an assessment
    */

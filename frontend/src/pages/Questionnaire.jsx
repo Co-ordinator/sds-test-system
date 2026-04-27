@@ -59,6 +59,25 @@ const SECTIONS = [
   }
 ];
 
+const ROMAN_LABEL_SPEECH_VALUES = [
+  ['IV', '4'],
+  ['III', '3'],
+  ['II', '2'],
+  ['I', '1']
+];
+
+const getSectionSpeechNumber = (section) =>
+  ROMAN_LABEL_SPEECH_VALUES.find(([roman]) => roman === section?.num)?.[1] || section?.num || '';
+
+const normalizeRomanLabelsForSpeech = (text = '') =>
+  ROMAN_LABEL_SPEECH_VALUES.reduce(
+    (value, [roman, number]) =>
+      value
+        .replace(new RegExp(`\\b(Section)\\s+${roman}\\b`, 'gi'), `$1 ${number}`)
+        .replace(new RegExp(`\\b(Group)\\s+${roman}\\b`, 'gi'), `$1 ${number}`),
+    String(text)
+  );
+
 const RATING_LABELS = [
   { value: '1', label: 'Very Low' },
   { value: '2', label: 'Low' },
@@ -210,7 +229,7 @@ const SectionFourRatingGuide = () => (
       </p>
     </div>
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] text-sm" aria-label="Section IV rating scale for Group I and Group II">
+      <table className="w-full min-w-[760px] text-sm" aria-label="Section 4 rating scale for Group 1 and Group 2">
         <thead>
           <tr className="border-b" style={{ borderColor: GOV.borderLight }}>
             <th className="px-4 py-3 text-left font-semibold" style={{ color: GOV.textMuted }} scope="col">
@@ -396,10 +415,11 @@ const Questionnaire = () => {
     }
 
     stopNarration();
+    const sectionSpeechNumber = getSectionSpeechNumber(section);
     const speechText = [
-      `Up next. Section ${section.num}: ${section.label}.`,
+      `Up next. Section ${sectionSpeechNumber}: ${section.label}.`,
       ...(section.transitionNarrative || [section.description])
-    ].join(' ');
+    ].map(normalizeRomanLabelsForSpeech).join(' ');
 
     const utterance = new SpeechSynthesisUtterance(speechText);
     utterance.rate = 0.9;
@@ -916,6 +936,7 @@ const Questionnaire = () => {
         const firstSection = SECTIONS[0];
         const firstSectionNarrative = firstSection.transitionNarrative || [firstSection.description];
         const isNarratingFirstSection = activeNarrationKey === firstSection.id;
+        const firstSectionSpeechNumber = getSectionSpeechNumber(firstSection);
         return (
           <div className="bg-white rounded-md p-8 md:p-12 text-center">
             <div className="max-w-4xl mx-auto rounded-lg p-5 md:p-6 text-left" style={{ backgroundColor: GOV.blueLightAlt }}>
@@ -944,7 +965,7 @@ const Questionnaire = () => {
                     onClick={() => handleNarrationToggle(firstSection)}
                     className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ backgroundColor: '#ffffff', borderColor: GOV.border, color: GOV.blue }}
-                    aria-label={isNarratingFirstSection ? 'Stop reading Section I instructions aloud' : 'Read Section I instructions aloud'}
+                    aria-label={isNarratingFirstSection ? `Stop reading Section ${firstSectionSpeechNumber} instructions aloud` : `Read Section ${firstSectionSpeechNumber} instructions aloud`}
                   >
                     <Volume2 className={`w-4 h-4 ${isNarratingFirstSection ? 'animate-pulse' : ''}`} aria-hidden="true" />
                     {isNarratingFirstSection ? 'Stop Audio' : 'Read Aloud'}
@@ -980,6 +1001,7 @@ const Questionnaire = () => {
         const resumeSection = currentSectionMeta;
         const resumeSectionNarrative = resumeSection.transitionNarrative || [resumeSection.description];
         const isNarratingResumeSection = activeNarrationKey === resumeSection.id;
+        const resumeSectionSpeechNumber = getSectionSpeechNumber(resumeSection);
         return (
           <div className="bg-white rounded-md p-8 md:p-12 text-center">
             <div className="max-w-4xl mx-auto rounded-lg p-5 md:p-6 text-left" style={{ backgroundColor: GOV.blueLightAlt }}>
@@ -1011,7 +1033,7 @@ const Questionnaire = () => {
                     onClick={() => handleNarrationToggle(resumeSection)}
                     className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ backgroundColor: '#ffffff', borderColor: GOV.border, color: GOV.blue }}
-                    aria-label={isNarratingResumeSection ? `Stop reading Section ${resumeSection.num} instructions aloud` : `Read Section ${resumeSection.num} instructions aloud`}
+                    aria-label={isNarratingResumeSection ? `Stop reading Section ${resumeSectionSpeechNumber} instructions aloud` : `Read Section ${resumeSectionSpeechNumber} instructions aloud`}
                   >
                     <Volume2 className={`w-4 h-4 ${isNarratingResumeSection ? 'animate-pulse' : ''}`} aria-hidden="true" />
                     {isNarratingResumeSection ? 'Stop Audio' : 'Read Aloud'}
@@ -1048,6 +1070,7 @@ const Questionnaire = () => {
         const nextSection = SECTIONS[sectionTransition.to];
         const nextSectionNarrative = nextSection.transitionNarrative || [nextSection.description];
         const isNarratingNextSection = activeNarrationKey === nextSection.id;
+        const nextSectionSpeechNumber = getSectionSpeechNumber(nextSection);
         return (
           <div className="bg-white rounded-md p-8 md:p-12 text-center">
             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f0fdf4' }}>
@@ -1080,7 +1103,7 @@ const Questionnaire = () => {
                     onClick={() => handleNarrationToggle(nextSection)}
                     className="inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                     style={{ backgroundColor: '#ffffff', borderColor: GOV.border, color: GOV.blue }}
-                    aria-label={isNarratingNextSection ? `Stop reading Section ${nextSection.num} instructions aloud` : `Read Section ${nextSection.num} instructions aloud`}
+                    aria-label={isNarratingNextSection ? `Stop reading Section ${nextSectionSpeechNumber} instructions aloud` : `Read Section ${nextSectionSpeechNumber} instructions aloud`}
                   >
                     <Volume2 className={`w-4 h-4 ${isNarratingNextSection ? 'animate-pulse' : ''}`} aria-hidden="true" />
                     {isNarratingNextSection ? 'Stop Audio' : 'Read Aloud'}
@@ -1105,7 +1128,7 @@ const Questionnaire = () => {
                     </p>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-sm" aria-label="Section IV rating scale for Group I and Group II">
+                    <table className="w-full min-w-[760px] text-sm" aria-label="Section 4 rating scale for Group 1 and Group 2">
                       <thead>
                         <tr className="border-b" style={{ borderColor: GOV.borderLight }}>
                           <th className="px-4 py-3 text-left font-semibold" style={{ color: GOV.textMuted }} scope="col">

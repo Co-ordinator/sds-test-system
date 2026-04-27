@@ -8,17 +8,9 @@ const crypto = require('crypto');
 const { NotFoundError, BadRequestError, ConflictError } = require('../utils/errors/appError');
 const scoringService = require('./scoring.service');
 
-const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
-
 const getAssessmentDisplayCode = (assessment) => {
   if (!assessment || (assessment.status !== 'completed' && !assessment.hollandCode)) return null;
-  if (assessment.hollandCode) return assessment.hollandCode;
-  const totals = SCORE_KEYS.reduce((acc, key) => {
-    acc[key] = Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
-    return acc;
-  }, {});
-  if (!SCORE_KEYS.some((key) => totals[key] > 0)) return assessment.hollandCode || null;
-  return scoringService.buildHollandCodes(totals, 0).primaryCode || assessment.hollandCode || null;
+  return scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || null) || null;
 };
 
 const attachAssessmentDisplayCode = (assessment) => {

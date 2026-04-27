@@ -5,10 +5,6 @@ const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
 
-const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
-
-const getScore = (assessment, key) => Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
-
 const attachHollandCodeDisplay = (assessment) => {
   if (!assessment) return assessment;
   if (assessment.status !== 'completed' && !assessment.hollandCode) {
@@ -16,15 +12,10 @@ const attachHollandCodeDisplay = (assessment) => {
     return assessment;
   }
 
-  const totals = SCORE_KEYS.reduce((acc, key) => {
-    acc[key] = getScore(assessment, key);
-    return acc;
-  }, {});
-  if (!SCORE_KEYS.some((key) => totals[key] > 0)) {
-    assessment.setDataValue?.('hollandCodeDisplay', assessment.hollandCode || null);
-    return assessment;
-  }
-  assessment.setDataValue?.('hollandCodeDisplay', assessment.hollandCode || null);
+  assessment.setDataValue?.(
+    'hollandCodeDisplay',
+    scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || null) || null
+  );
   return assessment;
 };
 
@@ -207,29 +198,16 @@ module.exports = {
       throw new ForbiddenError('Not authorized to view these results', 'RESULTS_NOT_AUTHORIZED');
     }
 
-    const { displayCode } = scoringService.buildHollandCodes({
-      R: assessment.scoreR,
-      I: assessment.scoreI,
-      A: assessment.scoreA,
-      S: assessment.scoreS,
-      E: assessment.scoreE,
-      C: assessment.scoreC,
-    }, 0);
-    assessment.setDataValue('hollandCodeDisplay', assessment.hollandCode || displayCode);
+    const scores = scoringService.getScoreTotals(assessment);
+    const displayCode = scoringService.getDisplayCodeFromScores(scores, assessment.hollandCode || '');
+    assessment.setDataValue('hollandCodeDisplay', displayCode || assessment.hollandCode);
 
     const recommendations = await scoringService.getRecommendations(
       assessment.hollandCode,
       assessment.educationLevelAtTest,
       null,
       {
-        scores: {
-          R: assessment.scoreR,
-          I: assessment.scoreI,
-          A: assessment.scoreA,
-          S: assessment.scoreS,
-          E: assessment.scoreE,
-          C: assessment.scoreC,
-        },
+        scores,
         displayCode,
       }
     );
@@ -254,15 +232,9 @@ module.exports = {
     }
 
     let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
-    const { displayCode } = scoringService.buildHollandCodes({
-      R: assessment.scoreR,
-      I: assessment.scoreI,
-      A: assessment.scoreA,
-      S: assessment.scoreS,
-      E: assessment.scoreE,
-      C: assessment.scoreC,
-    }, 0);
-    assessment.setDataValue('hollandCodeDisplay', assessment.hollandCode || displayCode);
+    const scores = scoringService.getScoreTotals(assessment);
+    const displayCode = scoringService.getDisplayCodeFromScores(scores, assessment.hollandCode || '');
+    assessment.setDataValue('hollandCodeDisplay', displayCode || assessment.hollandCode);
 
     try {
       recommendations = await scoringService.getRecommendations(
@@ -270,14 +242,7 @@ module.exports = {
         assessment.educationLevelAtTest,
         null,
         {
-          scores: {
-            R: assessment.scoreR,
-            I: assessment.scoreI,
-            A: assessment.scoreA,
-            S: assessment.scoreS,
-            E: assessment.scoreE,
-            C: assessment.scoreC,
-          },
+          scores,
           displayCode,
         }
       );

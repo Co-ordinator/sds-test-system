@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { GOV, TYPO } from '../../theme/government';
 
 const RIASEC_COLORS = ['#F44336', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
+const getAssessmentDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '';
 
 const SBadge = ({ status }) => {
   const map = {
@@ -52,7 +53,7 @@ const CounselorOverviewPanel = ({ students, institutionStats }) => {
               <div className="text-right">
                 <SBadge status={s.latestAssessment?.status} />
                 <p className="text-xs mt-0.5 font-mono" style={{ color: GOV.textMuted }}>
-                  {s.latestAssessment?.hollandCode || `${Math.round(s.latestAssessment?.progress || 0)}%`}
+                  {getAssessmentDisplayCode(s.latestAssessment) || `${Math.round(s.latestAssessment?.progress || 0)}%`}
                 </p>
               </div>
               {s.latestAssessment?.status === 'completed' && (

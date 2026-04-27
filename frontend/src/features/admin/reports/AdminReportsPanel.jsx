@@ -112,7 +112,7 @@ const GENDER_LBL = { male:'Male', female:'Female', other:'Other', prefer_not_to_
 const UTYPE_LBL = { 'High School Student':'High School', 'University Student':'University', Professional:'Professional', 'Test Administrator':'Test Admin', 'System Administrator':'Sys Admin' };
 const fmtN = n => Number(n || 0).toLocaleString();
 const capF = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '—';
-const getReportCode = row => row?.hollandCode || row?.holland_code || row?.hollandCodeDisplay || '';
+const getReportCode = row => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
 const parseHollandCodeGroups = code => String(code || '')
   .toUpperCase()
   .trim()

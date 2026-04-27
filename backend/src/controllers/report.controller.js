@@ -46,7 +46,7 @@ const CONTENT_BOTTOM = PH - 55;
 
 const fmtNum   = n => Number(n || 0).toLocaleString();
 const capFirst = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '—';
-const getReportCode = row => row?.hollandCode || row?.holland_code || row?.hollandCodeDisplay || '';
+const getReportCode = row => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
 const parseHollandCodeGroups = (code) => String(code || '')
   .toUpperCase()
   .trim()

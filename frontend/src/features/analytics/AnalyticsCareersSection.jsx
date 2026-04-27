@@ -9,7 +9,7 @@ import DataTable from '../../components/data/DataTable';
 import { PIE_COLORS, DEMAND_COLORS, DEMAND_LABELS, RIASEC_COLORS, RIASEC_LABELS, QUAL_LABELS } from './analyticsConstants';
 
 const DEMAND_LEVEL_KEYS = Object.keys(DEMAND_LABELS);
-const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
 
 /* ── Shared Card (matches Overview) ── */
 const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' }) => (

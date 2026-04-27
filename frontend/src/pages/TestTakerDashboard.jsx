@@ -6,7 +6,7 @@ import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 
-const getHollandDisplayCode = (assessment) => assessment?.hollandCode || assessment?.hollandCodeDisplay || '–';
+const getHollandDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '–';
 
 const TestTakerDashboard = () => {
   const { user, setSession, logout } = useAuth();

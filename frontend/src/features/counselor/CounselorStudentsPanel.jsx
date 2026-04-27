@@ -7,6 +7,7 @@ import { useToast, ErrorBanner } from '../../components/ui/StatusIndicators';
 import { counselorService } from '../../services/counselorService';
 
 const RIASEC_COLORS = ['#F44336', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
+const getAssessmentDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '';
 
 const SBadge = ({ status }) => {
   const map = {
@@ -75,7 +76,7 @@ const CounselorStudentsPanel = ({ students, isAdmin, loading, error, onRefresh, 
     { key: 'gradeLevel', header: 'Grade', sortable: true, render: (s) => <span className="text-xs" style={{ color: GOV.textMuted }}>{s.gradeLevel || '–'}</span> },
     ...(isAdmin ? [{ key: 'institutionName', header: 'Institution', sortable: true, render: (s) => <span className="text-xs" style={{ color: GOV.textMuted }}>{s.institutionName || '–'}</span> }] : []),
     { key: 'status', header: 'Latest Test', render: (s) => <SBadge status={s.latestAssessment?.status} /> },
-    { key: 'hollandCode', header: 'Holland Code', sortable: true, render: (s) => <span className="font-mono font-semibold text-sm" style={{ color: GOV.text }}>{s.latestAssessment?.hollandCode || '–'}</span> },
+    { key: 'hollandCode', header: 'Holland Code', sortable: true, render: (s) => <span className="font-mono font-semibold text-sm" style={{ color: GOV.text }}>{getAssessmentDisplayCode(s.latestAssessment) || '–'}</span> },
     {
       key: 'actions', header: 'Actions', stopPropagation: true,
       render: (s) => (
@@ -197,7 +198,7 @@ const CounselorStudentsPanel = ({ students, isAdmin, loading, error, onRefresh, 
                     <div key={a.id} className="border rounded-md overflow-hidden" style={{ borderColor: GOV.border }}>
                       <div className="px-4 py-3 flex items-center justify-between" style={{ backgroundColor: GOV.blueLightAlt }}>
                         <div>
-                          <span className="font-mono font-bold text-sm" style={{ color: GOV.blue }}>{a.hollandCode || 'In Progress'}</span>
+                          <span className="font-mono font-bold text-sm" style={{ color: GOV.blue }}>{getAssessmentDisplayCode(a) || 'In Progress'}</span>
                           <span className="ml-3 text-xs" style={{ color: GOV.textMuted }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString() : ''}</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -209,7 +210,7 @@ const CounselorStudentsPanel = ({ students, isAdmin, loading, error, onRefresh, 
                           )}
                         </div>
                       </div>
-                      {a.hollandCode && (
+                      {getAssessmentDisplayCode(a) && (
                         <div className="px-4 py-3">
                           <div className="grid grid-cols-6 gap-2">
                             {['R', 'I', 'A', 'S', 'E', 'C'].map((k, i) => (

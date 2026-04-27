@@ -14,7 +14,7 @@ const ChartCard = ({ title, subtitle, children }) => (
   </div>
 );
 
-const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
 
 const KnowledgeGraphFlow = ({ kgData }) => {
   if (!kgData) return null;

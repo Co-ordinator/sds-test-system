@@ -7,7 +7,6 @@ const {
 const { Op, fn, col, literal } = require('sequelize');
 const scoringService = require('./scoring.service');
 
-const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
 const ASSESSMENT_SCORE_ATTRIBUTES = [
   'id', 'hollandCode',
   'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC'
@@ -59,14 +58,7 @@ const countUsers = ({ userWhere, userInclude, extraWhere = {} }) => {
 };
 
 const getAssessmentDisplayCode = (assessment) => {
-  const storedCode = assessment?.hollandCode || assessment?.get?.('hollandCode');
-  if (storedCode) return storedCode;
-  const totals = SCORE_KEYS.reduce((acc, key) => {
-    acc[key] = Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
-    return acc;
-  }, {});
-  if (!SCORE_KEYS.some((key) => totals[key] > 0)) return '';
-  return scoringService.buildHollandCodes(totals, 0).primaryCode || '';
+  return scoringService.getAssessmentDisplayCode(assessment, '') || '';
 };
 
 const getIncludedUser = (assessment) => assessment?.user || assessment?.get?.('user') || null;

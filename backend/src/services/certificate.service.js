@@ -5,19 +5,12 @@ const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
 
-const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
-
 const attachAssessmentDisplayCode = (assessment) => {
   if (!assessment) return assessment;
-  const totals = SCORE_KEYS.reduce((acc, key) => {
-    acc[key] = Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
-    return acc;
-  }, {});
-  if (!SCORE_KEYS.some((key) => totals[key] > 0)) {
-    assessment.setDataValue?.('hollandCodeDisplay', assessment.hollandCode || null);
-    return assessment;
-  }
-  assessment.setDataValue?.('hollandCodeDisplay', assessment.hollandCode || null);
+  assessment.setDataValue?.(
+    'hollandCodeDisplay',
+    scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || null) || null
+  );
   return assessment;
 };
 
@@ -132,12 +125,8 @@ module.exports = {
       E: assessment.scoreE || 0,
       C: assessment.scoreC || 0
     };
-    const hasScores = RIASEC_KEYS.some((key) => Number(totals[key]) > 0);
-    const { displayCode } = hasScores
-      ? scoringService.buildHollandCodes(totals, 0)
-      : { displayCode: assessment.hollandCode || '' };
-    const primaryCode = assessment.hollandCode || scoringService.normalizeHollandCode(displayCode);
-    const hollandLetters = scoringService.parseDisplayCodeGroups(primaryCode)
+    const displayCode = scoringService.getDisplayCodeFromScores(totals, assessment.hollandCode || '');
+    const hollandLetters = scoringService.parseDisplayCodeGroups(displayCode || assessment.hollandCode)
       .slice(0, 3)
       .map((group) => group.join('/'));
 

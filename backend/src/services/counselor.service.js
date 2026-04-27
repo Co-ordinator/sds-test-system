@@ -66,6 +66,9 @@ module.exports = {
 
     const formatted = students.map((student) => {
       const latestAssessment = student.assessments?.[0] || null;
+      const latestDisplayCode = latestAssessment
+        ? scoringService.getAssessmentDisplayCode(latestAssessment, latestAssessment.hollandCode || null)
+        : null;
       return {
         id: student.id,
         firstName: student.firstName,
@@ -80,6 +83,7 @@ module.exports = {
           status: latestAssessment.status,
           progress: Number(latestAssessment.progress),
           hollandCode: latestAssessment.hollandCode,
+          hollandCodeDisplay: latestDisplayCode,
           createdAt: latestAssessment.createdAt,
           completedAt: latestAssessment.completedAt,
           scoreR: latestAssessment.scoreR, scoreI: latestAssessment.scoreI,
@@ -120,16 +124,20 @@ module.exports = {
       raw: true
     });
 
-    const hollandDist = await Assessment.findAll({
+    const completedAssessments = await Assessment.findAll({
       where: { status: 'completed', hollandCode: { [Op.ne]: null } },
-      attributes: [
-        'hollandCode',
-        [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('Assessment.id')), 'count']
-      ],
+      attributes: ['id', 'hollandCode', 'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC'],
       include: [{ model: User, as: 'user', required: true, attributes: [], where: { institutionId } }],
-      group: ['hollandCode'],
-      raw: true
     });
+    const hollandCounts = completedAssessments.reduce((acc, assessment) => {
+      const code = scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || '');
+      if (!code) return acc;
+      acc[code] = (acc[code] || 0) + 1;
+      return acc;
+    }, {});
+    const hollandDist = Object.entries(hollandCounts)
+      .map(([code, count]) => ({ hollandCode: code, hollandCodeDisplay: code, count }))
+      .sort((a, b) => Number(b.count) - Number(a.count) || a.hollandCode.localeCompare(b.hollandCode));
 
     return { stats: { ...stats, totalStudents, studentsWithAssessments }, hollandDistribution: hollandDist, actor };
   },
@@ -183,6 +191,12 @@ module.exports = {
     const assessments = await Assessment.findAll({
       where: { userId: student.id },
       order: [['createdAt', 'DESC']]
+    });
+    assessments.forEach((assessment) => {
+      assessment.setDataValue?.(
+        'hollandCodeDisplay',
+        scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || null) || null
+      );
     });
 
     const completed = assessments.find((a) => a.status === 'completed');

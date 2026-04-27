@@ -7,7 +7,7 @@ import { ErrorBanner } from '../../../components/ui/StatusIndicators';
 import { useToast } from '../../../components/ui/StatusIndicators';
 import { adminService } from '../../../services/adminService';
 
-const getHollandDisplayCode = (assessment) => assessment?.hollandCode || assessment?.hollandCodeDisplay || '—';
+const getHollandDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '—';
 
 const AdminCertificatesPanel = () => {
   const { toast, showToast, Toast: ToastComp } = useToast();

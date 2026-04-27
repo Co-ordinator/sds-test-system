@@ -8,7 +8,7 @@ import ActionMenu from '../../../components/ui/ActionMenu';
 import { adminService } from '../../../services/adminService';
 import { usePermissions } from '../../../context/PermissionContext';
 
-const getHollandDisplayCode = (assessment) => assessment?.hollandCode || assessment?.hollandCodeDisplay || '–';
+const getHollandDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '–';
 
 const AdminResultsPanel = () => {
   const navigate = useNavigate();

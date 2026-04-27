@@ -8,8 +8,6 @@ const BASE_TAKER = { role: 'Test Taker' };
 
 const REGIONS = ['hhohho', 'manzini', 'lubombo', 'shiselweni'];
 const GENDERS  = ['male', 'female', 'other', 'prefer_not_to_say'];
-const SCORE_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
-
 /* ── Query helpers ───────────────────────────────────────────────────────── */
 const buildQ = (f = {}) => {
   const { institutionId, region, userType, gender, startDate, endDate } = f;
@@ -45,14 +43,7 @@ const getTopCode = async (aw, ui, uw) => {
 
 /* ── Report Service ──────────────────────────────────────────────────────── */
 const getAssessmentDisplayCode = (assessment) => {
-  const storedCode = assessment?.hollandCode || assessment?.get?.('hollandCode');
-  if (storedCode) return storedCode;
-  const totals = SCORE_KEYS.reduce((acc, key) => {
-    acc[key] = Number(assessment?.[`score${key}`] ?? assessment?.get?.(`score${key}`) ?? 0);
-    return acc;
-  }, {});
-  if (!SCORE_KEYS.some((key) => totals[key] > 0)) return '-';
-  return scoringService.buildHollandCodes(totals, 0).primaryCode || '-';
+  return scoringService.getAssessmentDisplayCode(assessment, '-') || '-';
 };
 
 const getHollandDistribution = async (aw, ui, uw, limit = 10) => {

@@ -28,7 +28,7 @@ const EMPTY_FILTERS = {
   institutionId: '', institutionType: '', region: '', userType: '', startDate: '', endDate: ''
 };
 
-const getHollandDisplayCode = (item) => item?.hollandCode || item?.holland_code || item?.hollandCodeDisplay || item?.code || '';
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
 
 const QUICK_DATE_RANGES = [
   { key: '30d', label: 'Last 30 days', days: 30 },

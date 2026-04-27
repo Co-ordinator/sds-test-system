@@ -149,15 +149,15 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
             </Link>
           </div>
 
-          <div className="max-w-7xl mx-auto px-6 h-full flex items-center">
-            <nav className="hidden lg:flex items-center gap-0.5 min-w-0 -ml-2 xl:-ml-3">
+          <div className="max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center">
+            <nav className="hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar">
               {navLinks.map(({ to, label, Icon, badge }) => {
                 const active = isActive(to);
                 return (
                   <Link
                     key={`${to}-${label}`}
                     to={to}
-                    className="relative flex items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap"
+                    className="relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap"
                     style={
                       active
                         ? { color: GOV.blue, fontWeight: 700 }
@@ -181,7 +181,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
             <div className="relative">
               <button
                 type="button"
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
+                className="flex max-w-[170px] items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
                 onClick={() => setUserMenuOpen(o => !o)}
               >
                 <div
@@ -190,9 +190,9 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
                 >
                   <User className="w-4 h-4" style={{ color: GOV.blue }} />
                 </div>
-                <div className="hidden sm:block text-left">
-                  <p className="text-xs font-semibold leading-none" style={{ color: GOV.text }}>{displayName}</p>
-                  <p className="text-[10px] mt-0.5 leading-none" style={{ color: GOV.textMuted }}>{roleLabel}</p>
+                <div className="hidden sm:block min-w-0 text-left">
+                  <p className="truncate text-xs font-semibold leading-none" style={{ color: GOV.text }}>{displayName}</p>
+                  <p className="truncate text-[10px] mt-0.5 leading-none" style={{ color: GOV.textMuted }}>{roleLabel}</p>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} />
               </button>
