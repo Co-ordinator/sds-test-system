@@ -18,7 +18,7 @@ import AnalyticsFundingAlignmentSection from '../features/analytics/AnalyticsFun
 
 const TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'career', label: 'Career Intelligence' },
+  { key: 'career', label: 'Career Overview' },
   { key: 'map', label: 'Regional Map' },
   { key: 'trends', label: 'Trends & Segmentation' },
   { key: 'funding', label: 'Funding Alignment' },
@@ -180,7 +180,7 @@ const Analytics = () => {
       <div className="border-b bg-white shadow-sm" style={{ borderColor: GOV.border }}>
         <div className="max-w-7xl mx-auto px-6 pt-5">
           <div className="flex items-start gap-4 pb-4">
-            <h1 className="text-lg font-bold flex-1 pt-1" style={{ color: GOV.text }}>National Career Intelligence Platform</h1>
+            <h1 className="text-lg font-bold flex-1 pt-1" style={{ color: GOV.text }}>National Career Overview Platform</h1>
             <button
               type="button"
               onClick={() => setRefreshKey(prev => prev + 1)}
@@ -401,7 +401,7 @@ const Analytics = () => {
         )}
 
         <p className="text-xs text-center py-4" style={{ color: GOV.textHint }}>
-          Kingdom of Eswatini · National Career Intelligence Platform · Ministry of Labour and Social Security
+          Kingdom of Eswatini · National Career Overview Platform · Ministry of Labour and Social Security
         </p>
       </div>
     </AppShell>

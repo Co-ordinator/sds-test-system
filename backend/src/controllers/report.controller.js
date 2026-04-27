@@ -28,7 +28,7 @@ const REPORT_TYPES = {
   executive_summary:      { label: 'Executive Summary Report',         fetchData: (s, f) => s.getExecutiveSummary(f) },
   regional:               { label: 'Regional Distribution Report',     fetchData: (s, f) => s.getRegionalReport(f) },
   gender_demographics:    { label: 'Gender & Demographics Report',     fetchData: (s, f) => s.getGenderReport(f) },
-  career_intelligence:    { label: 'Career Intelligence Report',       fetchData: (s, f) => s.getCareerIntelligenceReport(f) },
+  career_intelligence:    { label: 'Career Overview Report',           fetchData: (s, f) => s.getCareerIntelligenceReport(f) },
   institution_performance:{ label: 'Institution Performance Report',   fetchData: (s, f) => s.getInstitutionReport(f) },
   assessment_trends:      { label: 'Assessment Trends Report',         fetchData: (s, f) => s.getTrendsReport(f) },
 };

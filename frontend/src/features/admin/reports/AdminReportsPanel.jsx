@@ -13,7 +13,7 @@ const REPORT_SECTIONS = [
   { key: 'executive_summary',       label: 'Executive Summary',       icon: Globe,      description: 'KPIs, Holland codes, distribution charts' },
   { key: 'regional',                label: 'Regional Distribution',   icon: Map,        description: 'Regional performance scorecard' },
   { key: 'gender_demographics',     label: 'Gender & Demographics',   icon: Users,      description: 'Gender breakdown, cross-tabulation' },
-  { key: 'career_intelligence',     label: 'Career Intelligence',     icon: Briefcase,  description: 'RIASEC averages, Holland codes, occupations' },
+  { key: 'career_intelligence',     label: 'Career Overview',         icon: Briefcase,  description: 'RIASEC averages, Holland codes, occupations' },
   { key: 'institution_performance', label: 'Institution Performance', icon: Building2,  description: 'Performance ranking by institution' },
   { key: 'assessment_trends',       label: 'Assessment Trends',       icon: TrendingUp, description: 'Monthly completion & registration trends' },
 ];
@@ -527,7 +527,7 @@ const AdminReportsPanel = () => {
         );
       }
 
-      /* ═══════════════════════ CAREER INTELLIGENCE ════════════════════ */
+      /* ═══════════════════════ CAREER OVERVIEW ════════════════════ */
       case 'career_intelligence': {
         const ri = preview.riasecAverages || {};
         const riasec = [

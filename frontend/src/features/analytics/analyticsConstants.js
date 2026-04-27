@@ -21,7 +21,7 @@ export const QUAL_LABELS = { bachelor: 'Bachelor', diploma: 'Diploma', tvet: 'TV
 
 export const ANALYTICS_TABS = [
   { key: 'overview', label: 'Overview' },
-  { key: 'career', label: 'Career Intelligence' },
+  { key: 'career', label: 'Career Overview' },
   { key: 'map', label: 'Regional Map' },
   { key: 'trends', label: 'Trends & Segmentation' },
 ];

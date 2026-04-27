@@ -163,7 +163,7 @@ module.exports = {
     return { genderBreakdown: genderBreakdown.filter(g => g.totalUsers > 0), userTypeDist, regionGenderDist };
   },
 
-  /* 4 ── Career Intelligence ─────────────────────────────────────────────── */
+  /* 4 ── Career Overview ─────────────────────────────────────────────────── */
   async getCareerIntelligenceReport(filters = {}) {
     const { uw, aw, ui } = buildQ(filters);
 
