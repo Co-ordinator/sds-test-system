@@ -6,6 +6,7 @@ const fs = require('fs');
 const { AuditLog, sequelize } = require('../models');
 const certificateService = require('../services/certificate.service');
 const logger = require('../utils/logger');
+const { drawLetterheadImage } = require('../utils/pdfAssets');
 
 const LOGO_PATHS = [
   path.join(__dirname, '../../assets/siyinqaba.png'),
@@ -24,6 +25,8 @@ const REGION_LABELS = {
   shiselweni: 'SHISELWENI',
   multiple: 'MULTIPLE'
 };
+
+const getRegionLabel = (value) => REGION_LABELS[String(value || '').toLowerCase()];
 
 const cleanText = (value, fallback = '') => {
   const text = String(value || '').trim();
@@ -69,38 +72,13 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   const border = '#6b7280';
 
   // ── HEADER ─────────────────────────────────────────────────────────────
-  // Centered national header
-  doc.font('Helvetica-Bold').fontSize(18).fillColor('#000000');
-  doc.text('GOVERNMENT OF ESWATINI', lm, 40, { width: contentW, align: 'center' });
-
-  // Logo in center
-  const logoPath = resolveLogoPath();
-  if (logoPath) {
-    try {
-      const logoWidth = 56;
-      const logoCenterX = (pageW - logoWidth) / 2;
-      doc.image(logoPath, logoCenterX, 60, { width: logoWidth });
-    } catch (_) {}
-  }
-
-  // Contact info below header
-  const subY = 112;
-  doc.font('Helvetica').fontSize(7.5).fillColor('#000000');
-  doc.text('Tel:  +268 4041971/2/3', lm, subY);
-  doc.text('Fax: +268 4049889', lm, subY + 10);
-
-  // Right side contact
-  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000000');
-  doc.text('Principal Secretary\'s Office', lm, subY, { width: contentW, align: 'right' });
-  doc.font('Helvetica').fontSize(7.5);
-  doc.text('Ministry of Labour & Social Security', lm, subY + 10, { width: contentW, align: 'right' });
-  doc.text('P.O. Box 198, Mbabane H100', lm, subY + 20, { width: contentW, align: 'right' });
-
-  doc.font('Helvetica').fontSize(7.5).fillColor('#000000');
-  doc.text('Email: mkhaliphi@gov.sz', lm, subY + 32);
-
-  // Horizontal rule
-  const ruleY = subY + 44;
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 18,
+    width: pageW,
+    maxHeight: 132
+  });
+  const ruleY = letterhead ? Math.max(letterhead.bottom + 8, 150) : 136;
   doc.moveTo(lm, ruleY).lineTo(pageW - rm, ruleY).strokeColor('#000000').lineWidth(0.8).stroke();
 
   // ── TITLE ──────────────────────────────────────────────────────────────
@@ -255,7 +233,7 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
   const studentName = cleanText([user.firstName, user.lastName].filter(Boolean).join(' '), 'TEST TAKER').toUpperCase();
   const pin = cleanText(user.nationalId || user.studentCode, 'NOT PROVIDED');
   const institutionName = cleanText(user.institution?.name || user.currentInstitution, 'NOT SPECIFIED').toUpperCase();
-  const districtName = cleanText(user.district || user.institution?.district || REGION_LABELS[user.region] || REGION_LABELS[user.institution?.region], 'NOT SPECIFIED').toUpperCase();
+  const regionName = cleanText(getRegionLabel(user.region) || getRegionLabel(user.institution?.region), 'NOT SPECIFIED').toUpperCase();
   const testDate = formatUpperMonthYear(assessment.completedAt);
   const totals = {
     R: assessment.scoreR || 0,
@@ -277,34 +255,29 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
     } catch (_) {}
   }
 
-  doc.font('Helvetica-Bold').fontSize(17).fillColor('#1f2933');
-  doc.text('GOVERNMENT OF THE KINGDOM OF ESWATINI', lm, 60, { width: contentW, align: 'center' });
-
-  if (logoPath) {
-    try {
-      const logoWidth = 58;
-      doc.image(logoPath, (pageW - logoWidth) / 2, 89, { width: logoWidth });
-    } catch (_) {}
-  }
-
-  doc.font('Helvetica-Bold').fontSize(16).fillColor('#1f2933');
-  doc.text('MINISTRY OF LABOUR & SOCIAL SECURITY', lm, 154, { width: contentW, align: 'center' });
-  doc.font('Helvetica').fontSize(7.5).fillColor('#4b5563');
-  doc.text('P.O. Box 198, Mbabane H100   |   Telephone: (+268) 2404 1971/2/3   |   Facsimile: (+268) 2404 9889   |   Email: min_labour@gov.sz', lm, 192, {
-    width: contentW,
-    align: 'center'
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 22,
+    width: pageW,
+    maxHeight: 136
   });
-  doc.moveTo(lm, 212).lineTo(pageW - rm, 212).strokeColor('#111827').lineWidth(0.9).stroke();
+  const headerBottom = letterhead ? letterhead.bottom : 138;
+  const dividerY = headerBottom + 8;
+  doc.moveTo(lm, dividerY).lineTo(pageW - rm, dividerY).strokeColor('#111827').lineWidth(0.9).stroke();
 
+  const departmentY = dividerY + 14;
   doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#1f2933');
-  doc.text('NATIONAL EMPLOYMENT SERVICES DEPARTMENT', lm, 226, { width: contentW, align: 'center' });
-  doc.text('MEASUREMENT AND TESTING UNIT', lm, 241, { width: contentW, align: 'center' });
+  doc.text('NATIONAL EMPLOYMENT SERVICES DEPARTMENT', lm, departmentY, { width: contentW, align: 'center' });
+  doc.text('MEASUREMENT AND TESTING UNIT', lm, departmentY + 15, { width: contentW, align: 'center' });
 
   doc.font('Helvetica').fontSize(8.5).fillColor('#111827');
-  const certifyText = `This is to certify that ${studentName}  PIN: ${pin} completed a Self-Directed Search test in: ${testDate} at: ${institutionName} located in the: ${districtName} DISTRICT.`;
-  doc.text(certifyText, lm + 26, 274, { width: contentW - 52, align: 'left', lineGap: 2 });
+  const certifyText = `This is to certify that ${studentName}  PIN: ${pin} completed a Self-Directed Search test in: ${testDate} at: ${institutionName} located in the: ${regionName} REGION.`;
+  const certifyY = departmentY + 44;
+  const certifyOptions = { width: contentW - 52, align: 'left', lineGap: 2 };
+  const certifyHeight = doc.heightOfString(certifyText, certifyOptions);
+  doc.text(certifyText, lm + 26, certifyY, certifyOptions);
 
-  const titleY = 324;
+  const titleY = certifyY + Math.max(certifyHeight, 34) + 22;
   doc.font('Times-Bold').fontSize(13).fillColor('#111827');
   doc.text('SELF-DIRECTED SEARCH (SDS) SUMMARY SHEET CERTIFICATE', lm, titleY, { width: contentW, align: 'center' });
 

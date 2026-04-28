@@ -1,18 +1,10 @@
 'use strict';
 
 const PDFDocument = require('pdfkit');
-const path = require('path');
-const fs = require('fs');
 const reportService = require('../services/report.service');
 const logger = require('../utils/logger');
 const { BadRequestError } = require('../utils/errors/appError');
-
-const LOGO_PATHS = [
-  path.join(__dirname, '../../assets/siyinqaba.png'),
-  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
-];
-
-const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
+const { drawLetterheadImage } = require('../utils/pdfAssets');
 
 /* ── Colours — neutral formal palette ───────────────────────────────── */
 const NAVY    = '#2D8BC4';
@@ -64,40 +56,28 @@ const describeHollandCode = (code, names) => parseHollandCodeGroups(code)
 /* drawPageHeader ──────────────────────────────────────────────────────── */
 function drawPageHeader(doc, reportLabel, dateStr, preparedBy, filterSummary) {
   doc.rect(0, 0, PW, PH).fill(WHITE);
-  doc.font('Helvetica-Bold').fontSize(18).fillColor(TEXT);
-  doc.text('GOVERNMENT OF ESWATINI', LM, 30, { width: CW, align: 'center' });
-
-  const logoPath = resolveLogoPath();
-  if (logoPath) {
-    try {
-      doc.image(logoPath, (PW - 50) / 2, 50, { width: 50 });
-    } catch (_) {}
-  }
-
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT);
-  doc.text('Tel:  +268 4041971/2/3', LM, 96);
-  doc.text('Fax: +268 4049889', LM, 108);
-  doc.text('Email: mkhaliphi@gov.sz', LM, 120);
-
-  doc.text('Principal Secretary\'s Office', LM, 96, { width: CW, align: 'right' });
-  doc.font('Helvetica').fontSize(8);
-  doc.text('Ministry of Labour & Social Security', LM, 108, { width: CW, align: 'right' });
-  doc.text('P.O. Box 198, Mbabane H100', LM, 120, { width: CW, align: 'right' });
-
-  doc.moveTo(LM, 136).lineTo(PW - RM, 136).strokeColor('#000000').lineWidth(0.7).stroke();
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 18,
+    width: PW,
+    maxHeight: 132
+  });
+  const titleY = letterhead ? Math.max(letterhead.bottom + 10, 160) : 42;
   doc.font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
-    .text(reportLabel.toUpperCase(), LM, 146, { width: CW, align: 'center' });
+    .text(reportLabel.toUpperCase(), LM, titleY, { width: CW, align: 'center' });
   doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-    .text(`Generated: ${dateStr}  |  Prepared by: ${preparedBy}`, LM, 160, { width: CW, align: 'center' });
+    .text(`Generated: ${dateStr}  |  Prepared by: ${preparedBy}`, LM, titleY + 14, { width: CW, align: 'center' });
 
-  doc.rect(LM, 174, CW, 24).lineWidth(0.5).strokeColor(BORDER).stroke();
+  const filterY = titleY + 28;
+  doc.rect(LM, filterY, CW, 24).lineWidth(0.5).strokeColor(BORDER).stroke();
   doc.fillColor(MUTED).font('Helvetica-Bold').fontSize(6.5)
-    .text('ACTIVE FILTERS', LM + 8, 182, { width: 70 });
+    .text('ACTIVE FILTERS', LM + 8, filterY + 8, { width: 70 });
   doc.fillColor(TEXT).font('Helvetica').fontSize(6.5)
-    .text(filterSummary, LM + 80, 182, { width: CW - 88, ellipsis: true });
+    .text(filterSummary, LM + 80, filterY + 8, { width: CW - 88, ellipsis: true });
 
-  doc.moveTo(LM, 206).lineTo(PW - RM, 206).strokeColor(BORDER).lineWidth(0.6).stroke();
-  return 220;
+  const ruleY = filterY + 32;
+  doc.moveTo(LM, ruleY).lineTo(PW - RM, ruleY).strokeColor(BORDER).lineWidth(0.6).stroke();
+  return ruleY + 14;
 }
 
 /* drawContinuationHeader ──────────────────────────────────────────── */

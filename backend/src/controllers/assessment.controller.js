@@ -1,8 +1,7 @@
 const assessmentService = require('../services/assessment.service');
 const PDFDocument = require('pdfkit');
 const logger = require('../utils/logger');
-const path = require('path');
-const fs = require('fs');
+const { LETTERHEAD_PATHS, drawLetterheadImage, resolveLetterheadPath } = require('../utils/pdfAssets');
 
 const RIASEC_LABELS = { R: 'Realistic', I: 'Investigative', A: 'Artistic', S: 'Social', E: 'Enterprising', C: 'Conventional' };
 const RIASEC_COLORS = { R: '#F44336', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#2D8BC4' };
@@ -30,18 +29,6 @@ const parseHollandDisplayGroups = (code) => String(code || '')
   .filter((group) => group.length > 0);
 const DEMAND_LABELS = { critical: 'Critical', very_high: 'Very High', high: 'High', medium: 'Medium', low: 'Low' };
 const DEMAND_PDF_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };
-const LOGO_PATHS = [
-  process.env.PDF_LOGO_PATH ? path.resolve(process.env.PDF_LOGO_PATH) : null,
-  path.join(__dirname, '../../assets/siyinqaba.png'),
-  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
-  path.join(process.cwd(), 'backend/assets/siyinqaba.png'),
-  path.join(process.cwd(), 'frontend/public/siyinqaba.png'),
-  path.join(process.cwd(), 'public_html/siyinqaba.png'),
-  path.join(process.cwd(), 'siyinqaba.png'),
-].filter(Boolean);
-
-const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
-
 /**
  * Assessment Controller
  * Coordinates starting assessments, progress saving, and final Holland Code calculation.
@@ -216,13 +203,13 @@ class AssessmentController {
       const leftMargin = 50;
       const bottomY = pageHeight - 56;
 
-      const logoPath = resolveLogoPath();
-      if (!logoPath) {
+      const letterheadPath = resolveLetterheadPath();
+      if (!letterheadPath) {
         logger.warn({
-          actionType: 'PDF_LOGO_MISSING',
-          message: 'Assessment PDF logo not found on disk',
+          actionType: 'PDF_LETTERHEAD_MISSING',
+          message: 'Assessment PDF letterhead not found on disk',
           req,
-          details: { attemptedPaths: LOGO_PATHS }
+          details: { attemptedPaths: LETTERHEAD_PATHS }
         });
       }
 
@@ -262,27 +249,22 @@ class AssessmentController {
       };
 
       const drawLetterhead = (title, subtitle = '') => {
-        doc.font('Helvetica-Bold').fontSize(18).fillColor(text);
-        doc.text('GOVERNMENT OF ESWATINI', leftMargin, 30, { width: pageWidth, align: 'center' });
-        if (logoPath) {
-          try { doc.image(logoPath, (doc.page.width - 46) / 2, 48, { width: 46 }); } catch (_) {}
-        }
-        doc.font('Helvetica-Bold').fontSize(8).fillColor(text);
-        doc.text('Tel:  +268 4041971/2/3', leftMargin, 96);
-        doc.text('Fax: +268 4049889', leftMargin, 108);
-        doc.text('Email: mkhaliphi@gov.sz', leftMargin, 120);
-        doc.text('Principal Secretary\'s Office', leftMargin, 96, { width: pageWidth, align: 'right' });
-        doc.font('Helvetica').fontSize(8);
-        doc.text('Ministry of Labour & Social Security', leftMargin, 108, { width: pageWidth, align: 'right' });
-        doc.text('P.O. Box 198, Mbabane H100', leftMargin, 120, { width: pageWidth, align: 'right' });
-        doc.moveTo(leftMargin, 136).lineTo(leftMargin + pageWidth, 136).strokeColor('#000000').lineWidth(0.7).stroke();
+        const letterhead = drawLetterheadImage(doc, {
+          x: 0,
+          y: 18,
+          width: doc.page.width,
+          maxHeight: 132
+        });
+        const titleY = letterhead ? Math.max(letterhead.bottom + 10, 160) : 58;
+
         doc.font('Helvetica-Bold').fontSize(12).fillColor(text)
-          .text(title, leftMargin, 146, { width: pageWidth, align: 'center' });
+          .text(title, leftMargin, titleY, { width: pageWidth, align: 'center' });
         doc.font('Helvetica').fontSize(7.5).fillColor(muted);
         const subtitleLine = subtitle ? `${subtitle} - Generated: ${generatedDateStr}` : `Generated: ${generatedDateStr}`;
-        doc.text(subtitleLine, leftMargin, 160, { width: pageWidth, align: 'center' });
-        doc.moveTo(leftMargin, 170).lineTo(leftMargin + pageWidth, 170).strokeColor(border).lineWidth(0.6).stroke();
-        return 178;
+        doc.text(subtitleLine, leftMargin, titleY + 14, { width: pageWidth, align: 'center' });
+        const ruleY = titleY + 24;
+        doc.moveTo(leftMargin, ruleY).lineTo(leftMargin + pageWidth, ruleY).strokeColor(border).lineWidth(0.6).stroke();
+        return ruleY + 8;
       };
 
       let pageContext = {
