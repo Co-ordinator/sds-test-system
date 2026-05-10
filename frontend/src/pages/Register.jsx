@@ -24,9 +24,14 @@ export default function Register() {
       consent: true
     };
     try {
-      await api.post('/api/v1/auth/register', payload);
+      const response = await api.post('/api/v1/auth/register', payload);
+      const verificationEmailSent = response?.data?.verificationEmailSent !== false;
       navigate('/registration-success', {
-        state: { email: payload.email }
+        state: {
+          email: payload.email,
+          verificationEmailSent,
+          message: response?.data?.message || ''
+        }
       });
     } catch (err) {
       const uiMessage = err?.uiMessage || err?.response?.data?.message || 'Registration failed. Please try again.';

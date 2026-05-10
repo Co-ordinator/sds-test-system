@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
-  Filter, RefreshCw, Briefcase, MapPin, TrendingUp, BarChart2, Download
+  Filter, RefreshCw, Download
 } from 'lucide-react';
 import api from '../services/api';
 import { analyticsService } from '../services/analyticsService';
@@ -16,7 +16,7 @@ import AnalyticsMapSection from '../features/analytics/AnalyticsMapSection';
 import AnalyticsTrendsSection from '../features/analytics/AnalyticsTrendsSection';
 import AnalyticsFundingAlignmentSection from '../features/analytics/AnalyticsFundingAlignmentSection';
 
-const TABS = [
+const ANALYTICS_TABS = [
   { key: 'overview', label: 'Overview' },
   { key: 'career', label: 'Career Overview' },
   { key: 'map', label: 'Regional Map' },
@@ -36,12 +36,14 @@ const QUICK_DATE_RANGES = [
   { key: 'ytd', label: 'Year to date', type: 'ytd' },
 ];
 
-const Analytics = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) => {
+  const hasDashboardOverview = typeof dashboardOverview === 'function';
+  const [activeTab, setActiveTab] = useState(() => (hasDashboardOverview ? 'dashboard' : 'overview'));
   const [analytics, setAnalytics] = useState(null);
   const [hollandDist, setHollandDist] = useState([]);
   const [trend, setTrend] = useState([]);
   const [regionalData, setRegionalData] = useState(null);
+  const [mapRegionalData, setMapRegionalData] = useState(null);
   const [kgData, setKgData] = useState(null);
   const [institutions, setInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +54,21 @@ const Analytics = () => {
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS });
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!hasDashboardOverview && activeTab === 'dashboard') setActiveTab('overview');
+  }, [activeTab, hasDashboardOverview]);
+
+  const tabs = useMemo(() => {
+    const analyticsTabs = ANALYTICS_TABS.map(tab => (
+      tab.key === 'overview' && hasDashboardOverview
+        ? { ...tab, label: 'National Insights' }
+        : tab
+    ));
+    return hasDashboardOverview
+      ? [{ key: 'dashboard', label: 'Overview' }, ...analyticsTabs]
+      : analyticsTabs;
+  }, [hasDashboardOverview]);
 
   const hasActiveFilters = useMemo(
     () => Object.values(filters).some(Boolean),
@@ -116,7 +133,9 @@ const Analytics = () => {
     const fetchAll = async () => {
       try {
         const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
-        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData, pipeline, kg] = await Promise.all([
+        const mapFilters = { ...f };
+        delete mapFilters.region;
+        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData, pipeline, kg, unfilteredRegionalData] = await Promise.all([
           analyticsService.getOverview(f),
           analyticsService.getHollandDistribution(f),
           analyticsService.getTrend(f),
@@ -125,17 +144,19 @@ const Analytics = () => {
           analyticsService.getFundingAlignment(f),
           analyticsService.getSkillsPipeline(f),
           analyticsService.getKnowledgeGraph(f),
+          filters.region ? analyticsService.getRegional(mapFilters) : Promise.resolve(null),
         ]);
         setAnalytics(overviewData);
         setHollandDist(hollandData);
         setTrend(trendData);
         setRegionalData(regionalData);
+        setMapRegionalData(unfilteredRegionalData || regionalData);
         setSegmentData(segmentData);
         setFundingAlignmentData(fundingData);
         setPipelineData(pipeline);
         setKgData(kg);
       } catch {
-        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setSegmentData(null); setFundingAlignmentData(null); setPipelineData(null); setKgData(null);
+        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setMapRegionalData(null); setSegmentData(null); setFundingAlignmentData(null); setPipelineData(null); setKgData(null);
       } finally { setLoading(false); }
     };
     setLoading(true); fetchAll();
@@ -161,7 +182,9 @@ const Analytics = () => {
 
   const regionChartData = useMemo(() => (regionalData?.regions || []).map(r => ({
     name: REGION_LABELS[r.region] || r.region, key: r.region,
-    users: Number(r.totalUsers || 0), completed: Number(r.completedAssessments || 0),
+    users: Number(r.totalUsers || 0),
+    assessments: Number(r.totalAssessments || 0),
+    completed: Number(r.completedAssessments || 0),
     topCode: r.topCode || '--'
   })), [regionalData]);
 
@@ -174,13 +197,24 @@ const Analytics = () => {
   const totalAssessments = analytics?.totals?.assessments ?? regionalData?.summary?.totalAssessments ?? 0;
   const completedAssessments = analytics?.totals?.completedAssessments ?? regionalData?.summary?.completedAssessments ?? 0;
 
-  return (
-    <AppShell>
+  const containerClass = embedded ? 'space-y-5' : '';
+  const headerClass = embedded
+    ? 'rounded-lg border bg-white shadow-sm'
+    : 'border-b bg-white shadow-sm';
+  const headerInnerClass = embedded
+    ? 'px-4 pt-4 sm:px-5'
+    : 'max-w-7xl mx-auto px-6 pt-5';
+  const bodyClass = embedded
+    ? 'space-y-5'
+    : 'max-w-7xl mx-auto px-6 py-6 space-y-5';
+
+  const content = (
+    <div className={containerClass}>
       {/* Sub-header */}
-      <div className="border-b bg-white shadow-sm" style={{ borderColor: GOV.border }}>
-        <div className="max-w-7xl mx-auto px-6 pt-5">
-          <div className="flex items-start gap-4 pb-4">
-            <h1 className="text-lg font-bold flex-1 pt-1" style={{ color: GOV.text }}>National Career Overview Platform</h1>
+      <div className={headerClass} style={{ borderColor: GOV.border }}>
+        <div className={headerInnerClass}>
+          <div className="flex flex-wrap items-start gap-2 pb-4 sm:gap-3">
+            <h1 className="min-w-[14rem] flex-1 pt-1 text-lg font-bold" style={{ color: GOV.text }}>National Career Overview Platform</h1>
             <button
               type="button"
               onClick={() => setRefreshKey(prev => prev + 1)}
@@ -197,7 +231,7 @@ const Analytics = () => {
             </button>
           </div>
           <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-2">
-            {TABS.map(tab => (
+            {tabs.map(tab => (
               <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
                 className={`px-3 py-2 rounded-md text-xs whitespace-nowrap transition-colors border ${activeTab === tab.key ? 'font-bold' : 'font-medium'}`}
                 style={activeTab === tab.key
@@ -218,15 +252,15 @@ const Analytics = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
-        {/* ── Compact Applied-Filters bar ── */}
+      <div className={bodyClass}>
+        {/* Compact applied-filters bar */}
         <div className="flex flex-wrap items-center gap-2 px-1 py-1">
           <Filter className="w-3.5 h-3.5 flex-shrink-0" style={{ color: GOV.blue }} />
           <span className="text-xs font-semibold mr-1 flex-shrink-0" style={{ color: GOV.textMuted }}>Applied Filters:</span>
 
           {/* active filter chips */}
           {activeFilterChips.length === 0 && (
-            <span className="text-xs italic" style={{ color: GOV.textHint }}>None — showing all data</span>
+            <span className="text-xs italic" style={{ color: GOV.textHint }}>None - showing all data</span>
           )}
           {activeFilterChips.map(chip => (
             <button
@@ -237,7 +271,7 @@ const Analytics = () => {
               style={{ backgroundColor: '#eff6ff', borderColor: '#bfdbfe', color: '#1d4ed8' }}
             >
               {chip.label}
-              <span className="ml-0.5 text-blue-400 hover:text-blue-700">×</span>
+              <span className="ml-0.5 text-blue-400 hover:text-blue-700">x</span>
             </button>
           ))}
 
@@ -281,7 +315,7 @@ const Analytics = () => {
 
           {/* summary badge */}
           <span className="ml-1 text-xs pl-2 border-l" style={{ borderColor: GOV.borderLight, color: GOV.textHint }}>
-            {totalUsers.toLocaleString()} users · {completedAssessments.toLocaleString()} completed
+            {totalUsers.toLocaleString()} users - {completedAssessments.toLocaleString()} completed
           </span>
         </div>
 
@@ -373,6 +407,17 @@ const Analytics = () => {
           </div>
         ) : (
           <>
+            {activeTab === 'dashboard' && hasDashboardOverview && dashboardOverview({
+              analytics,
+              regionalData,
+              mapRegionalData: mapRegionalData || regionalData,
+              hollandDist,
+              trend,
+              institutions,
+              filters,
+              refreshKey,
+              onRegionSelect: (region) => setFilters(prev => ({ ...prev, region })),
+            })}
             {activeTab === 'overview' && (
               <AnalyticsOverviewSection
                 analytics={analytics} riasecData={riasecData} pieData={pieData}
@@ -400,12 +445,18 @@ const Analytics = () => {
           </>
         )}
 
-        <p className="text-xs text-center py-4" style={{ color: GOV.textHint }}>
-          Kingdom of Eswatini · National Career Overview Platform · Ministry of Labour and Social Security
-        </p>
+        {!embedded && (
+          <p className="text-xs text-center py-4" style={{ color: GOV.textHint }}>
+          Kingdom of Eswatini - National Career Overview Platform - Ministry of Labour and Social Security
+          </p>
+        )}
       </div>
-    </AppShell>
+    </div>
   );
+
+  return embedded ? content : <AppShell>{content}</AppShell>;
 };
+
+const Analytics = () => <AnalyticsPanel />;
 
 export default Analytics;

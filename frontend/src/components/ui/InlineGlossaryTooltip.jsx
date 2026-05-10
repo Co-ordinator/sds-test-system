@@ -19,6 +19,7 @@ const InlineGlossaryTooltip = ({
 }) => {
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
   const { getTermDefinition, markTermAsLearned, shouldHighlight } = useGlossary();
   
@@ -29,11 +30,23 @@ const InlineGlossaryTooltip = ({
   // Get term data with learning tracking
   const termData = getTermDefinition(term.toLowerCase());
   const shouldShowHighlight = shouldHighlight(term.toLowerCase());
+  const sectionLabel = termData?.category || termData?.section || 'glossary';
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setIsMobileViewport(window.innerWidth < 640);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
 
   // Handle text-to-speech
   const speakText = useCallback((text) => {
     if ('speechSynthesis' in window && !isSpeaking) {
       setIsSpeaking(true);
+      window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1;
@@ -101,6 +114,19 @@ const InlineGlossaryTooltip = ({
 
   // Position styles
   const getPositionStyles = () => {
+    if (isMobileViewport) {
+      return {
+        position: 'fixed',
+        zIndex: 60,
+        left: '12px',
+        right: '12px',
+        bottom: '16px',
+        minWidth: 0,
+        maxWidth: 'none',
+        width: 'auto'
+      };
+    }
+
     const base = {
       position: 'absolute',
       zIndex: 50,
@@ -171,6 +197,7 @@ const InlineGlossaryTooltip = ({
           className={`
             bg-white border rounded-lg shadow-xl p-4 animate-in fade-in-0 zoom-in-95
             ${highContrast ? 'border-2 border-black' : 'border-gray-200'}
+            ${isMobileViewport ? 'max-h-[70vh] overflow-y-auto' : ''}
           `}
           style={getPositionStyles()}
           id="glossary-tooltip-content"
@@ -192,7 +219,7 @@ const InlineGlossaryTooltip = ({
                           termData.difficulty === 'medium' ? '#d97706' : '#16a34a'
                   }}
                 >
-                  {termData.category}
+                  {sectionLabel}
                 </span>
                 {termData.difficulty && (
                   <span className="text-xs text-gray-500">

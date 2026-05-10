@@ -139,6 +139,10 @@ module.exports = {
         {
           scores: totals,
           displayCode,
+          userType: assessment.user?.userType,
+          degreeProgram: assessment.user?.degreeProgram,
+          yearOfStudy: assessment.user?.yearOfStudy,
+          yearsExperience: assessment.user?.yearsExperience
         }
       );
       occupationNames = (recs.occupations || []).slice(0, 3).map(o => o.name);

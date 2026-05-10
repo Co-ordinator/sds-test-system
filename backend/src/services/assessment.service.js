@@ -47,7 +47,7 @@ module.exports = {
       where: { userId },
       order: [['createdAt', 'DESC']],
       attributes: [
-        'id', 'status', 'progress', 'hollandCode',
+        'id', 'status', 'progress', 'hollandCode', 'hollandCodeDisplay',
         'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC',
         'completedAt', 'createdAt', 'updatedAt'
       ]
@@ -186,7 +186,13 @@ module.exports = {
   },
 
   getResults: async (assessmentId, userId, userRole) => {
-    const assessment = await Assessment.findByPk(assessmentId);
+    const assessment = await Assessment.findByPk(assessmentId, {
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel', 'degreeProgram', 'yearOfStudy', 'yearsExperience']
+      }]
+    });
 
     if (!assessment || assessment.status !== 'completed') {
       throw new NotFoundError('Results not found', 'RESULTS_NOT_FOUND');
@@ -199,7 +205,7 @@ module.exports = {
     }
 
     const scores = scoringService.getScoreTotals(assessment);
-    const displayCode = scoringService.getDisplayCodeFromScores(scores, assessment.hollandCode || '');
+    const displayCode = scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || '');
     assessment.setDataValue('hollandCodeDisplay', displayCode || assessment.hollandCode);
 
     const recommendations = await scoringService.getRecommendations(
@@ -209,6 +215,10 @@ module.exports = {
       {
         scores,
         displayCode,
+        userType: assessment.user?.userType,
+        degreeProgram: assessment.user?.degreeProgram,
+        yearOfStudy: assessment.user?.yearOfStudy,
+        yearsExperience: assessment.user?.yearsExperience
       }
     );
 
@@ -217,7 +227,7 @@ module.exports = {
 
   getResultsForPdf: async (assessmentId, userId, userRole) => {
     const assessment = await Assessment.findByPk(assessmentId, {
-      include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel'] }]
+      include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel', 'degreeProgram', 'yearOfStudy', 'yearsExperience'] }]
     });
 
     if (!assessment || assessment.status !== 'completed') {
@@ -233,7 +243,7 @@ module.exports = {
 
     let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
     const scores = scoringService.getScoreTotals(assessment);
-    const displayCode = scoringService.getDisplayCodeFromScores(scores, assessment.hollandCode || '');
+    const displayCode = scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || '');
     assessment.setDataValue('hollandCodeDisplay', displayCode || assessment.hollandCode);
 
     try {
@@ -244,6 +254,10 @@ module.exports = {
         {
           scores,
           displayCode,
+          userType: assessment.user?.userType,
+          degreeProgram: assessment.user?.degreeProgram,
+          yearOfStudy: assessment.user?.yearOfStudy,
+          yearsExperience: assessment.user?.yearsExperience
         }
       );
     } catch (_) {}

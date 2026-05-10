@@ -654,14 +654,20 @@ const TestResults = () => {
     .map((group) => group.map((letter) => RIASEC_META[letter]?.label).filter(Boolean).join('/'))
     .join(' - ');
   const hollandLetters = Array.from(new Set(hollandDisplayGroups.flat().filter((letter) => RIASEC_META[letter])));
-  const userType = assessment.user?.userType || user?.userType;
+  const recommendationAudience = recs.audience || {};
+  const normalizeAudienceType = (value) => String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ');
+  const audienceType = recommendationAudience.type || normalizeAudienceType(assessment.user?.userType || user?.userType);
   const studentName = [assessment.user?.firstName || user?.firstName, assessment.user?.lastName || user?.lastName].filter(Boolean).join(' ') || 'Student';
 
-  const focusLabel = userType === 'professional'
+  const focusLabel = audienceType === 'professional'
     ? 'Career Transition Opportunities'
-    : userType === 'university_student'
+    : audienceType === 'university student' || audienceType === 'university_student'
       ? 'Graduate Career Pathways'
       : 'Career Paths & Study Options';
+  const audienceFocusMessage = recommendationAudience.focusMessage || 'Explore the recommendations below as a career guidance starting point.';
 
   /* Chart data */
   const radarData = Object.entries(scores).map(([key, score]) => ({
@@ -725,7 +731,7 @@ const TestResults = () => {
     >
       <div className="bg-white rounded-md p-6 mb-6">
         <p className="text-sm mb-4" style={{ color: GOV.textMuted }}>
-          Congratulations on completing your Self-Directed Search (SDS) Career Test! Below you will find a personalized overview of your RIASEC scores, an interpretation of your Holland Codes, and tailored career recommendations based on your unique profile.
+          Congratulations on completing your Self-Directed Search (SDS) Career Test! Below you will find a personalized overview of your RIASEC scores, an interpretation of your Holland Codes, and tailored career recommendations based on your unique profile. {audienceFocusMessage}
         </p>
         <div className="flex flex-wrap items-center gap-2 text-xs" style={{ color: GOV.textHint }}>
           <span>{studentName}</span>
@@ -838,15 +844,17 @@ const TestResults = () => {
               {occupations.map((occ) => {
                 const riasecLetter = occ.primaryRiasec || hollandLetters[0];
                 const meta = RIASEC_META[riasecLetter] || RIASEC_META.R;
+                const occupationName = occ.displayName || occ.name;
+                const occupationDescription = occ.displayDescription || occ.description;
                 return (
                   <div key={occ.id} className="flex items-start gap-3 p-4 rounded-lg border transition-all duration-200 hover:shadow-md hover:scale-[1.01] cursor-pointer" style={{ borderColor: GOV.border }}>
                     <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 text-white text-sm font-bold" style={{ backgroundColor: meta.color }}>
                       {riasecLetter || <FileText className="w-4 h-4" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm" style={{ color: GOV.text }}>{occ.name}</p>
-                      {occ.description && (
-                        <p className="text-xs mt-0.5 line-clamp-2" style={{ color: GOV.textMuted }}>{occ.description}</p>
+                      <p className="font-semibold text-sm" style={{ color: GOV.text }}>{occupationName}</p>
+                      {occupationDescription && (
+                        <p className="text-xs mt-0.5 line-clamp-2" style={{ color: GOV.textMuted }}>{occupationDescription}</p>
                       )}
                       <div className="flex items-center gap-2 mt-1.5">
                         {occ.demandLevel && <DemandBadge level={occ.demandLevel} />}

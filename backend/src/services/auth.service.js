@@ -434,12 +434,16 @@ module.exports = {
     if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
     if (user.isEmailVerified) throw new BadRequestError('Email is already verified', 'EMAIL_ALREADY_VERIFIED');
 
+    const previousVerification = {
+      token: user.emailVerificationToken,
+      expires: user.emailVerificationExpires
+    };
     const emailToken = crypto.randomBytes(32).toString('hex');
     user.emailVerificationToken = hashToken(emailToken);
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
 
-    return { user, emailToken };
+    return { user, emailToken, previousVerification };
   },
 
   /* ─── Change Password ─────────────────────────────────────────────────── */

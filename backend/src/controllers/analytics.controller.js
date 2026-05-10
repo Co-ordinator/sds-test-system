@@ -62,7 +62,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/institutions ────────────────────────────────── */
   getInstitutionBreakdown: async (req, res, next) => {
     try {
-      const data = await analyticsService.getInstitutionBreakdown();
+      const data = await analyticsService.getInstitutionBreakdown(req.query);
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch institution analytics', req, details: { error: error.message } });

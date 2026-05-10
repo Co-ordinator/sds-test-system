@@ -9,8 +9,9 @@ const logger = require('../utils/logger');
 const { drawLetterheadImage } = require('../utils/pdfAssets');
 
 const LOGO_PATHS = [
-  path.join(__dirname, '../../assets/siyinqaba.png'),
-  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
+  path.join(__dirname, '../../../docs/letterhead.png'),
+  path.join(__dirname, '../../assets/letterhead.png'),
+  path.join(__dirname, '../../../frontend/public/letterhead.png'),
 ];
 
 const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));

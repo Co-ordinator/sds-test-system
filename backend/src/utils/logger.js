@@ -68,17 +68,47 @@ const redactPathTokens = (pathValue) => {
     .replace(/(\/reset-password\/)[^/?#]+/i, '$1[REDACTED]');
 };
 
+const redactCookies = (cookies = {}) => {
+  if (!cookies || typeof cookies !== 'object') return {};
+  return Object.fromEntries(
+    Object.keys(cookies).map((key) => [key, '[REDACTED]'])
+  );
+};
+
+const sanitizeRequest = (req) => {
+  if (!req || typeof req !== 'object') return undefined;
+  return {
+    requestId: req.requestId || null,
+    method: req.method || null,
+    originalUrl: redactPathTokens(req.originalUrl || req.url || null),
+    path: redactPathTokens(req.path || null),
+    ip: req.ip || req.headers?.['x-forwarded-for'] || null,
+    userId: req.user?.id || null,
+    body: redactValue(req.body || {}),
+    params: redactValue(req.params || {}),
+    query: redactValue(req.query || {}),
+    cookies: redactCookies(req.cookies),
+    signedCookies: redactCookies(req.signedCookies),
+    headers: {
+      origin: req.headers?.origin || null,
+      referer: redactPathTokens(req.headers?.referer || null),
+      userAgent: req.headers?.['user-agent'] || null
+    }
+  };
+};
+
 // Redact sensitive information
 const redactSensitive = winston.format((info) => {
   if (info.req) {
-    info.req.body = redactValue(info.req.body);
-    info.req.params = redactValue(info.req.params);
-    info.req.query = redactValue(info.req.query);
-    info.req.url = redactPathTokens(info.req.url);
-    info.req.path = redactPathTokens(info.req.path);
+    info.req = sanitizeRequest(info.req);
   }
   if (info.body) info.body = redactValue(info.body);
   if (info.details) info.details = redactValue(info.details);
+  if (info.message && typeof info.message === 'object') {
+    if (info.message.req) info.message.req = sanitizeRequest(info.message.req);
+    if (info.message.body) info.message.body = redactValue(info.message.body);
+    if (info.message.details) info.message.details = redactValue(info.message.details);
+  }
   if (typeof info.message === 'string') info.message = redactPathTokens(info.message);
   return info;
 });

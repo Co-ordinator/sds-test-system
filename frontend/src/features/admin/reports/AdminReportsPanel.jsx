@@ -765,7 +765,7 @@ const AdminReportsPanel = () => {
           <div className="bg-white border rounded-md overflow-hidden" style={{ borderColor: GOV.border }}>
             {/* Ministry branded header bar */}
             <div className="flex items-center gap-3 px-4 py-2.5" style={{ backgroundColor: GOV.blue }}>
-              <img src="/siyinqaba.png" alt="Ministry Logo" className="h-8 w-8 object-contain flex-shrink-0 rounded"
+              <img src="/letterhead.png" alt="Ministry Logo" className="h-8 w-32 object-contain object-left flex-shrink-0 rounded"
                 onError={e => { e.target.style.display = 'none'; }} />
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-bold tracking-wide text-white opacity-90">MINISTRY OF LABOUR AND SOCIAL SECURITY</p>
@@ -848,7 +848,7 @@ const AdminReportsPanel = () => {
       <div ref={presentationRef} style={{ display: presentationMode ? 'flex' : 'none', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#ffffff' }}>
         {/* ── Thin ministry header ── */}
         <div className="flex items-center gap-3 px-10 py-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }}>
-          <img src="/siyinqaba.png" alt="Ministry Logo" className="h-7 w-7 object-contain flex-shrink-0"
+          <img src="/letterhead.png" alt="Ministry Logo" className="h-8 w-32 object-contain object-left flex-shrink-0"
             onError={e => { e.target.style.display = 'none'; }} />
           <p className="text-[10px] font-bold tracking-widest text-white flex-1">MINISTRY OF LABOUR AND SOCIAL SECURITY</p>
           <div className="flex items-center gap-1.5 flex-shrink-0">

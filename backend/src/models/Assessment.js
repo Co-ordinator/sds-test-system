@@ -28,6 +28,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(3),
       allowNull: true
     },
+    hollandCodeDisplay: {
+      type: DataTypes.STRING(32),
+      allowNull: true,
+      field: 'holland_code_display'
+    },
     
     // Captured at the time of test to ensure historical accuracy
     educationLevelAtTest: {
@@ -61,6 +66,7 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['completed_at'] },
       { fields: ['user_id', 'status'] },
       { fields: ['holland_code'] },
+      { fields: ['holland_code_display'] },
       { fields: ['created_at'] }
     ]
   });

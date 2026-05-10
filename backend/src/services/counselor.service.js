@@ -225,6 +225,10 @@ module.exports = {
               C: completed.scoreC,
             },
             displayCode,
+            userType: student?.userType,
+            degreeProgram: student?.degreeProgram,
+            yearOfStudy: student?.yearOfStudy,
+            yearsExperience: student?.yearsExperience
           }
         );
       } catch (_) {}

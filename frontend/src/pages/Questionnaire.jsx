@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2, X } from 'lucide-react';
 import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
@@ -330,6 +330,101 @@ const getResumePosition = (savedAnswers = {}, sectionQuestionMap = {}) => {
   return { sectionIndex: 0, questionIndex: 0 };
 };
 
+const hasAnswerValue = (value) => value !== undefined && value !== null && value !== '';
+
+const buildQuestionReviewItems = (questionsBySection = {}) => {
+  let globalNumber = 0;
+  return SECTIONS.flatMap((section, sectionIndex) => (
+    (questionsBySection[section.id] || []).map((question, questionIndex) => {
+      globalNumber += 1;
+      return {
+        section,
+        sectionIndex,
+        question,
+        questionIndex,
+        globalNumber
+      };
+    })
+  ));
+};
+
+const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
+  if (!skippedQuestions.length) return null;
+
+  return (
+    <aside
+      className="fixed inset-x-3 top-20 z-50 max-h-[34vh] overflow-hidden rounded-md border bg-white shadow-2xl sm:inset-x-4 sm:top-24 md:inset-x-auto md:bottom-4 md:right-4 md:top-28 md:w-72 md:max-h-none"
+      style={{ borderColor: GOV.border }}
+      role="complementary"
+      aria-label="Skipped questions review panel"
+    >
+      <div className="flex items-start justify-between gap-2 border-b px-3 py-2.5" style={{ borderColor: GOV.borderLight }}>
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: '#fef3c7' }}>
+            <AlertTriangle className="h-3.5 w-3.5" style={{ color: '#d97706' }} aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold" style={{ color: GOV.text }}>Skipped questions</h2>
+            <p className="mt-0.5 text-[11px] leading-snug" style={{ color: GOV.textMuted }}>
+              {skippedQuestions.length} question{skippedQuestions.length === 1 ? '' : 's'} need an answer before you submit.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          style={{ color: GOV.textMuted }}
+          aria-label="Close skipped questions panel"
+        >
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+
+      <div className="max-h-[calc(34vh-5.75rem)] overflow-y-auto px-2.5 py-2.5 md:max-h-[calc(100vh-13rem)]">
+        <div className="space-y-1.5">
+          {skippedQuestions.map((item) => {
+            const color = RIASEC_COLORS[item.question.riasecType] || GOV.blue;
+            const sectionLabel = `Section ${item.section.num}`;
+            const questionText = item.question.text || 'Question text unavailable';
+            return (
+              <button
+                key={item.question.id}
+                type="button"
+                onClick={() => onJump(item)}
+                className="w-full rounded-md border bg-white p-2.5 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                style={{ borderColor: GOV.borderLight }}
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold" style={{ color: GOV.text }}>
+                    Question {item.globalNumber}
+                  </span>
+                  <span
+                    className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                    style={{ backgroundColor: `${color}14`, color }}
+                  >
+                    {item.question.questionCode || item.question.riasecType || sectionLabel}
+                  </span>
+                </div>
+                <p className="text-[11px] font-semibold" style={{ color: GOV.textMuted }}>
+                  {sectionLabel}: {item.section.label}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug" style={{ color: GOV.text }}>
+                  {questionText}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="border-t px-3 py-2 text-[11px]" style={{ borderColor: GOV.borderLight, color: GOV.textMuted }}>
+        Tap a question to jump back and answer it.
+      </div>
+    </aside>
+  );
+};
+
 const Questionnaire = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -357,6 +452,7 @@ const Questionnaire = () => {
   const [sectionTransition, setSectionTransition] = useState(null);
   const [showInitialSectionIntro, setShowInitialSectionIntro] = useState(true);
   const [showResumeSectionIntro, setShowResumeSectionIntro] = useState(false);
+  const [showSkippedReviewPanel, setShowSkippedReviewPanel] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [activeNarrationKey, setActiveNarrationKey] = useState(null);
   const hasRestoredPositionRef = useRef(false);
@@ -364,10 +460,21 @@ const Questionnaire = () => {
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
   const currentQuestion = sectionQuestions[currentQuestionIndex];
+  const questionReviewItems = useMemo(
+    () => buildQuestionReviewItems(questionsBySection),
+    [questionsBySection]
+  );
+  const skippedQuestions = useMemo(
+    () => questionReviewItems.filter(({ question }) => !hasAnswerValue(answers[question.id])),
+    [answers, questionReviewItems]
+  );
   const isSelfEstimates = sectionId === 'self_estimates';
   const totalSections = SECTIONS.length;
-  const totalQuestions = Object.values(questionsBySection).reduce((sum, q) => sum + q.length, 0);
-  const answeredCount = Object.keys(answers).length;
+  const totalQuestions = questionReviewItems.length;
+  const answeredCount = questionReviewItems.reduce(
+    (sum, { question }) => sum + (hasAnswerValue(answers[question.id]) ? 1 : 0),
+    0
+  );
   const allAnswered = totalQuestions > 0 && answeredCount >= totalQuestions;
   const rawProgressPercent = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
   const progressPercent = allAnswered ? 100 : Math.floor(rawProgressPercent);
@@ -541,6 +648,7 @@ const Questionnaire = () => {
   };
 
   const goNext = () => {
+    setError(null);
     if (currentQuestionIndex < sectionQuestions.length - 1) {
       setCurrentQuestionIndex((i) => i + 1);
     } else if (currentSectionIndex < totalSections - 1) {
@@ -577,6 +685,7 @@ const Questionnaire = () => {
   };
 
   const goPrev = () => {
+    setError(null);
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex((i) => i - 1);
     } else if (currentSectionIndex > 0) {
@@ -586,12 +695,33 @@ const Questionnaire = () => {
     }
   };
 
+  const openSkippedReviewPanel = () => {
+    if (!skippedQuestions.length) return false;
+    stopNarration();
+    setError(null);
+    setShowSkippedReviewPanel(true);
+    return true;
+  };
+
+  const jumpToSkippedQuestion = (item) => {
+    if (!item) return;
+    stopNarration();
+    setIsPaused(false);
+    setSectionTransition(null);
+    setShowInitialSectionIntro(false);
+    setShowResumeSectionIntro(false);
+    setError(null);
+    setCurrentSectionIndex(item.sectionIndex);
+    setCurrentQuestionIndex(item.questionIndex);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  };
+
   const handleComplete = async () => {
     if (!assessment?.id || totalQuestions === 0) return;
-    if (answeredCount < totalQuestions) {
-      const unanswered = totalQuestions - answeredCount;
-      setError(`You must answer all questions before submitting. ${unanswered} question${unanswered > 1 ? 's' : ''} remaining (${answeredCount}/${totalQuestions} answered).`);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (skippedQuestions.length > 0) {
+      openSkippedReviewPanel();
       return;
     }
     setSubmitting(true);
@@ -622,7 +752,14 @@ const Questionnaire = () => {
     hasRestoredPositionRef.current = false;
     setShowInitialSectionIntro(true);
     setShowResumeSectionIntro(false);
+    setShowSkippedReviewPanel(false);
   }, [assessment?.id]);
+
+  useEffect(() => {
+    if (showSkippedReviewPanel && skippedQuestions.length === 0) {
+      setShowSkippedReviewPanel(false);
+    }
+  }, [showSkippedReviewPanel, skippedQuestions.length]);
 
   // Restore last viewed question for in-progress assessments.
   useEffect(() => {
@@ -884,6 +1021,14 @@ const Questionnaire = () => {
         <div className="p-3 rounded-md text-sm border" style={{ backgroundColor: GOV.errorBg, borderColor: GOV.errorBorder, color: GOV.error }}>
           {error}
         </div>
+      )}
+
+      {showSkippedReviewPanel && !isPaused && skippedQuestions.length > 0 && (
+        <SkippedQuestionsPanel
+          skippedQuestions={skippedQuestions}
+          onJump={jumpToSkippedQuestion}
+          onClose={() => setShowSkippedReviewPanel(false)}
+        />
       )}
 
       {isPaused && !sectionTransition && (
@@ -1342,18 +1487,18 @@ const Questionnaire = () => {
             </button>
 
             <div className="flex flex-1 items-center justify-end gap-2">
-              {allAnswered && (
+              {(allAnswered || isLastQuestion) && canAdvance && (
                 <button
                   type="button"
                   onClick={handleComplete}
-                  disabled={submitting}
+                  disabled={saving || isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: '#16a34a' }}
                 >
                   {submitting ? 'Submitting...' : 'Submit test'}
                 </button>
               )}
-              {!isLastQuestion && (
+              {!allAnswered && !isLastQuestion && (
                 <button
                   type="button"
                   onClick={goNext}

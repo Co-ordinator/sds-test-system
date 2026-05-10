@@ -2,6 +2,7 @@ const assessmentService = require('../services/assessment.service');
 const PDFDocument = require('pdfkit');
 const logger = require('../utils/logger');
 const { LETTERHEAD_PATHS, drawLetterheadImage, resolveLetterheadPath } = require('../utils/pdfAssets');
+const { renderResultsPdf } = require('../utils/resultsPdfRenderer');
 
 const RIASEC_LABELS = { R: 'Realistic', I: 'Investigative', A: 'Artistic', S: 'Social', E: 'Enterprising', C: 'Conventional' };
 const RIASEC_COLORS = { R: '#F44336', I: '#2563eb', A: '#7c3aed', S: '#059669', E: '#d97706', C: '#2D8BC4' };
@@ -192,6 +193,16 @@ class AssessmentController {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="CareerReport_${assessment.id}.pdf"`);
       doc.pipe(res);
+
+      renderResultsPdf(doc, {
+        assessment,
+        recommendations,
+        studentName,
+        generatedDateStr,
+        completedDate
+      });
+      doc.end();
+      return;
 
       const govBlue = '#2D8BC4';
       const text = '#111827';

@@ -35,7 +35,7 @@ export default function Unauthorized() {
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         <div className="w-full max-w-[380px] flex flex-col items-center">
           <Link to="/" className={`${LOGO.marginBottom} flex-shrink-0`} aria-label="Home">
-            <img src="/siyinqaba.png" alt={LOGO_ALT} className={LOGO.className} />
+            <img src="/letterhead.png" alt={LOGO_ALT} className={LOGO.className} />
           </Link>
 
           {showResend && <ResendVerification onClose={() => setShowResend(false)} defaultEmail={user?.email || ''} />}

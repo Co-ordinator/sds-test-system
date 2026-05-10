@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
-  BarChart2, Settings, Menu, X, Bell, Award, FileText, Monitor,
-  BookOpen, ClipboardList,
+  Settings, Menu, X, Bell, Award, FileText,
+  BookOpen, ClipboardList, Accessibility,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
-import { GOV, TYPO } from '../../theme/government';
+import { GOV } from '../../theme/government';
 import { useNotificationCount } from '../../hooks/useNotificationCount';
 
 // All possible admin nav links with required permissions
 const ADMIN_NAV_LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: Home, permission: null },
   { to: '/admin/results', label: 'Results', Icon: Award, permission: 'results.view' },
-  { to: '/admin/analytics', label: 'Analytics', Icon: BarChart2, permission: 'analytics.view' },
   { to: '/admin/reports', label: 'Report', Icon: FileText, permission: 'analytics.view' },
   { to: '/admin/audit', label: 'Audit Log', Icon: ClipboardList, permission: 'audit.view' },
   { to: '/admin/notifications', label: 'Notifications', Icon: Bell, badge: true, permission: 'notifications.view' },
@@ -25,7 +24,7 @@ const TEST_TAKER_NAV = [
   { to: '/dashboard', label: 'Dashboard', Icon: Home },
   { to: '/profile', label: 'Profile', Icon: User },
   { to: '/glossary', label: 'Glossary', Icon: BookOpen },
-  { to: '/accessibility', label: 'Accessibility', Icon: Monitor },
+  { to: '/accessibility', label: 'Accessibility', Icon: Accessibility },
 ];
 
 const ROLE_LABELS = {
@@ -49,7 +48,6 @@ const BREADCRUMB_MAP = {
   '/admin/results': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Results' }],
   '/admin/reports': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Report' }],
   '/admin/audit': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Audit Log' }],
-  '/admin/analytics': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Analytics' }],
   '/admin/notifications': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Notifications' }],
   '/admin/settings': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings' }],
   '/admin/courses': [{ label: 'Admin', to: '/admin/dashboard' }, { label: 'Settings', to: '/admin/settings' }, { label: 'Courses' }],
@@ -64,14 +62,14 @@ const BREADCRUMB_MAP = {
   '/results': [{ label: 'Dashboard', to: '/dashboard' }, { label: 'Results' }],
 };
 
-export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
+export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hideBreadcrumbs = false }) {
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
-  const navigate = useNavigate();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const role = user?.role || 'Test Taker';
+  const isTestTaker = role === 'Test Taker';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
   const dashboardPath = role === 'System Administrator'
     ? '/admin/dashboard'
@@ -117,9 +115,9 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className={`min-h-screen flex flex-col ${isTestTaker ? 'bg-[#fbfdff]' : 'bg-white'}`}>
       <div
-        className="flex-shrink-0 py-0.5 border-b"
+        className={isTestTaker ? 'hidden' : 'flex-shrink-0 py-0.5 border-b'}
         style={{ backgroundColor: GOV.ministryBarBg, borderColor: GOV.border }}
       >
         <div className="max-w-7xl mx-auto px-6 text-center">
@@ -134,8 +132,8 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
         className="sticky top-0 z-20 border-b h-14"
         style={{ borderColor: GOV.border, backgroundColor: '#ffffff' }}
       >
-        <div className="relative h-full px-4 lg:px-6">
-          <div className="absolute left-3 sm:left-4 lg:left-6 top-1/2 -translate-y-1/2 flex items-center gap-2 sm:gap-3 z-10">
+        <div className={`relative h-full ${isTestTaker ? 'px-3 sm:px-6' : 'px-4 lg:px-6'}`}>
+          <div className={`absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:gap-3 ${isTestTaker ? 'left-3 sm:left-6' : 'left-3 sm:left-4 lg:left-6'}`}>
             <button
               type="button"
               className="lg:hidden p-1.5 rounded-md hover:bg-gray-100"
@@ -144,27 +142,35 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
               {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
             </button>
 
-            <Link to={dashboardPath} className="flex items-center min-w-0 max-w-[40vw] sm:max-w-[180px]" aria-label="Go to dashboard">
-              <img src="/siyinqaba.png" alt="Siyinqaba" className="h-7 sm:h-10 w-auto max-w-full object-contain" />
+            <Link
+              to={dashboardPath}
+              className="flex w-[150px] min-w-0 items-center sm:w-[180px] lg:w-[205px]"
+              aria-label="Go to dashboard"
+            >
+              <img
+                src="/letterhead.png"
+                alt="Government of Eswatini"
+                className="h-10 w-full object-contain object-left sm:h-11"
+              />
             </Link>
           </div>
 
-          <div className="max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center">
-            <nav className="hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar">
+          <div className={isTestTaker ? 'mx-auto hidden h-full max-w-7xl items-center lg:flex lg:pl-[190px] lg:pr-[190px]' : 'max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center'}>
+            <nav className={isTestTaker ? 'hidden h-full w-full min-w-0 items-center gap-5 overflow-x-auto lg:flex custom-scrollbar' : 'hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar'}>
               {navLinks.map(({ to, label, Icon, badge }) => {
                 const active = isActive(to);
                 return (
                   <Link
                     key={`${to}-${label}`}
                     to={to}
-                    className="relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap"
+                    className={isTestTaker ? 'relative flex h-full shrink-0 items-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors whitespace-nowrap' : 'relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap'}
                     style={
                       active
-                        ? { color: GOV.blue, fontWeight: 700 }
-                        : { color: GOV.textMuted, fontWeight: 500 }
+                        ? { color: GOV.blue, fontWeight: 700, borderColor: isTestTaker ? GOV.blue : undefined }
+                        : { color: GOV.textMuted, fontWeight: isTestTaker ? 600 : 500, borderColor: isTestTaker ? 'transparent' : undefined }
                     }
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} />
                     {label}
                     {badge && notificationCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
@@ -177,24 +183,24 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
             </nav>
           </div>
 
-          <div className="absolute right-3 sm:right-4 lg:right-6 top-1/2 -translate-y-1/2 z-10">
+          <div className={`absolute top-1/2 z-10 -translate-y-1/2 ${isTestTaker ? 'right-3 sm:right-6' : 'right-3 sm:right-4 lg:right-6'}`}>
             <div className="relative">
               <button
                 type="button"
-                className="flex max-w-[170px] items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors"
+                className={isTestTaker ? 'flex max-w-[180px] items-center gap-2 rounded-md px-2.5 py-1.5 transition-colors hover:bg-gray-50' : 'flex max-w-[170px] items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors'}
                 onClick={() => setUserMenuOpen(o => !o)}
               >
                 <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
+                  className={isTestTaker ? 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full' : 'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0'}
                   style={{ backgroundColor: GOV.blueLightAlt }}
                 >
-                  <User className="w-4 h-4" style={{ color: GOV.blue }} />
+                  <User className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} style={{ color: GOV.blue }} />
                 </div>
                 <div className="hidden sm:block min-w-0 text-left">
-                  <p className="truncate text-xs font-semibold leading-none" style={{ color: GOV.text }}>{displayName}</p>
-                  <p className="truncate text-[10px] mt-0.5 leading-none" style={{ color: GOV.textMuted }}>{roleLabel}</p>
+                  <p className={isTestTaker ? 'truncate text-xs font-semibold leading-none' : 'truncate text-xs font-semibold leading-none'} style={{ color: GOV.text }}>{displayName}</p>
+                  <p className={isTestTaker ? 'truncate text-[10px] mt-0.5 leading-none' : 'truncate text-[10px] mt-0.5 leading-none'} style={{ color: GOV.textMuted }}>{roleLabel}</p>
                 </div>
-                <ChevronDown className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} />
+                <ChevronDown className={isTestTaker ? 'h-3.5 w-3.5' : 'w-3.5 h-3.5'} style={{ color: GOV.textMuted }} />
               </button>
 
               {userMenuOpen && (
@@ -282,7 +288,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs }) {
       )}
 
       {/* ── Breadcrumbs ── */}
-      {breadcrumbs.length > 0 && (
+      {!hideBreadcrumbs && breadcrumbs.length > 0 && (
         <div className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }}>
           <div className="max-w-7xl mx-auto px-6 py-1.5 flex items-center gap-1">
             {breadcrumbs.map((crumb, idx) => (

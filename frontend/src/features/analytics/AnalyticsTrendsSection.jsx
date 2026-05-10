@@ -219,7 +219,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         ) : <Empty h={240} />}
       </Card>
 
-      <Card title="Career Evolution by User Type" sub="Highest average RIASEC scores per type (top 3 shown)" className="col-span-12 lg:col-span-6">
+      <Card title="Top RIASEC Themes by User Type" sub="Highest average RIASEC scores per user type (top 3 shown)" className="col-span-12 lg:col-span-6">
         {careerByUserTypeRows.length > 0 ? (
           <div className="space-y-3">
             {careerByUserTypeRows.map((row) => {

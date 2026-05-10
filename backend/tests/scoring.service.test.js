@@ -39,4 +39,26 @@ describe('scoringService Holland display codes', () => {
 
     expect(scoringService.getAssessmentDisplayCode(assessment)).toBe('S C A/E');
   });
+
+  test('builds recommendation variants for a tied strongest rank', () => {
+    const variants = scoringService.buildCodeVariants('AER', 'A/E R I');
+
+    expect(variants).toEqual(expect.arrayContaining(['AER', 'EAR', 'ARI', 'ERI']));
+    expect(scoringService.getPrimaryLettersForMatching('AER', 'A/E R I')).toEqual(['A', 'E']);
+  });
+
+  test('builds recommendation variants for a tied third rank', () => {
+    const variants = scoringService.buildCodeVariants('SCA', 'S C A/E');
+
+    expect(variants).toEqual(expect.arrayContaining(['SCA', 'SCE']));
+    expect(scoringService.getLettersForMatching('SCA', 'S C A/E')).toEqual(['S', 'C', 'A', 'E']);
+  });
+
+  test('gives tied first-rank letters equal fallback weight when scores are unavailable', () => {
+    const variants = scoringService.buildCodeVariants('AER', 'A/E R I');
+    const weights = scoringService.buildWeightsFromCodeVariants('AER', variants);
+
+    expect(weights.A).toBe(1);
+    expect(weights.E).toBe(1);
+  });
 });

@@ -32,7 +32,12 @@ const Empty = ({ h = 200 }) => <div className={`flex items-center justify-center
 const DEMAND_ORDER = { critical: 0, very_high: 1, high: 2, medium: 3, low: 4 };
 const DEMAND_UNRATED_COLOR = '#94a3b8';
 
-const GrowthBadge = ({ growth }) => {
+const GrowthBadge = ({ growth, isNew }) => {
+  if (isNew || growth == null) return (
+    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: '#dbeafe', color: '#1d4ed8' }}>
+      New
+    </span>
+  );
   if (growth > 0) return (
     <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: '#d1fae5', color: '#065f46' }}>
       <TrendingUp className="w-3 h-3" /> +{growth}%
@@ -71,7 +76,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
     return hollandDist.slice(0, 12).map((d) => ({ code: getHollandDisplayCode(d), count: Number(d.count) }));
   }, [hollandDist]);
 
-  const sortedEmergingCareers = useMemo(() => {
+  const highDemandCareers = useMemo(() => {
     if (!pipelineData?.emergingCareers?.length) return [];
     return [...pipelineData.emergingCareers].sort((a, b) => (DEMAND_ORDER[a.localDemand] || 99) - (DEMAND_ORDER[b.localDemand] || 99));
   }, [pipelineData]);
@@ -299,7 +304,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
       {/* ═══ Skills Pipeline ═══ */}
 
       {/* Career Interest Momentum */}
-      <Card title="Career Interest Momentum" sub="Holland code growth: current 30d vs prior 30d" className="col-span-12 lg:col-span-6">
+      <Card title="Career Interest Momentum" sub="Holland code completions: current 30 days vs prior 30 days" className="col-span-12 lg:col-span-6">
         {(pipelineData?.hollandPipeline?.length > 0) ? (
           <div className="space-y-2">
             {pipelineData.hollandPipeline.slice(0, 10).map((item, i) => (
@@ -315,7 +320,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
                   </div>
                 </div>
                 <span className="text-xs w-8 text-right font-semibold" style={{ color: GOV.textMuted }}>{item.current}</span>
-                <GrowthBadge growth={item.growth} />
+                <GrowthBadge growth={item.growth} isNew={item.isNew} />
               </div>
             ))}
           </div>
@@ -339,18 +344,18 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
         ) : <Empty h={250} />}
       </Card>
 
-      {/* Emerging careers grid */}
-      {sortedEmergingCareers.length > 0 && (
+      {/* High-demand careers grid */}
+      {highDemandCareers.length > 0 && (
         <div className="col-span-12 bg-white rounded-lg border overflow-hidden" style={{ borderColor: GOV.border, boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
           <div className="px-4 pt-4 pb-2 flex items-center justify-between">
             <div>
-              <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>Emerging High-Demand Careers (Eswatini)</p>
-              <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>Critical workforce pipeline — careers with high local demand</p>
+              <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>High-Demand Careers (Eswatini)</p>
+              <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>Catalog careers marked as critical or high local demand</p>
             </div>
             <button className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }}><MoreHorizontal className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px mx-4 mb-4 rounded-lg overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
-            {sortedEmergingCareers.map((career, i) => (
+            {highDemandCareers.map((career, i) => (
               <div key={i} className="bg-white p-3">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <p className="text-xs font-semibold leading-snug flex-1" style={{ color: GOV.text }}>{career.name}</p>
@@ -493,7 +498,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
       )}
 
       {/* Top Skills in Demand */}
-      <Card title="Top Skills in Demand" sub="Most required skills across all careers" className="col-span-12 lg:col-span-4">
+      <Card title="Most Common Catalog Skills" sub="Skills listed most often across stored occupations" className="col-span-12 lg:col-span-4">
         {(kgData?.topSkills || []).length > 0 ? (
           <div className="space-y-1.5">
             {kgData.topSkills.slice(0, 12).map((s, i) => {
@@ -516,7 +521,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
 
       {/* Career Categories */}
       {(kgData?.careerCategories || []).length > 0 && (
-        <Card title="Career Categories" sub="Occupations grouped by industry" className="col-span-12">
+        <Card title="Career Catalog Categories" sub="Stored occupations grouped by industry/category" className="col-span-12">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={kgData.careerCategories.slice(0, 12).map(d => ({ name: d.category, value: Number(d.count) }))}>
               <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />

@@ -34,6 +34,17 @@ module.exports = (sequelize, DataTypes) => {
       field: 'local_demand'
     },
     skills: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
+    source: { type: DataTypes.STRING, allowNull: true },
+    sourceCode: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'source_code'
+    },
+    consistencyScore: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'consistency_score'
+    },
     status: {
       type: DataTypes.ENUM('approved', 'pending_review'),
       allowNull: false,

@@ -57,7 +57,11 @@ const GlossaryPage = () => {
       { value: 'riasec', label: 'RIASEC Types', count: allTerms.filter(term => term.section === 'riasec').length, icon: Users },
       { value: 'structure', label: 'Assessment Terms', count: allTerms.filter(term => term.section === 'structure').length, icon: GraduationCap },
       { value: 'actions', label: 'Activity Words', count: allTerms.filter(term => term.section === 'actions').length, icon: Briefcase },
-      { value: 'occupations', label: 'Occupations', count: allTerms.filter(term => term.section === 'occupations').length, icon: Briefcase }
+      { value: 'activities', label: 'Activities', count: allTerms.filter(term => term.section === 'activities').length, icon: BookOpen },
+      { value: 'competencies', label: 'Competencies', count: allTerms.filter(term => term.section === 'competencies').length, icon: GraduationCap },
+      { value: 'occupations', label: 'Occupations', count: allTerms.filter(term => term.section === 'occupations').length, icon: Briefcase },
+      { value: 'self_estimates', label: 'Self Estimates', count: allTerms.filter(term => term.section === 'self_estimates').length, icon: Users },
+      { value: 'general', label: 'General', count: allTerms.filter(term => term.section === 'general').length, icon: BookOpen }
     ];
   }, [glossaryTerms]);
 
