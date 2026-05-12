@@ -8,9 +8,24 @@ const localDevFallback = hostName === 'localhost' || hostName === '127.0.0.1'
   ? 'http://localhost:5000'
   : origin;
 
-// Paths in the app include /api/v1, so this should point to origin only.
-const rawUrl = (process.env.REACT_APP_API_URL || localDevFallback || 'http://localhost:5000').trim();
-const baseURL = rawUrl.replace(/\/api\/v1\/?$/, '') || rawUrl;
+/** Strip trailing /api or /api/v1 so baseURL is the API host (or empty for same-origin proxy). */
+const normalizeApiBase = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  let t = url.trim().replace(/\/$/, '');
+  t = t.replace(/\/api\/v1\/?$/i, '');
+  t = t.replace(/\/api\/?$/i, '');
+  return t;
+};
+
+const rawEnv = (process.env.REACT_APP_API_URL || '').trim();
+const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1';
+// Same-origin in dev so httpOnly SameSite=Strict cookies set by the API reach the browser (see package.json "proxy").
+const useRelativeDevApi =
+  isBrowser && process.env.NODE_ENV === 'development' && isLocalHost && !rawEnv;
+
+const baseURL = useRelativeDevApi
+  ? ''
+  : normalizeApiBase(rawEnv) || localDevFallback || 'http://localhost:5000';
 
 const api = axios.create({
   baseURL,
