@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "build": "node scripts/build.js",
     "test": "jest --runInBand",
     "test:error-contract": "jest --runInBand tests/error.middleware.test.js tests/validation.middleware.test.js",
     "check:no-console": "node scripts/check-no-console.js",
@@ -47,6 +48,8 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
+    "esbuild": "^0.25.11",
+    "fast-glob": "^3.3.3",
     "jest": "^29.7.0",
     "sequelize-cli": "^6.6.5",
     "supertest": "^6.3.4"
