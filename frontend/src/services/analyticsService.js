@@ -39,8 +39,8 @@ export const analyticsService = {
     api.get(`${BASE}/skills-pipeline${qs(filters)}`).then(r => r.data?.data || null),
 
   // ── Per-institution analytics ─────────────────────────────────────────
-  getInstitutionBreakdown: () =>
-    api.get(`${BASE}/institutions`).then(r => r.data?.data || null),
+  getInstitutionBreakdown: (filters = {}) =>
+    api.get(`${BASE}/institutions${qs(filters)}`).then(r => r.data?.data || null),
 
   // ── Government Funding Priority Alignment ───────────────────────────────
   getFundingAlignment: (filters = {}) =>

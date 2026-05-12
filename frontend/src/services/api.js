@@ -56,6 +56,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
+    const skipAuthRetry = Boolean(originalRequest?.skipAuthRetry);
 
     // Handle 403 Forbidden - permission denied
     if (error.response?.status === 403) {
@@ -68,6 +69,7 @@ api.interceptors.response.use(
       error.response?.status === 401
       && originalRequest
       && !originalRequest._retry
+      && !skipAuthRetry
       && !isAuthEndpoint(requestUrl)
     ) {
       if (isRefreshing) {

@@ -2,12 +2,12 @@
 
 const { User, Assessment, Institution, Occupation } = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const scoringService = require('./scoring.service');
 
 const BASE_TAKER = { role: 'Test Taker' };
 
 const REGIONS = ['hhohho', 'manzini', 'lubombo', 'shiselweni'];
 const GENDERS  = ['male', 'female', 'other', 'prefer_not_to_say'];
-
 /* ── Query helpers ───────────────────────────────────────────────────────── */
 const buildQ = (f = {}) => {
   const { institutionId, region, userType, gender, startDate, endDate } = f;
@@ -42,6 +42,34 @@ const getTopCode = async (aw, ui, uw) => {
 };
 
 /* ── Report Service ──────────────────────────────────────────────────────── */
+const getAssessmentDisplayCode = (assessment) => {
+  return scoringService.getAssessmentDisplayCode(assessment, '-') || '-';
+};
+
+const getHollandDistribution = async (aw, ui, uw, limit = 10) => {
+  const assessments = await Assessment.findAll({
+    where: { ...aw, hollandCode: { [Op.ne]: null } },
+    attributes: ['id', 'hollandCode', 'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC'],
+    include: ui(uw),
+  });
+
+  const counts = assessments.reduce((acc, assessment) => {
+    const displayCode = getAssessmentDisplayCode(assessment);
+    acc[displayCode] = (acc[displayCode] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(counts)
+    .map(([code, count]) => ({ holland_code: code, hollandCodeDisplay: code, count }))
+    .sort((a, b) => Number(b.count) - Number(a.count) || a.holland_code.localeCompare(b.holland_code))
+    .slice(0, limit);
+};
+
+const getTopDisplayCode = async (aw, ui, uw) => {
+  const [row] = await getHollandDistribution(aw, ui, uw, 1);
+  return row?.holland_code || '-';
+};
+
 module.exports = {
 
   /* 1 ── Executive Summary ───────────────────────────────────────────────── */
@@ -58,14 +86,7 @@ module.exports = {
       ? Math.round((completedAssessments / totalAssessments) * 100) : 0;
 
     const [hollandDist, genderDist, regionDist, userTypeDist] = await Promise.all([
-      Assessment.findAll({
-        where: { ...aw, holland_code: { [Op.ne]: null } },
-        attributes: ['holland_code', [fn('COUNT', col('Assessment.id')), 'count']],
-        include: ui(uw),
-        group: ['Assessment.holland_code'],
-        order: [[fn('COUNT', col('Assessment.id')), 'DESC']],
-        limit: 10, raw: true,
-      }),
+      getHollandDistribution(aw, ui, uw, 10),
       User.findAll({
         where: { ...uw, gender: { [Op.ne]: null } },
         attributes: ['gender', [fn('COUNT', col('User.id')), 'count']],
@@ -98,7 +119,7 @@ module.exports = {
       const [totalUsers, completedAssessments, topCode] = await Promise.all([
         User.count({ where: rw }),
         Assessment.count({ where: aw, include: ui(rw) }),
-        getTopCode(aw, ui, rw),
+        getTopDisplayCode(aw, ui, rw),
       ]);
       const completionRate = totalUsers > 0
         ? Math.round((completedAssessments / totalUsers) * 100) : 0;
@@ -123,7 +144,7 @@ module.exports = {
         const [totalUsers, completedAssessments, topCode] = await Promise.all([
           User.count({ where: gw }),
           Assessment.count({ where: aw, include: ui(gw) }),
-          getTopCode(aw, ui, gw),
+          getTopDisplayCode(aw, ui, gw),
         ]);
         return { gender, totalUsers, completedAssessments, topCode };
       })),
@@ -142,19 +163,12 @@ module.exports = {
     return { genderBreakdown: genderBreakdown.filter(g => g.totalUsers > 0), userTypeDist, regionGenderDist };
   },
 
-  /* 4 ── Career Intelligence ─────────────────────────────────────────────── */
+  /* 4 ── Career Overview ─────────────────────────────────────────────────── */
   async getCareerIntelligenceReport(filters = {}) {
     const { uw, aw, ui } = buildQ(filters);
 
     const [hollandDist, riasecRow, topOccupations] = await Promise.all([
-      Assessment.findAll({
-        where: { ...aw, holland_code: { [Op.ne]: null } },
-        attributes: ['holland_code', [fn('COUNT', col('Assessment.id')), 'count']],
-        include: ui(uw),
-        group: ['Assessment.holland_code'],
-        order: [[fn('COUNT', col('Assessment.id')), 'DESC']],
-        limit: 15, raw: true,
-      }),
+      getHollandDistribution(aw, ui, uw, 15),
       Assessment.findOne({
         where: aw,
         attributes: [

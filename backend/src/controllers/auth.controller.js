@@ -3,6 +3,7 @@ const { AuditLog } = require('../models');
 const { logAuthAction } = require('../middleware/authentication.middleware');
 const { sendEmail } = require('../config/email.config');
 const logger = require('../utils/logger');
+const { AppError } = require('../utils/errors/appError');
 
 const ACCESS_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -43,36 +44,100 @@ const resolveFrontendBaseUrl = (req) => {
   return configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
 };
 
+const createEmailAudit = async (req, user, description, details = {}) => {
+  await AuditLog.create({
+    userId: user.id,
+    actionType: 'SYSTEM',
+    description,
+    details: {
+      resourceType: 'email',
+      resourceId: user.id,
+      requestMethod: req.method,
+      requestPath: req.originalUrl || req.path,
+      ...details
+    },
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent']
+  }).catch(() => {});
+};
+
+const sendVerificationEmail = async (req, user, emailToken, { subject, successDescription, failureDescription, successLogMessage, failureLogMessage }) => {
+  const frontendBaseUrl = resolveFrontendBaseUrl(req);
+
+  try {
+    const delivery = await sendEmail({
+      email: user.email,
+      subject,
+      template: 'welcome-verify',
+      context: {
+        firstName: user.firstName || 'Student',
+        lastName: user.lastName || '',
+        email: user.email,
+        region: user.region,
+        verificationUrl: `${frontendBaseUrl}/verify-email/${emailToken}`
+      }
+    });
+
+    logger.info({
+      actionType: 'SYSTEM',
+      message: successLogMessage,
+      req,
+      details: { userId: user.id, attempts: delivery.attempts, messageId: delivery.messageId }
+    });
+    await createEmailAudit(req, user, successDescription, {
+      messageId: delivery.messageId,
+      attempts: delivery.attempts
+    });
+
+    return { sent: true, delivery };
+  } catch (emailError) {
+    logger.error({
+      actionType: 'EMAIL_FAILED',
+      message: failureLogMessage,
+      req,
+      details: { error: emailError.message }
+    });
+    await createEmailAudit(req, user, failureDescription, {
+      errorMessage: emailError.message
+    });
+
+    return { sent: false, error: emailError };
+  }
+};
+
 const register = async (req, res, next) => {
   try {
-    const { user, token, refreshToken, emailToken } = await authService.register(req.body);
+    const { user, emailToken } = await authService.register(req.body);
     logger.info({ actionType: 'REGISTER', message: `User registered: ${user.email}`, req, details: { email: user.email, role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
-    setRefreshTokenCookie(res, refreshToken);
-    setAccessTokenCookie(res, token);
 
-    res.status(201).json({ status: 'success', token, data: { user: user.toJSON() } });
-
+    let emailResult = { sent: false };
     if (user.email) {
-      const frontendBaseUrl = resolveFrontendBaseUrl(req);
-      sendEmail({
-        email: user.email,
+      emailResult = await sendVerificationEmail(req, user, emailToken, {
         subject: 'Welcome to SDS Test System - Verify Your Email',
-        template: 'welcome-verify',
-        context: {
-          firstName: user.firstName || 'Student',
-          lastName: user.lastName || '',
-          email: user.email,
-          region: user.region,
-          verificationUrl: `${frontendBaseUrl}/verify-email/${emailToken}`
-        }
-      })
-        .then(() => AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Welcome email sent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/register' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }))
-        .catch(emailError => {
-          logger.error({ actionType: 'EMAIL_FAILED', message: 'Welcome email failed', req, details: { error: emailError.message } });
-          AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Failed to send welcome email', details: { resourceType: 'email', resourceId: user.id, errorMessage: emailError.message, requestMethod: 'POST', requestPath: '/api/v1/auth/register' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
-        });
+        successDescription: 'Welcome email sent',
+        failureDescription: 'Failed to send welcome email',
+        successLogMessage: `Welcome verification email sent to: ${user.email}`,
+        failureLogMessage: 'Welcome email failed'
+      });
     }
+
+    const verificationEmailSent = Boolean(emailResult.sent);
+    res.status(201).json({
+      status: 'success',
+      message: verificationEmailSent
+        ? 'Account created. Please verify your email to continue.'
+        : 'Account created, but the verification email could not be sent right now. Please use resend verification link.',
+      requiresEmailVerification: true,
+      verificationEmailSent,
+      emailDelivery: verificationEmailSent ? 'sent' : 'failed',
+      data: {
+        user: user.toJSON(),
+        emailDelivery: verificationEmailSent
+          ? { attempts: emailResult.delivery.attempts }
+          : null
+      }
+    });
   } catch (error) {
     logger.error({ actionType: 'REGISTER_FAILED', message: 'User registration failed', req, details: { error: error.message, stack: error.stack } });
     next(error);
@@ -105,7 +170,13 @@ const login = async (req, res, next) => {
     setAccessTokenCookie(res, token);
     res.status(200).json({ status: 'success', token, mustChangePassword, data: { user: user.toJSON ? user.toJSON() : user } });
   } catch (error) {
-    logger.warn({ actionType: 'LOGIN_FAILED', message: error.message, req });
+    logger.log({
+      level: 'warn',
+      actionType: 'LOGIN_FAILED',
+      message: error.message,
+      req,
+      details: { code: error.code, status: error.status || error.statusCode }
+    });
     next(error);
   }
 };
@@ -250,28 +321,36 @@ const deleteUserAccount = async (req, res, next) => {
 
 const resendVerificationEmail = async (req, res, next) => {
   try {
-    const { user, emailToken } = await authService.resendVerificationEmail(req.body.email);
+    const { user, emailToken, previousVerification } = await authService.resendVerificationEmail(req.body.email);
 
-    res.status(200).json({ status: 'success', message: 'Verification email sent' });
-
-    const frontendBaseUrl = resolveFrontendBaseUrl(req);
-    sendEmail({
-      email: user.email,
+    const emailResult = await sendVerificationEmail(req, user, emailToken, {
       subject: 'Verify Your Email Address',
-      template: 'welcome-verify',
-      context: {
-        firstName: user.firstName || 'Student',
-        verificationUrl: `${frontendBaseUrl}/verify-email/${emailToken}`
-      }
-    })
-      .then(() => {
-        logger.info({ actionType: 'VERIFICATION_EMAIL_RESENT', message: `Verification email resent to: ${user.email}`, req, details: { userId: user.id } });
-        return AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Verification email resent', details: { resourceType: 'email', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/resend-verification' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
-      })
-      .catch(emailError => {
-        logger.error({ actionType: 'EMAIL_FAILED', message: 'Resend verification email failed', req, details: { error: emailError.message } });
-        AuditLog.create({ userId: user.id, actionType: 'SYSTEM', description: 'Failed to resend verification email', details: { resourceType: 'email', resourceId: user.id, errorMessage: emailError.message, requestMethod: 'POST', requestPath: '/api/v1/auth/resend-verification' }, ipAddress: req.ip, userAgent: req.headers['user-agent'] }).catch(() => {});
+      successDescription: 'Verification email resent',
+      failureDescription: 'Failed to resend verification email',
+      successLogMessage: `Verification email resent to: ${user.email}`,
+      failureLogMessage: 'Resend verification email failed'
+    });
+
+    if (!emailResult.sent) {
+      await user.update({
+        emailVerificationToken: previousVerification.token,
+        emailVerificationExpires: previousVerification.expires
+      }).catch(() => {});
+      throw new AppError('We could not send the verification email right now. Please wait a moment and try again.', {
+        status: 503,
+        code: 'EMAIL_DELIVERY_FAILED',
+        expose: true
       });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Verification email sent',
+      emailDelivery: 'sent',
+      data: {
+        emailDelivery: { attempts: emailResult.delivery.attempts }
+      }
+    });
   } catch (error) {
     logger.error({ actionType: 'RESEND_VERIFICATION_FAILED', message: 'Failed to resend verification email', req, details: { error: error.message } });
     next(error);

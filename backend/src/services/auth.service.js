@@ -137,13 +137,7 @@ module.exports = {
       throw error;
     }
 
-    const token = signToken(user.id, user.role);
-    const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await user.save();
-
-    return { user, token, refreshToken, emailToken };
+    return { user, emailToken };
   },
 
   /* ─── Verify Email ────────────────────────────────────────────────────── */
@@ -165,7 +159,16 @@ module.exports = {
       });
       
       if (recentlyVerifiedUser) {
-        return { user: recentlyVerifiedUser, token: null, refreshToken: null, alreadyVerified: true };
+        let token = null;
+        let refreshToken = null;
+        try {
+          token = signToken(recentlyVerifiedUser.id, recentlyVerifiedUser.role);
+          refreshToken = signRefreshToken(recentlyVerifiedUser.id, recentlyVerifiedUser.role);
+          recentlyVerifiedUser.refreshToken = hashToken(refreshToken);
+          recentlyVerifiedUser.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+          await recentlyVerifiedUser.save();
+        } catch (_) {}
+        return { user: recentlyVerifiedUser, token, refreshToken, alreadyVerified: true };
       }
       throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
     }
@@ -243,6 +246,11 @@ module.exports = {
     const { sequelize } = require('../models');
     const user = await User.findByPk(userId);
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
+    if (user.email && !user.isEmailVerified && !user.createdByTestAdministrator) {
+      const error = new AuthError('Please verify your email before completing onboarding.', 'EMAIL_NOT_VERIFIED', 403);
+      error.requiresVerification = true;
+      throw error;
+    }
 
     const allowed = [
       'firstName', 'lastName', 'gender', 'nationalId', 'phoneNumber', 'region', 'district', 'address',
@@ -426,12 +434,16 @@ module.exports = {
     if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
     if (user.isEmailVerified) throw new BadRequestError('Email is already verified', 'EMAIL_ALREADY_VERIFIED');
 
+    const previousVerification = {
+      token: user.emailVerificationToken,
+      expires: user.emailVerificationExpires
+    };
     const emailToken = crypto.randomBytes(32).toString('hex');
     user.emailVerificationToken = hashToken(emailToken);
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
 
-    return { user, emailToken };
+    return { user, emailToken, previousVerification };
   },
 
   /* ─── Change Password ─────────────────────────────────────────────────── */

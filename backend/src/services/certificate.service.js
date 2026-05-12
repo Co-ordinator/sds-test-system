@@ -1,9 +1,23 @@
 'use strict';
 
-const { Certificate, Assessment, Answer, User } = require('../models');
+const { Certificate, Assessment, Answer, User, Institution } = require('../models');
 const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
+
+const attachAssessmentDisplayCode = (assessment) => {
+  if (!assessment) return assessment;
+  assessment.setDataValue?.(
+    'hollandCodeDisplay',
+    scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || null) || null
+  );
+  return assessment;
+};
+
+const attachCertificateDisplayCode = (certificate) => {
+  attachAssessmentDisplayCode(certificate?.assessment);
+  return certificate;
+};
 
 const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
 
@@ -40,12 +54,23 @@ module.exports = {
   },
 
   /* ─── Generate (create/upsert) certificate ─────────────────────────────── */
-  generateCertificate: async (assessmentId, generatedBy) => {
+  generateCertificate: async (assessmentId, generatedBy, options = {}) => {
     const assessment = await Assessment.findByPk(assessmentId, {
-      include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId'] }]
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: [
+          'id', 'firstName', 'lastName', 'email', 'nationalId', 'studentCode',
+          'institutionId', 'currentInstitution', 'region', 'district'
+        ],
+        include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'region', 'district'] }]
+      }]
     });
 
     if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
+    if (options.ownerUserId && assessment.userId !== options.ownerUserId) {
+      throw new ForbiddenError('Not authorized', 'CERTIFICATE_NOT_AUTHORIZED');
+    }
     if (assessment.status !== 'completed') {
       throw new BadRequestError('Assessment must be completed before issuing a certificate', 'ASSESSMENT_NOT_COMPLETED');
     }
@@ -68,7 +93,11 @@ module.exports = {
   /* ─── Get data for PDF download ────────────────────────────────────────── */
   getDownloadData: async (assessmentId, userId, userRole) => {
     const assessment = await Assessment.findByPk(assessmentId, {
-      include: [{ model: User, as: 'user' }]
+      include: [{
+        model: User,
+        as: 'user',
+        include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'region', 'district'] }]
+      }]
     });
 
     if (!assessment || assessment.status !== 'completed') {
@@ -88,33 +117,32 @@ module.exports = {
     }
 
     const sectionScores = await module.exports.computeSectionScores(assessmentId);
-    const hollandCode = assessment.hollandCode || '';
-    const hollandLetters = hollandCode.replace(/\//g, '').split('').filter(c => 'RIASEC'.includes(c)).slice(0, 3);
+    const totals = {
+      R: assessment.scoreR || 0,
+      I: assessment.scoreI || 0,
+      A: assessment.scoreA || 0,
+      S: assessment.scoreS || 0,
+      E: assessment.scoreE || 0,
+      C: assessment.scoreC || 0
+    };
+    const displayCode = scoringService.getDisplayCodeFromScores(totals, assessment.hollandCode || '');
+    const hollandLetters = scoringService.parseDisplayCodeGroups(displayCode || assessment.hollandCode)
+      .slice(0, 3)
+      .map((group) => group.join('/'));
 
     let occupationNames = [];
     try {
-      const { displayCode } = scoringService.buildHollandCodes({
-        R: assessment.scoreR,
-        I: assessment.scoreI,
-        A: assessment.scoreA,
-        S: assessment.scoreS,
-        E: assessment.scoreE,
-        C: assessment.scoreC,
-      }, 0);
       const recs = await scoringService.getRecommendations(
         assessment.hollandCode,
         assessment.educationLevelAtTest,
         null,
         {
-          scores: {
-            R: assessment.scoreR,
-            I: assessment.scoreI,
-            A: assessment.scoreA,
-            S: assessment.scoreS,
-            E: assessment.scoreE,
-            C: assessment.scoreC,
-          },
+          scores: totals,
           displayCode,
+          userType: assessment.user?.userType,
+          degreeProgram: assessment.user?.degreeProgram,
+          yearOfStudy: assessment.user?.yearOfStudy,
+          yearsExperience: assessment.user?.yearsExperience
         }
       );
       occupationNames = (recs.occupations || []).slice(0, 3).map(o => o.name);
@@ -129,16 +157,17 @@ module.exports = {
 
   /* ─── List all certificates (admin) ────────────────────────────────────── */
   listCertificates: async () => {
-    return await Certificate.findAll({
+    const certs = await Certificate.findAll({
       include: [{
         model: Assessment,
         as: 'assessment',
-        attributes: ['id', 'hollandCode', 'completedAt', 'status'],
+        attributes: ['id', 'hollandCode', 'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC', 'completedAt', 'status'],
         include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email'] }]
       }],
       order: [['generatedAt', 'DESC']],
       limit: 500
     });
+    return certs.map(attachCertificateDisplayCode);
   },
 
   /* ─── Check if certificate exists ──────────────────────────────────────── */
@@ -153,10 +182,15 @@ module.exports = {
 
   /* ─── My certificates (user) ────────────────────────────────────────────── */
   myCertificates: async (userId) => {
-    return await Certificate.findAll({
+    const certs = await Certificate.findAll({
       where: { userId },
-      include: [{ model: Assessment, as: 'assessment', attributes: ['id', 'hollandCode', 'completedAt'] }],
+      include: [{
+        model: Assessment,
+        as: 'assessment',
+        attributes: ['id', 'hollandCode', 'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC', 'completedAt']
+      }],
       order: [['generatedAt', 'DESC']]
     });
+    return certs.map(attachCertificateDisplayCode);
   }
 };

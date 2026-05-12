@@ -13,7 +13,7 @@ const REPORT_SECTIONS = [
   { key: 'executive_summary',       label: 'Executive Summary',       icon: Globe,      description: 'KPIs, Holland codes, distribution charts' },
   { key: 'regional',                label: 'Regional Distribution',   icon: Map,        description: 'Regional performance scorecard' },
   { key: 'gender_demographics',     label: 'Gender & Demographics',   icon: Users,      description: 'Gender breakdown, cross-tabulation' },
-  { key: 'career_intelligence',     label: 'Career Intelligence',     icon: Briefcase,  description: 'RIASEC averages, Holland codes, occupations' },
+  { key: 'career_intelligence',     label: 'Career Overview',         icon: Briefcase,  description: 'RIASEC averages, Holland codes, occupations' },
   { key: 'institution_performance', label: 'Institution Performance', icon: Building2,  description: 'Performance ranking by institution' },
   { key: 'assessment_trends',       label: 'Assessment Trends',       icon: TrendingUp, description: 'Monthly completion & registration trends' },
 ];
@@ -112,6 +112,20 @@ const GENDER_LBL = { male:'Male', female:'Female', other:'Other', prefer_not_to_
 const UTYPE_LBL = { 'High School Student':'High School', 'University Student':'University', Professional:'Professional', 'Test Administrator':'Test Admin', 'System Administrator':'Sys Admin' };
 const fmtN = n => Number(n || 0).toLocaleString();
 const capF = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '—';
+const getReportCode = row => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
+const parseHollandCodeGroups = code => String(code || '')
+  .toUpperCase()
+  .trim()
+  .split(/\s+/)
+  .flatMap(group => {
+    const cleaned = group.replace(/[^RIASEC/]/g, '');
+    if (!cleaned) return [];
+    if (!cleaned.includes('/')) return cleaned.split('').map(letter => [letter]);
+    return [cleaned.split('/').filter(Boolean)];
+  });
+const describeHollandCode = code => parseHollandCodeGroups(code)
+  .map(group => group.map(letter => RIASEC_NAME[letter] || letter).join('/'))
+  .join(' / ');
 
 /* ── Reusable report preview primitives — clean formal style ────────────── */
 const KpiCard = ({ label, value, sub }) => (
@@ -364,8 +378,8 @@ const AdminReportsPanel = () => {
               <thead><THead cols={['Code', 'Personality Profile', 'Frequency', 'Count']} /></thead>
               <tbody>
                 {(preview.hollandDist || []).map((row, i) => {
-                  const code = row.holland_code || '', cnt = Number(row.count);
-                  const desc = code.split('').map(c => RIASEC_NAME[c] || c).join(' / ');
+                  const code = getReportCode(row), cnt = Number(row.count);
+                  const desc = describeHollandCode(code);
                   return (
                     <tr key={i} style={{ backgroundColor: i % 2 === 1 ? C.STRIPE : C.WHITE }}>
                       <td className="px-2 py-1 border-b font-bold" style={{ borderColor: C.BORDER, color: C.TEXT }}>{code}</td>
@@ -513,7 +527,7 @@ const AdminReportsPanel = () => {
         );
       }
 
-      /* ═══════════════════════ CAREER INTELLIGENCE ════════════════════ */
+      /* ═══════════════════════ CAREER OVERVIEW ════════════════════ */
       case 'career_intelligence': {
         const ri = preview.riasecAverages || {};
         const riasec = [
@@ -553,8 +567,8 @@ const AdminReportsPanel = () => {
               <thead><THead cols={['Code', 'Personality Profile', 'Frequency', 'Count']} /></thead>
               <tbody>
                 {(preview.hollandDist || []).map((row, i) => {
-                  const code = row.holland_code || '', cnt = Number(row.count);
-                  const desc = code.split('').map(c => RIASEC_NAME[c] || c).join(' / ');
+                  const code = getReportCode(row), cnt = Number(row.count);
+                  const desc = describeHollandCode(code);
                   return (
                     <tr key={i} style={{ backgroundColor: i % 2 === 1 ? C.STRIPE : C.WHITE }}>
                       <td className="px-2 py-1 border-b font-bold" style={{ borderColor: C.BORDER, color: C.TEXT }}>{code}</td>
@@ -751,7 +765,7 @@ const AdminReportsPanel = () => {
           <div className="bg-white border rounded-md overflow-hidden" style={{ borderColor: GOV.border }}>
             {/* Ministry branded header bar */}
             <div className="flex items-center gap-3 px-4 py-2.5" style={{ backgroundColor: GOV.blue }}>
-              <img src="/siyinqaba.png" alt="Ministry Logo" className="h-8 w-8 object-contain flex-shrink-0 rounded"
+              <img src="/letterhead.png" alt="Ministry Logo" className="h-8 w-32 object-contain object-left flex-shrink-0 rounded"
                 onError={e => { e.target.style.display = 'none'; }} />
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-bold tracking-wide text-white opacity-90">MINISTRY OF LABOUR AND SOCIAL SECURITY</p>
@@ -834,7 +848,7 @@ const AdminReportsPanel = () => {
       <div ref={presentationRef} style={{ display: presentationMode ? 'flex' : 'none', flexDirection: 'column', height: '100vh', width: '100vw', backgroundColor: '#ffffff' }}>
         {/* ── Thin ministry header ── */}
         <div className="flex items-center gap-3 px-10 py-2 flex-shrink-0" style={{ backgroundColor: GOV.blue }}>
-          <img src="/siyinqaba.png" alt="Ministry Logo" className="h-7 w-7 object-contain flex-shrink-0"
+          <img src="/letterhead.png" alt="Ministry Logo" className="h-8 w-32 object-contain object-left flex-shrink-0"
             onError={e => { e.target.style.display = 'none'; }} />
           <p className="text-[10px] font-bold tracking-widest text-white flex-1">MINISTRY OF LABOUR AND SOCIAL SECURITY</p>
           <div className="flex items-center gap-1.5 flex-shrink-0">

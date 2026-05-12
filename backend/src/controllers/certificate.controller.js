@@ -6,10 +6,12 @@ const fs = require('fs');
 const { AuditLog, sequelize } = require('../models');
 const certificateService = require('../services/certificate.service');
 const logger = require('../utils/logger');
+const { drawLetterheadImage } = require('../utils/pdfAssets');
 
 const LOGO_PATHS = [
-  path.join(__dirname, '../../assets/siyinqaba.png'),
-  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
+  path.join(__dirname, '../../../docs/letterhead.png'),
+  path.join(__dirname, '../../assets/letterhead.png'),
+  path.join(__dirname, '../../../frontend/public/letterhead.png'),
 ];
 
 const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
@@ -17,6 +19,44 @@ const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPa
 const SECTION_MAP = { activities: 'I', competencies: 'II', occupations: 'III', self_estimates: 'IV' };
 const SECTION_LABELS = { activities: 'Activity', competencies: 'Competence', occupations: 'Occupation', self_estimates: 'Abilities' };
 const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
+const REGION_LABELS = {
+  hhohho: 'HHOHHO',
+  manzini: 'MANZINI',
+  lubombo: 'LUBOMBO',
+  shiselweni: 'SHISELWENI',
+  multiple: 'MULTIPLE'
+};
+
+const getRegionLabel = (value) => REGION_LABELS[String(value || '').toLowerCase()];
+
+const cleanText = (value, fallback = '') => {
+  const text = String(value || '').trim();
+  return text || fallback;
+};
+
+const formatUpperMonthYear = (dateValue) => {
+  const date = dateValue ? new Date(dateValue) : new Date();
+  return date.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }).toUpperCase();
+};
+
+const drawCell = (doc, x, y, w, h, text, options = {}) => {
+  const {
+    bold = false,
+    fontSize = 9,
+    align = 'center',
+    valign = 'center',
+    borderColor = '#4b5563',
+    fillColor = '#111827',
+    padding = 4
+  } = options;
+
+  doc.rect(x, y, w, h).strokeColor(borderColor).lineWidth(0.45).stroke();
+  doc.font(bold ? 'Times-Bold' : 'Times-Roman').fontSize(fontSize).fillColor(fillColor);
+  const body = String(text || '');
+  const textHeight = doc.heightOfString(body, { width: w - padding * 2, align });
+  const textY = valign === 'center' ? y + Math.max((h - textHeight) / 2, 2) : y + padding;
+  doc.text(body, x + padding, textY, { width: w - padding * 2, align });
+};
 
 /**
  * Build the SDS Certificate PDF and pipe it to a writable stream.
@@ -33,38 +73,13 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   const border = '#6b7280';
 
   // ── HEADER ─────────────────────────────────────────────────────────────
-  // Centered national header
-  doc.font('Helvetica-Bold').fontSize(18).fillColor('#000000');
-  doc.text('GOVERNMENT OF ESWATINI', lm, 40, { width: contentW, align: 'center' });
-
-  // Logo in center
-  const logoPath = resolveLogoPath();
-  if (logoPath) {
-    try {
-      const logoWidth = 56;
-      const logoCenterX = (pageW - logoWidth) / 2;
-      doc.image(logoPath, logoCenterX, 60, { width: logoWidth });
-    } catch (_) {}
-  }
-
-  // Contact info below header
-  const subY = 112;
-  doc.font('Helvetica').fontSize(7.5).fillColor('#000000');
-  doc.text('Tel:  +268 4041971/2/3', lm, subY);
-  doc.text('Fax: +268 4049889', lm, subY + 10);
-
-  // Right side contact
-  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#000000');
-  doc.text('Principal Secretary\'s Office', lm, subY, { width: contentW, align: 'right' });
-  doc.font('Helvetica').fontSize(7.5);
-  doc.text('Ministry of Labour & Social Security', lm, subY + 10, { width: contentW, align: 'right' });
-  doc.text('P.O. Box 198, Mbabane H100', lm, subY + 20, { width: contentW, align: 'right' });
-
-  doc.font('Helvetica').fontSize(7.5).fillColor('#000000');
-  doc.text('Email: mkhaliphi@gov.sz', lm, subY + 32);
-
-  // Horizontal rule
-  const ruleY = subY + 44;
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 18,
+    width: pageW,
+    maxHeight: 132
+  });
+  const ruleY = letterhead ? Math.max(letterhead.bottom + 8, 150) : 136;
   doc.moveTo(lm, ruleY).lineTo(pageW - rm, ruleY).strokeColor('#000000').lineWidth(0.8).stroke();
 
   // ── TITLE ──────────────────────────────────────────────────────────────
@@ -201,6 +216,155 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   doc.end();
 }
 
+async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollandLetters, certNumber, generatedDate) {
+  const doc = new PDFDocument({
+    size: 'A4',
+    margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    bufferPages: true
+  });
+  doc.pipe(res);
+
+  const pageW = doc.page.width;
+  const pageH = doc.page.height;
+  const lm = 46;
+  const rm = 46;
+  const contentW = pageW - lm - rm;
+  const border = '#4b5563';
+  const user = assessment.user || {};
+  const studentName = cleanText([user.firstName, user.lastName].filter(Boolean).join(' '), 'TEST TAKER').toUpperCase();
+  const pin = cleanText(user.nationalId || user.studentCode, 'NOT PROVIDED');
+  const institutionName = cleanText(user.institution?.name || user.currentInstitution, 'NOT SPECIFIED').toUpperCase();
+  const regionName = cleanText(getRegionLabel(user.region) || getRegionLabel(user.institution?.region), 'NOT SPECIFIED').toUpperCase();
+  const testDate = formatUpperMonthYear(assessment.completedAt);
+  const totals = {
+    R: assessment.scoreR || 0,
+    I: assessment.scoreI || 0,
+    A: assessment.scoreA || 0,
+    S: assessment.scoreS || 0,
+    E: assessment.scoreE || 0,
+    C: assessment.scoreC || 0
+  };
+
+  const logoPath = resolveLogoPath();
+  if (logoPath) {
+    try {
+      const watermarkW = 330;
+      doc.save();
+      doc.opacity(0.075);
+      doc.image(logoPath, (pageW - watermarkW) / 2, (pageH - watermarkW) / 2 + 12, { width: watermarkW });
+      doc.restore();
+    } catch (_) {}
+  }
+
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 22,
+    width: pageW,
+    maxHeight: 136
+  });
+  const headerBottom = letterhead ? letterhead.bottom : 138;
+  const dividerY = headerBottom + 8;
+  doc.moveTo(lm, dividerY).lineTo(pageW - rm, dividerY).strokeColor('#111827').lineWidth(0.9).stroke();
+
+  const departmentY = dividerY + 14;
+  doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#1f2933');
+  doc.text('NATIONAL EMPLOYMENT SERVICES DEPARTMENT', lm, departmentY, { width: contentW, align: 'center' });
+  doc.text('MEASUREMENT AND TESTING UNIT', lm, departmentY + 15, { width: contentW, align: 'center' });
+
+  doc.font('Helvetica').fontSize(8.5).fillColor('#111827');
+  const certifyText = `This is to certify that ${studentName}  PIN: ${pin} completed a Self-Directed Search test in: ${testDate} at: ${institutionName} located in the: ${regionName} REGION.`;
+  const certifyY = departmentY + 44;
+  const certifyOptions = { width: contentW - 52, align: 'left', lineGap: 2 };
+  const certifyHeight = doc.heightOfString(certifyText, certifyOptions);
+  doc.text(certifyText, lm + 26, certifyY, certifyOptions);
+
+  const titleY = certifyY + Math.max(certifyHeight, 34) + 22;
+  doc.font('Times-Bold').fontSize(13).fillColor('#111827');
+  doc.text('SELF-DIRECTED SEARCH (SDS) SUMMARY SHEET CERTIFICATE', lm, titleY, { width: contentW, align: 'center' });
+
+  const tableY = titleY + 24;
+  const colWidths = [82, 70, 78, 60, 60, 78, 88];
+  const totalTableW = colWidths.reduce((a, b) => a + b, 0);
+  const tableX = lm + (contentW - totalTableW) / 2;
+  const rowH = 31;
+  const headers = ['Sections', 'Realistic\nR', 'Investigative\nI', 'Artistic\nA', 'Social\nS', 'Enterprising\nE', 'Conventional\nC'];
+
+  let cellX = tableX;
+  headers.forEach((header, index) => {
+    drawCell(doc, cellX, tableY, colWidths[index], rowH, header, { bold: true, fontSize: 10, borderColor: border });
+    cellX += colWidths[index];
+  });
+
+  const sections = ['activities', 'competencies', 'occupations', 'self_estimates'];
+  sections.forEach((section, sectionIndex) => {
+    const rowY = tableY + rowH * (sectionIndex + 1);
+    let rowX = tableX;
+    drawCell(doc, rowX, rowY, colWidths[0], rowH, `Section ${SECTION_MAP[section]}\n${SECTION_LABELS[section]}`, {
+      align: 'left',
+      fontSize: 10,
+      borderColor: border
+    });
+    rowX += colWidths[0];
+    RIASEC_KEYS.forEach((key, keyIndex) => {
+      drawCell(doc, rowX, rowY, colWidths[keyIndex + 1], rowH, String((sectionScores[section] || {})[key] || 0), {
+        fontSize: 11,
+        borderColor: border
+      });
+      rowX += colWidths[keyIndex + 1];
+    });
+  });
+
+  const totalRowY = tableY + rowH * (sections.length + 1);
+  let totalX = tableX;
+  drawCell(doc, totalX, totalRowY, colWidths[0], rowH, 'Total score', { bold: true, align: 'left', fontSize: 10, borderColor: border });
+  totalX += colWidths[0];
+  RIASEC_KEYS.forEach((key, keyIndex) => {
+    drawCell(doc, totalX, totalRowY, colWidths[keyIndex + 1], rowH, String(totals[key]), { bold: true, fontSize: 11, borderColor: border });
+    totalX += colWidths[keyIndex + 1];
+  });
+
+  const codeTitleY = totalRowY + rowH + 20;
+  doc.font('Times-Bold').fontSize(13).fillColor('#111827');
+  doc.text('YOUR SDS CODE', lm, codeTitleY, { width: contentW, align: 'center' });
+
+  const codeTableW = totalTableW - 10;
+  const codeTableX = tableX + 5;
+  const codeColW = codeTableW / 3;
+  const codeY = codeTitleY + 24;
+  ['Letter of Highest Score', 'Letter of Second Highest Score', 'Letter of Third Highest Score'].forEach((header, index) => {
+    const x = codeTableX + index * codeColW;
+    drawCell(doc, x, codeY, codeColW, 18, header, { fontSize: 9.5, borderColor: border });
+    drawCell(doc, x, codeY + 18, codeColW, 34, hollandLetters[index] || '', { bold: true, fontSize: 12, borderColor: border });
+  });
+
+  const sigY = 666;
+  doc.moveTo(lm, sigY).lineTo(lm + 116, sigY).strokeColor('#111827').lineWidth(0.7).stroke();
+  doc.font('Helvetica-Bold').fontSize(14).fillColor('#111827');
+  doc.text('S.M MNDAWE', lm, sigY + 8);
+  doc.fontSize(13);
+  doc.text('PRINCIPAL SECRETARY', lm, sigY + 28);
+
+  doc.font('Helvetica').fontSize(7.5).fillColor('#6b7280');
+  doc.text(`Certificate No: ${certNumber}  |  Generated: ${generatedDate}`, lm, 744, { width: contentW, align: 'right' });
+
+  const footerW = 310;
+  const footerX = (pageW - footerW) / 2;
+  const footerY = 792;
+  doc.save();
+  doc.moveTo(footerX + 16, footerY)
+    .lineTo(footerX + footerW - 16, footerY)
+    .lineTo(footerX + footerW, footerY + 20)
+    .lineTo(footerX, footerY + 20)
+    .closePath()
+    .fillColor('#1f2937')
+    .fill();
+  doc.restore();
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#ffffff');
+  doc.text('www.gov.sz/index.php/ministries_departments', footerX, footerY + 6, { width: footerW, align: 'center' });
+
+  doc.end();
+}
+
 // ── Admin: generate certificate for a completed assessment ─────────────────
 module.exports.generateCertificate = async (req, res, next) => {
   try {
@@ -225,6 +389,30 @@ module.exports.generateCertificate = async (req, res, next) => {
   }
 };
 
+module.exports.generateMyCertificate = async (req, res, next) => {
+  try {
+    const { assessmentId } = req.params;
+    const { cert } = await certificateService.generateCertificate(assessmentId, req.user.id, {
+      ownerUserId: req.user.id
+    });
+
+    logger.info({ actionType: 'CERTIFICATE_SELF_GENERATED', message: `Certificate ${cert.certNumber} generated by assessment owner`, req });
+    res.json({
+      status: 'success',
+      data: {
+        id: cert.id,
+        certId: cert.id,
+        certificateNumber: cert.certNumber,
+        certNumber: cert.certNumber,
+        generatedAt: cert.generatedAt,
+        assessmentId
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ── Download certificate PDF ────────────────────────────────────────────────
 module.exports.downloadCertificate = async (req, res, next) => {
   try {
@@ -235,7 +423,7 @@ module.exports.downloadCertificate = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="SDS_Certificate_${cert.certNumber.replace(/\//g, '-')}.pdf"`);
 
-    await buildCertificatePdf(res, assessment, sectionScores, hollandLetters, occupationNames, cert.certNumber, generatedDate);
+    await buildSummaryCertificatePdf(res, assessment, sectionScores, hollandLetters, cert.certNumber, generatedDate);
 
     logger.info({ actionType: 'CERTIFICATE_DOWNLOADED', message: `Certificate ${cert.certNumber} downloaded`, req });
 

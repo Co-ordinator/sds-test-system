@@ -7,6 +7,8 @@ import { ErrorBanner } from '../../../components/ui/StatusIndicators';
 import { useToast } from '../../../components/ui/StatusIndicators';
 import { adminService } from '../../../services/adminService';
 
+const getHollandDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '—';
+
 const AdminCertificatesPanel = () => {
   const { toast, showToast, Toast: ToastComp } = useToast();
   const [certs, setCerts] = useState([]);
@@ -84,7 +86,7 @@ const AdminCertificatesPanel = () => {
               render: c => (
                 <span className="px-2 py-0.5 rounded text-xs font-bold"
                   style={{ backgroundColor: GOV.blueLightAlt || '#eff6ff', color: GOV.blue }}>
-                  {c.assessment?.hollandCode || '—'}
+                  {getHollandDisplayCode(c.assessment)}
                 </span>
               )
             },

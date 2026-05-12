@@ -4,6 +4,9 @@ const analyticsService = require('../services/analytics.service');
 const logger = require('../utils/logger');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
+const { drawLetterheadImage } = require('../utils/pdfAssets');
+
+const getHollandDisplayCode = (row) => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
 
 /**
  * Analytics Controller — HTTP layer only.
@@ -59,7 +62,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/institutions ────────────────────────────────── */
   getInstitutionBreakdown: async (req, res, next) => {
     try {
-      const data = await analyticsService.getInstitutionBreakdown();
+      const data = await analyticsService.getInstitutionBreakdown(req.query);
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch institution analytics', req, details: { error: error.message } });
@@ -135,9 +138,22 @@ const AnalyticsController = {
           `End Date: ${formatFilterLabel(filters.endDate, 'Any')}`
         ];
 
-        doc.rect(50, 50, pageWidth, 55).fill('#2D8BC4');
-        doc.fillColor('white').fontSize(16).font('Helvetica-Bold').text('Analytics Report', 65, 68);
-        doc.fillColor('#111827').moveDown(3).fontSize(10).font('Helvetica-Bold').text('Applied Filters');
+        const letterhead = drawLetterheadImage(doc, {
+          x: 0,
+          y: 18,
+          width: doc.page.width,
+          maxHeight: 132
+        });
+        const titleY = letterhead ? Math.max(letterhead.bottom + 10, 160) : 50;
+
+        doc.fillColor('#111827').fontSize(16).font('Helvetica-Bold')
+          .text('Analytics Report', 50, titleY, { width: pageWidth, align: 'center' });
+        doc.fontSize(7.5).font('Helvetica').fillColor('#6b7280')
+          .text(`Generated: ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}`, 50, titleY + 18, { width: pageWidth, align: 'center' });
+        doc.moveTo(50, titleY + 32).lineTo(50 + pageWidth, titleY + 32).strokeColor('#d1d5db').lineWidth(0.6).stroke();
+
+        doc.y = titleY + 46;
+        doc.fillColor('#111827').fontSize(10).font('Helvetica-Bold').text('Applied Filters');
         doc.fontSize(8.5).font('Helvetica').fillColor('#374151').text(filtersSummary.join('  |  '));
         doc.moveDown(1);
         doc.fontSize(11).font('Helvetica-Bold').fillColor('#111827').text('Summary');
@@ -156,7 +172,7 @@ const AnalyticsController = {
         doc.moveDown(0.8);
         doc.fontSize(11).font('Helvetica-Bold').fillColor('#111827').text('Top Holland Codes');
         doc.fontSize(9).font('Helvetica').fillColor('#374151');
-        hollandDist.slice(0, 10).forEach(row => doc.text(`${row.hollandCode}: ${row.count}`));
+        hollandDist.slice(0, 10).forEach(row => doc.text(`${getHollandDisplayCode(row)}: ${row.count}`));
         doc.moveDown(0.8);
         doc.fontSize(11).font('Helvetica-Bold').fillColor('#111827').text('Regional Completions');
         doc.fontSize(9).font('Helvetica').fillColor('#374151');
@@ -186,7 +202,7 @@ const AnalyticsController = {
           startDate: filters.startDate || '',
           endDate: filters.endDate || ''
         },
-        ...hollandDist.map(row => ({ section: 'holland_distribution', hollandCode: row.hollandCode, count: row.count })),
+        ...hollandDist.map(row => ({ section: 'holland_distribution', hollandCode: getHollandDisplayCode(row), count: row.count })),
         ...regionalDist.map(row => ({ section: 'regional_completion', region: row.region, completedAssessments: row.completedAssessments }))
       ];
 

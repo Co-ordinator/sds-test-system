@@ -65,13 +65,13 @@ export default function AssessmentShell({
           <div className="h-full max-w-7xl mx-auto flex items-center justify-between">
             <Link
               to={dashboardPath}
-              className="flex items-center min-w-0 max-w-[48vw] sm:max-w-[180px] rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1"
+              className="flex w-[150px] min-w-0 items-center rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 sm:w-[180px] lg:w-[205px]"
               aria-label="Go to dashboard"
             >
               <img
-                src="/siyinqaba.png"
-                alt="Siyinqaba - Government of Eswatini"
-                className="h-7 sm:h-8 w-auto max-w-full object-contain"
+                src="/letterhead.png"
+                alt="Government of Eswatini - Ministry of Labour and Social Security"
+                className="h-10 w-full object-contain object-left sm:h-11"
               />
               <span className="sr-only">Home</span>
             </Link>

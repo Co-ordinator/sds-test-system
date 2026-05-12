@@ -181,6 +181,7 @@ export default function Onboarding() {
   const handleSubmitProfile = async () => {
     setSubmitError('');
     setSubmitting(true);
+    let shouldGoToDashboard = true;
     try {
       const payload = buildProfilePayload();
       const res = await api.patch('/api/v1/auth/me', payload);
@@ -188,30 +189,24 @@ export default function Onboarding() {
       if (updatedUser && setSession) {
         setSession(null, updatedUser);
       }
-      navigate('/dashboard');
     } catch (err) {
       if (err.response?.status === 401) {
+        shouldGoToDashboard = false;
         navigate('/login', { state: { message: 'Please Login to complete your profile.' } });
         return;
       }
-      setSubmitError(err.response?.data?.message || 'Failed to save profile. Please try again.');
+      setSubmitError('Profile save is optional for now. You can complete it later from Profile.');
     } finally {
       setSubmitting(false);
+      if (shouldGoToDashboard) {
+        navigate('/dashboard');
+      }
     }
   };
 
   const handleContinue = () => {
     if (step === 0) {
       if (!selectedUserType) return;
-    }
-    if (step === 1) {
-      const errors = {};
-      if (!form.fullName.trim()) errors.fullName = 'Full name is required';
-      if (Object.keys(errors).length > 0) {
-        setStep1Errors(errors);
-        return;
-      }
-      setStep1Errors({});
     }
     if (step < 4) setStep((s) => s + 1);
     else handleSubmitProfile();

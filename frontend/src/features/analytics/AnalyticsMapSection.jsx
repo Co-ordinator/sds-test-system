@@ -87,7 +87,7 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange, isFulls
     const users = Number(info.totalUsers) || 0;
     const completed = Number(info.completedAssessments) || 0;
     const topCode = info.topCode || '–';
-    const perTaker = users > 0 ? (completed / users).toFixed(1) : '–';
+    const perRegisteredUser = users > 0 ? (completed / users).toFixed(1) : '–';
 
     layer.bindTooltip(
       `<div style="font-family:sans-serif;min-width:140px">
@@ -95,7 +95,7 @@ const LeafletChoropleth = ({ regionData, selectedRegion, onRegionChange, isFulls
         <div style="font-size:11px;color:#374151;line-height:1.7">
           👥 Registered: <strong>${users}</strong><br/>
           ✅ Completed assessments: <strong>${completed}</strong><br/>
-          📊 Avg per taker: <strong>${perTaker}</strong><br/>
+          📊 Completed / registered user: <strong>${perRegisteredUser}</strong><br/>
           🎯 Top code: <strong style="color:#F44336">${topCode}</strong>
         </div>
       </div>`,
@@ -190,7 +190,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
     }));
   }, [selectedDetail]);
 
-  const avgPerTaker = selectedDetail && selectedDetail.totalUsers > 0
+  const completionsPerRegisteredUser = selectedDetail && selectedDetail.totalUsers > 0
     ? (Number(selectedDetail.completedAssessments) / Number(selectedDetail.totalUsers)).toFixed(1)
     : '–';
 
@@ -241,7 +241,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded" style={{ background: 'linear-gradient(to right, rgba(96,165,250,0.55), rgba(29,78,216,0.88))' }} />
-                <span style={{ color: GOV.text }}>User Density</span>
+                <span style={{ color: GOV.text }}>Registered User Density</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 rounded" style={{ borderColor: '#111827' }} />
@@ -284,7 +284,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <StatBadge icon={Users} label="Registered" value={selectedDetail.totalUsers} color="#2563eb" />
                 <StatBadge icon={CheckCircle} label="Completed assessments" value={selectedDetail.completedAssessments} color="#059669" />
-                <StatBadge icon={TrendingUp} label="Avg per taker" value={avgPerTaker} color="#d97706" />
+                <StatBadge icon={TrendingUp} label="Completed/user" value={completionsPerRegisteredUser} color="#d97706" />
                 <StatBadge icon={MapPin} label="Top Code" value={selectedDetail.topCode || '–'} color="#7c3aed" />
               </div>
               <p className="text-xs font-semibold mb-2" style={{ color: GOV.textMuted }}>RIASEC Profile</p>
@@ -331,7 +331,7 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
                             {r.topCode}
                           </span>
                         </div>
-                        <span className="text-xs" style={{ color: GOV.textMuted }}>{r.users} / {r.completed}</span>
+                        <span className="text-xs" style={{ color: GOV.textMuted }}>{r.users} registered | {r.completed} completed</span>
                       </div>
                       <MiniBar value={r.users} max={max} color={REGION_COLORS[r.key]} />
                     </div>

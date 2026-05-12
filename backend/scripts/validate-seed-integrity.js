@@ -44,6 +44,8 @@ async function validateSeedIntegrity() {
         (SELECT COUNT(*) FROM subjects) AS subjects,
         (SELECT COUNT(*) FROM courses) AS courses,
         (SELECT COUNT(*) FROM course_institutions) AS course_institutions,
+        (SELECT COUNT(*) FROM occupations) AS occupations,
+        (SELECT COUNT(*) FROM occupation_courses) AS occupation_courses,
         (SELECT COUNT(*) FROM permissions) AS permissions
     `);
     const c = counts[0];
@@ -53,7 +55,35 @@ async function validateSeedIntegrity() {
     assertCount('subjects', c.subjects, 25);
     assertCount('courses', c.courses, 30);
     assertCount('course_institutions', c.course_institutions, 1);
+    assertCount('occupations', c.occupations, 1000);
+    assertCount('occupation_courses', c.occupation_courses, 1);
     assertCount('permissions', c.permissions, 10);
+
+    const [duplicateCourses] = await sequelize.query(`
+      SELECT COUNT(*) AS cnt
+      FROM (
+        SELECT LOWER(name)
+        FROM courses
+        GROUP BY LOWER(name)
+        HAVING COUNT(*) > 1
+      ) d
+    `);
+    if (Number(duplicateCourses[0].cnt) > 0) {
+      errors.push(`courses has ${duplicateCourses[0].cnt} duplicate name group(s)`);
+    }
+
+    const [duplicateOccupations] = await sequelize.query(`
+      SELECT COUNT(*) AS cnt
+      FROM (
+        SELECT LOWER(name)
+        FROM occupations
+        GROUP BY LOWER(name)
+        HAVING COUNT(*) > 1
+      ) d
+    `);
+    if (Number(duplicateOccupations[0].cnt) > 0) {
+      errors.push(`occupations has ${duplicateOccupations[0].cnt} duplicate name group(s)`);
+    }
 
     const [missingLinks] = await sequelize.query(`
       SELECT COUNT(*) AS cnt

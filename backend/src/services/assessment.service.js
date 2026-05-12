@@ -5,6 +5,20 @@ const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
 
+const attachHollandCodeDisplay = (assessment) => {
+  if (!assessment) return assessment;
+  if (assessment.status !== 'completed' && !assessment.hollandCode) {
+    assessment.setDataValue?.('hollandCodeDisplay', null);
+    return assessment;
+  }
+
+  assessment.setDataValue?.(
+    'hollandCodeDisplay',
+    scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || null) || null
+  );
+  return assessment;
+};
+
 module.exports = {
 
   /* ─── Assessment Lifecycle ────────────────────────────────────────────── */
@@ -29,11 +43,16 @@ module.exports = {
   },
 
   listMyAssessments: async (userId) => {
-    return await Assessment.findAll({
+    const assessments = await Assessment.findAll({
       where: { userId },
       order: [['createdAt', 'DESC']],
-      attributes: ['id', 'status', 'progress', 'hollandCode', 'completedAt', 'createdAt', 'updatedAt']
+      attributes: [
+        'id', 'status', 'progress', 'hollandCode', 'hollandCodeDisplay',
+        'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC',
+        'completedAt', 'createdAt', 'updatedAt'
+      ]
     });
+    return assessments.map(attachHollandCodeDisplay);
   },
 
   getAssessment: async (assessmentId, userId) => {
@@ -41,7 +60,7 @@ module.exports = {
       where: { id: assessmentId, userId }
     });
     if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
-    return assessment;
+    return attachHollandCodeDisplay(assessment);
   },
 
   /* ─── Progress Management ─────────────────────────────────────────────── */
@@ -167,7 +186,13 @@ module.exports = {
   },
 
   getResults: async (assessmentId, userId, userRole) => {
-    const assessment = await Assessment.findByPk(assessmentId);
+    const assessment = await Assessment.findByPk(assessmentId, {
+      include: [{
+        model: User,
+        as: 'user',
+        attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel', 'degreeProgram', 'yearOfStudy', 'yearsExperience']
+      }]
+    });
 
     if (!assessment || assessment.status !== 'completed') {
       throw new NotFoundError('Results not found', 'RESULTS_NOT_FOUND');
@@ -179,30 +204,21 @@ module.exports = {
       throw new ForbiddenError('Not authorized to view these results', 'RESULTS_NOT_AUTHORIZED');
     }
 
-    const { displayCode } = scoringService.buildHollandCodes({
-      R: assessment.scoreR,
-      I: assessment.scoreI,
-      A: assessment.scoreA,
-      S: assessment.scoreS,
-      E: assessment.scoreE,
-      C: assessment.scoreC,
-    }, 0);
-    assessment.setDataValue('hollandCodeDisplay', displayCode);
+    const scores = scoringService.getScoreTotals(assessment);
+    const displayCode = scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || '');
+    assessment.setDataValue('hollandCodeDisplay', displayCode || assessment.hollandCode);
 
     const recommendations = await scoringService.getRecommendations(
       assessment.hollandCode,
       assessment.educationLevelAtTest,
       null,
       {
-        scores: {
-          R: assessment.scoreR,
-          I: assessment.scoreI,
-          A: assessment.scoreA,
-          S: assessment.scoreS,
-          E: assessment.scoreE,
-          C: assessment.scoreC,
-        },
+        scores,
         displayCode,
+        userType: assessment.user?.userType,
+        degreeProgram: assessment.user?.degreeProgram,
+        yearOfStudy: assessment.user?.yearOfStudy,
+        yearsExperience: assessment.user?.yearsExperience
       }
     );
 
@@ -211,7 +227,7 @@ module.exports = {
 
   getResultsForPdf: async (assessmentId, userId, userRole) => {
     const assessment = await Assessment.findByPk(assessmentId, {
-      include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel'] }]
+      include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel', 'degreeProgram', 'yearOfStudy', 'yearsExperience'] }]
     });
 
     if (!assessment || assessment.status !== 'completed') {
@@ -226,15 +242,9 @@ module.exports = {
     }
 
     let recommendations = { occupations: [], courses: [], suggestedSubjects: [] };
-    const { displayCode } = scoringService.buildHollandCodes({
-      R: assessment.scoreR,
-      I: assessment.scoreI,
-      A: assessment.scoreA,
-      S: assessment.scoreS,
-      E: assessment.scoreE,
-      C: assessment.scoreC,
-    }, 0);
-    assessment.setDataValue('hollandCodeDisplay', displayCode);
+    const scores = scoringService.getScoreTotals(assessment);
+    const displayCode = scoringService.getAssessmentDisplayCode(assessment, assessment.hollandCode || '');
+    assessment.setDataValue('hollandCodeDisplay', displayCode || assessment.hollandCode);
 
     try {
       recommendations = await scoringService.getRecommendations(
@@ -242,15 +252,12 @@ module.exports = {
         assessment.educationLevelAtTest,
         null,
         {
-          scores: {
-            R: assessment.scoreR,
-            I: assessment.scoreI,
-            A: assessment.scoreA,
-            S: assessment.scoreS,
-            E: assessment.scoreE,
-            C: assessment.scoreC,
-          },
+          scores,
           displayCode,
+          userType: assessment.user?.userType,
+          degreeProgram: assessment.user?.degreeProgram,
+          yearOfStudy: assessment.user?.yearOfStudy,
+          yearsExperience: assessment.user?.yearsExperience
         }
       );
     } catch (_) {}

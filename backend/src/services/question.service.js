@@ -13,7 +13,7 @@ const parseCsvQuestions = async (csvText) => {
     const records = [];
     const parser = parse({ columns: true, bom: true, trim: true, skip_empty_lines: true });
     parser.on('readable', () => { let record; while ((record = parser.read())) records.push(record); });
-    parser.on('error', (err) => reject(err));
+    parser.on('error', (err) => reject(new ValidationError('Invalid CSV format', [{ message: err.message }])));
     parser.on('end', () => resolve(records));
     Readable.from(csvText).pipe(parser);
   });

@@ -21,6 +21,7 @@ router.get('/:assessmentId/results', AssessmentController.getResults);
 router.get('/:assessmentId/pdf', AssessmentController.downloadResultsPdf);
 
 // Certificate endpoints (any authenticated user)
+router.post('/:assessmentId/certificate/generate', restrictTo('Test Taker'), CertificateController.generateMyCertificate);
 router.get('/:assessmentId/certificate/check', CertificateController.checkCertificate);
 router.get('/:assessmentId/certificate/download', CertificateController.downloadCertificate);
 router.get('/my/certificates', CertificateController.myCertificates);

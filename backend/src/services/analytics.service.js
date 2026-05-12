@@ -5,6 +5,12 @@ const {
   CourseInstitution, OccupationCourse
 } = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
+const scoringService = require('./scoring.service');
+
+const ASSESSMENT_SCORE_ATTRIBUTES = [
+  'id', 'hollandCode', 'hollandCodeDisplay',
+  'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC'
+];
 
 /* ─────────────────────────────────────────────────────────────────────────────
  * Internal helpers (private to this module)
@@ -49,6 +55,62 @@ const countUsers = ({ userWhere, userInclude, extraWhere = {} }) => {
     return User.count({ where: { ...userWhere, ...extraWhere }, include: userInclude, distinct: true, col: 'id' });
   }
   return User.count({ where: { ...userWhere, ...extraWhere } });
+};
+
+const getAssessmentDisplayCode = (assessment) => {
+  return scoringService.getAssessmentDisplayCode(assessment, '') || '';
+};
+
+const getIncludedUser = (assessment) => assessment?.user || assessment?.get?.('user') || null;
+
+const mapDisplayCodeCounts = (assessments, { limit, countKey = 'count' } = {}) => {
+  const counts = assessments.reduce((acc, assessment) => {
+    const code = getAssessmentDisplayCode(assessment);
+    if (!code) return acc;
+    acc[code] = (acc[code] || 0) + 1;
+    return acc;
+  }, {});
+
+  const rows = Object.entries(counts)
+    .map(([code, count]) => ({
+      hollandCode: code,
+      hollandCodeDisplay: code,
+      count,
+      [countKey]: count
+    }))
+    .sort((a, b) => Number(b[countKey]) - Number(a[countKey]) || a.hollandCode.localeCompare(b.hollandCode));
+
+  return limit ? rows.slice(0, limit) : rows;
+};
+
+const getDisplayCodeDistribution = async (assessmentWhere, assessmentInclude, { extraWhere = {}, limit, countKey = 'count' } = {}) => {
+  const assessments = await Assessment.findAll({
+    where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null }, ...extraWhere },
+    include: assessmentInclude,
+    attributes: ASSESSMENT_SCORE_ATTRIBUTES
+  });
+  return mapDisplayCodeCounts(assessments, { limit, countKey });
+};
+
+const getGroupedDisplayCodeDistribution = async ({ assessmentWhere, include, groupKey, groupGetter }) => {
+  const assessments = await Assessment.findAll({
+    where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
+    include,
+    attributes: ASSESSMENT_SCORE_ATTRIBUTES
+  });
+
+  const counts = assessments.reduce((acc, assessment) => {
+    const groupValue = groupGetter(assessment);
+    const code = getAssessmentDisplayCode(assessment);
+    if (!groupValue || !code) return acc;
+    const key = `${groupValue}::${code}`;
+    if (!acc[key]) acc[key] = { [groupKey]: groupValue, hollandCode: code, hollandCodeDisplay: code, count: 0 };
+    acc[key].count += 1;
+    return acc;
+  }, {});
+
+  return Object.values(counts)
+    .sort((a, b) => Number(b.count) - Number(a.count) || String(a[groupKey]).localeCompare(String(b[groupKey])) || a.hollandCode.localeCompare(b.hollandCode));
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -97,17 +159,7 @@ const analyticsService = {
   getHollandDistribution: async (query = {}) => {
     const { assessmentWhere, assessmentInclude } = buildFilters(query);
 
-    const distribution = await Assessment.findAll({
-      where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
-      attributes: [
-        'hollandCode',
-        [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('Assessment.id')), 'count']
-      ],
-      include: assessmentInclude,
-      group: ['hollandCode'],
-      order: [[Assessment.sequelize.literal('"count"'), 'DESC']],
-      raw: true
-    });
+    const distribution = await getDisplayCodeDistribution(assessmentWhere, assessmentInclude);
 
     return { distribution };
   },
@@ -150,11 +202,20 @@ const analyticsService = {
       model: User, as: 'user', attributes: [], where: userWhere, required: true, include: userInclude
     }];
 
-    const [usersByRegion, completedByRegion, hollandByRegion, userTypeDistribution] = await Promise.all([
+    const [usersByRegion, assessmentsByRegion, completedByRegion, hollandByRegion, userTypeDistribution] = await Promise.all([
       User.findAll({
         where: userWhere, include: userInclude,
         attributes: ['region', [fn('COUNT', col('User.id')), 'totalUsers']],
         group: ['region'], raw: true
+      }),
+      Assessment.findAll({
+        where: assessmentWhere,
+        include: assessmentInclude,
+        attributes: [
+          [col('user.region'), 'region'],
+          [fn('COUNT', col('Assessment.id')), 'totalAssessments'],
+        ],
+        group: [col('user.region')], raw: true
       }),
       Assessment.findAll({
         where: { ...assessmentWhere, status: 'completed' },
@@ -171,17 +232,18 @@ const analyticsService = {
         ],
         group: [col('user.region')], raw: true
       }),
-      Assessment.findAll({
-        where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
-        include: assessmentInclude,
-        attributes: [
-          [col('user.region'), 'region'],
-          'hollandCode',
-          [fn('COUNT', col('Assessment.id')), 'count']
-        ],
-        group: [col('user.region'), 'Assessment.holland_code'],
-        order: [[fn('COUNT', col('Assessment.id')), 'DESC']],
-        raw: true
+      getGroupedDisplayCodeDistribution({
+        assessmentWhere,
+        include: [{
+          model: User,
+          as: 'user',
+          attributes: ['region'],
+          where: userWhere,
+          required: true,
+          include: userInclude
+        }],
+        groupKey: 'region',
+        groupGetter: (assessment) => getIncludedUser(assessment)?.region
       }),
       User.findAll({
         where: { ...userWhere, userType: userWhere.userType || { [Op.ne]: null } },
@@ -193,11 +255,15 @@ const analyticsService = {
     const REGIONS = ['hhohho', 'manzini', 'lubombo', 'shiselweni'];
     const regionMap = {};
     REGIONS.forEach(r => {
-      regionMap[r] = { region: r, totalUsers: 0, completedAssessments: 0, topCode: null, avgR: 0, avgI: 0, avgA: 0, avgS: 0, avgE: 0, avgC: 0 };
+      regionMap[r] = { region: r, totalUsers: 0, totalAssessments: 0, completedAssessments: 0, topCode: null, avgR: 0, avgI: 0, avgA: 0, avgS: 0, avgE: 0, avgC: 0 };
     });
     usersByRegion.forEach(row => {
       const r = (row.region || '').toLowerCase();
       if (regionMap[r]) regionMap[r].totalUsers = parseInt(row.totalUsers, 10) || 0;
+    });
+    assessmentsByRegion.forEach(row => {
+      const r = (row.region || '').toLowerCase();
+      if (regionMap[r]) regionMap[r].totalAssessments = parseInt(row.totalAssessments, 10) || 0;
     });
     const pickAvg = (row, l) => {
       const k = `avg${l}`;
@@ -232,29 +298,73 @@ const analyticsService = {
   },
 
   /* ── 5. Per-Institution Breakdown ───────────────────────────────────────── */
-  getInstitutionBreakdown: async () => {
-    const institutions = await Institution.findAll({ order: [['name', 'ASC']] });
+  getInstitutionBreakdown: async (query = {}) => {
+    const { userWhere, institutionWhere, assessmentWhere } = buildFilters(query);
+    const institutionInclude = {
+      model: Institution,
+      as: 'institution',
+      attributes: ['id', 'name', 'region', 'type'],
+      required: Object.keys(institutionWhere).length > 0,
+      where: institutionWhere
+    };
 
-    const results = await Promise.all(institutions.map(async (inst) => {
-      const totalStudents = await User.count({ where: { institutionId: inst.id, role: 'Test Taker' } });
-      const totalAssessments = await Assessment.count({
-        include: [{ model: User, as: 'user', required: true, where: { institutionId: inst.id } }]
-      });
-      const completedAssessments = await Assessment.count({
-        where: { status: 'completed' },
-        include: [{ model: User, as: 'user', required: true, where: { institutionId: inst.id } }]
-      });
-      return {
-        institutionId: inst.id,
-        institutionName: inst.name,
-        region: inst.region,
-        type: inst.type,
-        totalStudents,
-        totalAssessments,
-        completedAssessments,
-        completionRate: totalAssessments > 0 ? Number(((completedAssessments / totalAssessments) * 100).toFixed(1)) : 0
-      };
-    }));
+    const assessments = await Assessment.findAll({
+      where: assessmentWhere,
+      include: [{
+        model: User,
+        as: 'user',
+        required: true,
+        attributes: ['id', 'institutionId', 'region', 'userType'],
+        where: { ...userWhere, role: 'Test Taker' },
+        include: [institutionInclude]
+      }],
+      attributes: [...ASSESSMENT_SCORE_ATTRIBUTES, 'status', 'userId', 'createdAt', 'completedAt']
+    });
+
+    const institutionMap = {};
+    assessments.forEach((assessment) => {
+      const user = assessment.user || assessment.get?.('user');
+      const institution = user?.institution || user?.get?.('institution');
+      const key = institution?.id || user?.institutionId || `unknown:${user?.region || 'unknown'}`;
+      if (!institutionMap[key]) {
+        institutionMap[key] = {
+          institutionId: institution?.id || null,
+          institutionName: institution?.name || 'Unknown Institution',
+          region: institution?.region || user?.region || 'unknown',
+          type: institution?.type || 'unknown',
+          userIds: new Set(),
+          totalAssessments: 0,
+          completedAssessments: 0,
+          codeCounts: {}
+        };
+      }
+
+      const row = institutionMap[key];
+      if (user?.id) row.userIds.add(user.id);
+      row.totalAssessments += 1;
+      if (assessment.status === 'completed') {
+        row.completedAssessments += 1;
+        const code = getAssessmentDisplayCode(assessment);
+        if (code) row.codeCounts[code] = (row.codeCounts[code] || 0) + 1;
+      }
+    });
+
+    const results = Object.values(institutionMap)
+      .map((row) => {
+        const topCode = Object.entries(row.codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+        return {
+          institutionId: row.institutionId,
+          institutionName: row.institutionName,
+          region: row.region,
+          type: row.type,
+          totalStudents: row.userIds.size,
+          totalAssessments: row.totalAssessments,
+          completedAssessments: row.completedAssessments,
+          completionRate: row.totalAssessments > 0 ? Number(((row.completedAssessments / row.totalAssessments) * 100).toFixed(1)) : 0,
+          topCode
+        };
+      })
+      .sort((a, b) => b.totalAssessments - a.totalAssessments || a.institutionName.localeCompare(b.institutionName));
 
     return { institutions: results };
   },
@@ -318,13 +428,11 @@ const analyticsService = {
       .sort(([, a], [, b]) => b - a).slice(0, 30)
       .map(([skill, count]) => ({ skill, count }));
 
-    const topHollandCareerMatches = await Assessment.findAll({
-      where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
-      include: assessmentInclude,
-      attributes: ['hollandCode', [fn('COUNT', col('Assessment.id')), 'assessmentCount']],
-      group: ['hollandCode'], order: [[literal('"assessmentCount"'), 'DESC']],
-      limit: 15, raw: true
-    });
+    const topHollandCareerMatches = await getDisplayCodeDistribution(
+      assessmentWhere,
+      assessmentInclude,
+      { limit: 15, countKey: 'assessmentCount' }
+    );
 
     const genderDist = await Assessment.findAll({
       where: { ...assessmentWhere, status: 'completed' },
@@ -441,17 +549,18 @@ const analyticsService = {
         ],
         group: [col('user.user_type')], raw: true
       }),
-      Assessment.findAll({
-        where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
-        include: [{ model: User, as: 'user', required: true, attributes: [], where: { ...userWhere, gender: { [Op.ne]: null } }, include: userInclude }],
-        attributes: [
-          [col('user.gender'), 'gender'],
-          'hollandCode',
-          [fn('COUNT', col('Assessment.id')), 'count']
-        ],
-        group: [col('user.gender'), 'Assessment.holland_code'],
-        order: [[fn('COUNT', col('Assessment.id')), 'DESC']],
-        raw: true
+      getGroupedDisplayCodeDistribution({
+        assessmentWhere,
+        include: [{
+          model: User,
+          as: 'user',
+          required: true,
+          attributes: ['gender'],
+          where: { ...userWhere, gender: { [Op.ne]: null } },
+          include: userInclude
+        }],
+        groupKey: 'gender',
+        groupGetter: (assessment) => getIncludedUser(assessment)?.gender
       })
     ]);
 
@@ -469,18 +578,8 @@ const analyticsService = {
     priorStart.setDate(priorStart.getDate() - 30);
 
     const [currentDist, priorDist, emergingCareers] = await Promise.all([
-      Assessment.findAll({
-        where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null }, completedAt: { [Op.gte]: currentStart } },
-        include: assessmentInclude,
-        attributes: ['hollandCode', [fn('COUNT', col('Assessment.id')), 'count']],
-        group: ['hollandCode'], raw: true
-      }),
-      Assessment.findAll({
-        where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null }, completedAt: { [Op.gte]: priorStart, [Op.lt]: currentStart } },
-        include: assessmentInclude,
-        attributes: ['hollandCode', [fn('COUNT', col('Assessment.id')), 'count']],
-        group: ['hollandCode'], raw: true
-      }),
+      getDisplayCodeDistribution(assessmentWhere, assessmentInclude, { extraWhere: { completedAt: { [Op.gte]: currentStart } } }),
+      getDisplayCodeDistribution(assessmentWhere, assessmentInclude, { extraWhere: { completedAt: { [Op.gte]: priorStart, [Op.lt]: currentStart } } }),
       Occupation.findAll({
         where: { localDemand: { [Op.in]: ['critical', 'high'] } },
         attributes: ['name', 'primaryRiasec', 'localDemand', 'demandLevel', 'category'],
@@ -494,9 +593,15 @@ const analyticsService = {
     const hollandPipeline = currentDist.map(d => {
       const current = Number(d.count);
       const prior = priorMap[d.hollandCode] || 0;
-      const growth = prior === 0 ? (current > 0 ? 100 : 0) : Math.round(((current - prior) / prior) * 100);
-      return { code: d.hollandCode, current, prior, growth };
-    }).sort((a, b) => b.growth - a.growth);
+      const isNew = prior === 0 && current > 0;
+      const growth = prior === 0 ? null : Math.round(((current - prior) / prior) * 100);
+      return { code: d.hollandCode, current, prior, growth, isNew };
+    }).sort((a, b) => {
+      if (a.isNew !== b.isNew) return a.isNew ? -1 : 1;
+      const growthA = Number.isFinite(Number(a.growth)) ? Number(a.growth) : -Infinity;
+      const growthB = Number.isFinite(Number(b.growth)) ? Number(b.growth) : -Infinity;
+      return growthB - growthA || b.current - a.current || a.code.localeCompare(b.code);
+    });
 
     return { hollandPipeline, emergingCareers };
   },
@@ -527,12 +632,7 @@ const analyticsService = {
         ]);
         return { totalUsers, studentCount, totalAssessments, completedAssessments, completionRate: totalAssessments === 0 ? 0 : Number(((completedAssessments / totalAssessments) * 100).toFixed(2)), averages: averages || {} };
       })(),
-      Assessment.findAll({
-        where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
-        attributes: ['hollandCode', [Assessment.sequelize.fn('COUNT', Assessment.sequelize.col('Assessment.id')), 'count']],
-        include: assessmentInclude, group: ['hollandCode'],
-        order: [[Assessment.sequelize.literal('"count"'), 'DESC']], raw: true
-      }),
+      getDisplayCodeDistribution(assessmentWhere, assessmentInclude),
       Assessment.findAll({
         where: { ...assessmentWhere, status: 'completed' },
         include: [{ model: User, as: 'user', required: true, attributes: [], where: { ...userWhere, role: 'Test Taker', region: userWhere.region || { [Op.ne]: null } }, include: userInclude }],
@@ -553,7 +653,7 @@ const analyticsService = {
     const assessmentsWithAlignment = await Assessment.findAll({
       where: { ...assessmentWhere, status: 'completed', hollandCode: { [Op.ne]: null } },
       include: assessmentInclude,
-      attributes: ['id', 'hollandCode', 'userId', 'completedAt'],
+      attributes: [...ASSESSMENT_SCORE_ATTRIBUTES, 'userId', 'completedAt'],
       raw: false
     });
 
@@ -568,45 +668,6 @@ const analyticsService = {
       };
     }
 
-    // Process each assessment to compute funding alignment
-    const scoringService = require('./scoring.service');
-    const alignmentResults = [];
-
-    const RIASEC_LETTERS = new Set(['R', 'I', 'A', 'S', 'E', 'C']);
-
-    for (const assessment of assessmentsWithAlignment) {
-      const codeLetters = [...new Set(
-        String(assessment.hollandCode || '')
-          .replace(/\//g, '')
-          .split('')
-          .filter((c) => RIASEC_LETTERS.has(c.toUpperCase()))
-          .map((c) => c.toUpperCase())
-      )];
-      const matchedCourses = codeLetters.length === 0 ? [] : await Course.findAll({
-        where: {
-          isActive: true,
-          [Op.or]: codeLetters.map((l) => sequelize.where(
-            sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
-            { [Op.iLike]: `%${l}%` }
-          ))
-        },
-        attributes: ['fieldOfStudy', 'fundingPriority'],
-        order: [['funding_priority', 'DESC'], ['name', 'ASC']]
-      });
-
-      const alignment = scoringService.computeFundingAlignment(assessment.hollandCode, matchedCourses);
-      alignmentResults.push({
-        hollandCode: assessment.hollandCode,
-        overall: alignment.overall,
-        priorityFieldCount: alignment.priorityFieldCount,
-        nonPriorityFieldCount: alignment.nonPriorityFieldCount,
-        allFields: alignment.allFields,
-        userId: assessment.userId,
-        completedAt: assessment.completedAt
-      });
-    }
-
-    // Get user details for grouping
     const userIds = [...new Set(assessmentsWithAlignment.map(a => a.userId))];
     const users = await User.findAll({
       where: { id: { [Op.in]: userIds } },
@@ -616,6 +677,37 @@ const analyticsService = {
 
     const userMap = {};
     users.forEach(u => { userMap[u.id] = u; });
+
+    const alignmentResults = [];
+
+    for (const assessment of assessmentsWithAlignment) {
+      const displayCode = getAssessmentDisplayCode(assessment);
+      const codeLetters = scoringService.getLettersForMatching(assessment.hollandCode, displayCode);
+      const audience = scoringService.getCourseAudienceConfig(userMap[assessment.userId]?.userType);
+      const rawMatchedCourses = codeLetters.length === 0 ? [] : await Course.findAll({
+        where: {
+          isActive: true,
+          [Op.or]: codeLetters.map((l) => sequelize.where(
+            sequelize.fn('array_to_string', sequelize.col('riasec_codes'), ','),
+            { [Op.iLike]: `%${l}%` }
+          ))
+        },
+        attributes: ['id', 'name', 'qualificationType', 'fieldOfStudy', 'fundingPriority', 'riasecCodes'],
+        order: [['funding_priority', 'DESC'], ['name', 'ASC']]
+      });
+      const matchedCourses = rawMatchedCourses.filter((course) => scoringService.isCourseAllowedForAudience(course, audience));
+
+      const alignment = scoringService.computeFundingAlignment(displayCode || assessment.hollandCode, matchedCourses);
+      alignmentResults.push({
+        hollandCode: displayCode || assessment.hollandCode,
+        overall: alignment.overall,
+        priorityFieldCount: alignment.priorityFieldCount,
+        nonPriorityFieldCount: alignment.nonPriorityFieldCount,
+        allFields: alignment.allFields,
+        userId: assessment.userId,
+        completedAt: assessment.completedAt
+      });
+    }
 
     // Overall summary
     const totalAssessments = alignmentResults.length;

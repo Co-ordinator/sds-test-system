@@ -25,7 +25,7 @@ export default function OnboardingLayout({ children }) {
       <main className="flex-1 flex flex-col px-6 py-8">
         <div className="max-w-xl mx-auto w-full flex-1 flex flex-col">
           <Link to="/" className={`self-center ${LOGO.marginBottom}`} aria-label="Home">
-            <img src="/siyinqaba.png" alt={LOGO_ALT} className={LOGO.className} />
+            <img src="/letterhead.png" alt={LOGO_ALT} className={LOGO.className} />
           </Link>
           {children}
         </div>

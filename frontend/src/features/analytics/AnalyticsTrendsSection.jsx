@@ -37,6 +37,7 @@ const parseSegmentAvg = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? Math.round(n * 10) / 10 : 0;
 };
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
 const USER_TYPE_COLORS = {
   'High School Student': '#F44336',
   'University Student': '#2563eb',
@@ -178,15 +179,18 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: GENDER_COLORS[g] || '#6b7280' }} />
                       <span className="text-xs font-bold" style={{ color: GOV.text }}>{GENDER_LEGEND_LABELS[g] || (g ? `${g.charAt(0).toUpperCase()}${g.slice(1)}` : '—')}</span>
                     </div>
-                    {items.map(d => (
-                      <div key={d.hollandCode} className="flex items-center gap-2 mb-1">
-                        <span className="w-12 text-xs font-mono font-bold" style={{ color: GOV.blue }}>{d.hollandCode}</span>
-                        <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
-                          <div className="h-full rounded-full" style={{ width: `${(Number(d.count) / maxCount) * 100}%`, backgroundColor: GENDER_COLORS[g] || '#6b7280' }} />
+                    {items.map(d => {
+                      const code = getHollandDisplayCode(d);
+                      return (
+                        <div key={code} className="flex items-center gap-2 mb-1">
+                          <span className="min-w-[4.5rem] text-xs font-mono font-bold" style={{ color: GOV.blue }}>{code}</span>
+                          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
+                            <div className="h-full rounded-full" style={{ width: `${(Number(d.count) / maxCount) * 100}%`, backgroundColor: GENDER_COLORS[g] || '#6b7280' }} />
+                          </div>
+                          <span className="text-xs w-6 text-right tabular-nums" style={{ color: GOV.textMuted }}>{d.count}</span>
                         </div>
-                        <span className="text-xs w-6 text-right tabular-nums" style={{ color: GOV.textMuted }}>{d.count}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               });
@@ -215,7 +219,7 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         ) : <Empty h={240} />}
       </Card>
 
-      <Card title="Career Evolution by User Type" sub="Highest average RIASEC scores per type (top 3 shown)" className="col-span-12 lg:col-span-6">
+      <Card title="Top RIASEC Themes by User Type" sub="Highest average RIASEC scores per user type (top 3 shown)" className="col-span-12 lg:col-span-6">
         {careerByUserTypeRows.length > 0 ? (
           <div className="space-y-3">
             {careerByUserTypeRows.map((row) => {
@@ -276,11 +280,12 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
         {hollandDist.length > 0 ? (
           <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
             {hollandDist.map((d, i) => {
+              const code = getHollandDisplayCode(d);
               const pct = hollandTotal > 0 ? (Number(d.count) / hollandTotal) * 100 : 0;
               return (
-                <div key={`${d.hollandCode ?? '—'}-${i}`} className="flex items-center gap-2">
+                <div key={`${code || '—'}-${i}`} className="flex items-center gap-2">
                   <span className="w-4 text-xs font-bold text-right" style={{ color: GOV.textHint }}>#{i + 1}</span>
-                  <span className="w-12 text-xs font-mono font-bold" style={{ color: GOV.blue }}>{d.hollandCode}</span>
+                  <span className="min-w-[4.5rem] text-xs font-mono font-bold" style={{ color: GOV.blue }}>{code}</span>
                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
                     <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
                   </div>

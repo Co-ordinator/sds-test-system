@@ -91,19 +91,40 @@ npm install
 # Run migrations
 npx sequelize-cli db:migrate
 
-# Seed database with test data
-npx sequelize-cli db:seed:all
+# Seed database with required reference data
+npm run seed
+
+# Verify that required seed data exists
+npm run db:verify
 ```
 
-**Note:** Migrations create all tables and the seeder populates:
-- 5 education levels
-- 20+ institutions (universities, colleges, TVET, schools)
-- 228 SDS questions
-- 35+ occupations with Holland codes
-- 25+ courses with entry requirements
-- 25+ subjects with RIASEC mapping
-- 49 permissions across 13 modules
-- 5 test user accounts (see below)
+**Note:** Migrations create all tables and the seeders populate required reference data:
+- education levels and institutions
+- SDS questions and response options
+- glossary terms used by questionnaire tooltips and voice support
+- priority list and funding alignment data
+- Holland/RIASEC occupation catalog and occupation-course links
+- courses, course requirements, subjects, and RIASEC mappings
+- permissions and starter system roles/users
+
+### Database Setup for Hosting
+
+Run these commands once against the database used by the hosted backend. The database is selected from environment variables:
+
+- `DATABASE_URL` when `NODE_ENV=production`
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD` when using the development config
+
+```bash
+cd backend
+npm install
+npm run migrate
+npm run seed
+npm run db:verify
+```
+
+For Render, set the backend service environment variables first, especially `DATABASE_URL`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `DATA_ENCRYPTION_KEY`, `FRONTEND_URL`, and SMTP settings. Then run the same three database commands from a one-off shell/job or deploy hook before starting normal production traffic.
+
+Do not run `npm run db:reset` on production. It drops and recreates data.
 
 ### 4. Install & Setup Frontend
 
@@ -618,7 +639,7 @@ sds-test-system/
 ├── frontend/
 │   ├── public/
 │   │   ├── index.html ✅
-│   │   └── siyinqaba.png ✅
+│   │   └── letterhead.png ✅
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── data/
@@ -760,8 +781,9 @@ Tel: +268 4041971/2/3
 ### Deployment
 - [ ] Deploy backend (PM2, Docker, or cloud platform)
 - [ ] Deploy frontend (Netlify, Vercel, or static hosting)
-- [ ] Run database migrations on production
-- [ ] Seed production data (institutions, questions, occupations)
+- [ ] Run `npm run migrate` against the production database
+- [ ] Run `npm run seed` against the production database
+- [ ] Run `npm run db:verify` and confirm seed integrity passes
 - [ ] Test all critical user flows
 - [ ] Verify email sending works
 - [ ] Test PDF generation

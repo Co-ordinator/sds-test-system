@@ -21,7 +21,7 @@ router.get('/trend', requirePermission('analytics.view'), AnalyticsController.ge
 router.get('/regional', requirePermission('analytics.view'), AnalyticsController.getRegional);
 router.get('/institutions', requirePermission('analytics.view'), AnalyticsController.getInstitutionBreakdown);
 
-// ── Career Intelligence ─────────────────────────────────────────────────────
+// ── Career Overview ─────────────────────────────────────────────────────────
 router.get('/knowledge-graph', requirePermission('analytics.view'), AnalyticsController.getKnowledgeGraph);
 router.get('/segmentation', requirePermission('analytics.view'), AnalyticsController.getSegmentation);
 router.get('/skills-pipeline', requirePermission('analytics.view'), AnalyticsController.getSkillsPipeline);

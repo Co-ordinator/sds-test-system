@@ -4,6 +4,7 @@ import { GOV, TYPO } from '../../theme/government';
 
 const RIASEC_COLORS = ['#F44336', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
 const PIE_COLORS = ['#F44336', '#FFEB3B', '#7FBEEB', '#2563eb', '#7c3aed', '#059669', '#d97706', '#2D8BC4'];
+const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || '';
 
 const CounselorAnalyticsPanel = ({ institutionStats, hollandDist }) => {
   const riasecData = institutionStats ? [
@@ -15,7 +16,7 @@ const CounselorAnalyticsPanel = ({ institutionStats, hollandDist }) => {
     { name: 'C', value: Number(institutionStats.avgC || 0) },
   ] : [];
 
-  const pieData = (hollandDist || []).slice(0, 8).map(d => ({ name: d.hollandCode, value: Number(d.count) }));
+  const pieData = (hollandDist || []).slice(0, 8).map(d => ({ name: getHollandDisplayCode(d), value: Number(d.count) }));
 
   return (
     <div className="space-y-5">

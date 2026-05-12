@@ -71,10 +71,10 @@ export const TYPO = {
 
 /** Single logo size and alignment for all auth/onboarding surfaces */
 export const LOGO = {
-  className: 'h-12 sm:h-14 w-auto max-w-full object-contain',
+  className: 'h-14 sm:h-16 w-auto max-w-full object-contain',
   marginBottom: 'mb-5 sm:mb-6',
 };
 
 export const MINISTRY_NAME = 'Ministry of Labour and Social Security';
 export const KINGDOM = 'Kingdom of Eswatini';
-export const LOGO_ALT = 'Government of Eswatini – Coat of Arms';
+export const LOGO_ALT = 'Government of Eswatini - Ministry of Labour and Social Security';

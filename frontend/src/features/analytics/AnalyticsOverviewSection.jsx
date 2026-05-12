@@ -36,7 +36,7 @@ const DonutCenter = ({ cx, cy, total, label }) => (
 
 const AnalyticsOverviewSection = ({
   analytics, riasecData, pieData, regionChartData, userTypePieData, trendData,
-  kgData, completionRate, totalUsers, totalAssessments, completedAssessments,
+  kgData, completionRate, totalAssessments, completedAssessments,
 }) => {
   const riasecDonutData = useMemo(() => {
     if (!riasecData?.length) return [];
@@ -51,6 +51,10 @@ const AnalyticsOverviewSection = ({
 
   const topCode = pieData.length > 0 ? pieData[0].name : '–';
   const topCodeCount = pieData.length > 0 ? Number(pieData[0].value) : 0;
+  const riasecAverageTotal = useMemo(
+    () => riasecData.reduce((sum, item) => sum + Number(item.value || 0), 0),
+    [riasecData]
+  );
 
   const careerFieldData = useMemo(() => {
     if (!kgData?.careerCategories) return [];
@@ -79,7 +83,7 @@ const AnalyticsOverviewSection = ({
       {/* ── Row 1 ── */}
 
       {/* RIASEC Donut */}
-      <Card title="Career Interest Distribution" sub="National RIASEC breakdown" className="col-span-12 md:col-span-4 lg:col-span-3">
+      <Card title="Average RIASEC Score Share" sub="Share of national average scores, completed assessments only" className="col-span-12 md:col-span-4 lg:col-span-3">
         {riasecDonutData.length > 0 ? (
           <div className="flex items-center gap-3">
             <ResponsiveContainer width="55%" height={170}>
@@ -87,7 +91,7 @@ const AnalyticsOverviewSection = ({
                 <Pie data={riasecDonutData} dataKey="pct" nameKey="full"
                   cx="50%" cy="50%" innerRadius={46} outerRadius={72} paddingAngle={2} startAngle={90} endAngle={-270}>
                   {riasecDonutData.map(d => <Cell key={d.name} fill={RIASEC_PIE_COLORS[d.name] || '#6b7280'} />)}
-                  <DonutCenter cx="50%" cy="50%" total={totalUsers.toLocaleString()} label="users" />
+                  <DonutCenter cx="50%" cy="50%" total={riasecAverageTotal.toFixed(1)} label="avg total" />
                 </Pie>
                 <Tooltip formatter={(v, n) => [`${v}%`, n]} />
               </PieChart>
@@ -132,8 +136,8 @@ const AnalyticsOverviewSection = ({
         </div>
       </Card>
 
-      {/* Users by Region */}
-      <Card title="Users by Region" sub="Registered vs completed per region" className="col-span-12 md:col-span-12 lg:col-span-5">
+      {/* Assessments by Region */}
+      <Card title="Assessments by Region" sub="Total assessments vs completed assessments" className="col-span-12 md:col-span-12 lg:col-span-5">
         {regionChartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={170}>
             <BarChart data={regionChartData} barGap={2} barCategoryGap="30%">
@@ -141,7 +145,7 @@ const AnalyticsOverviewSection = ({
               <XAxis dataKey="name" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 9 }} />
               <Tooltip /><Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
-              <Bar dataKey="users" name="Registered" fill="#2563eb" radius={[2,2,0,0]} />
+              <Bar dataKey="assessments" name="Total assessments" fill="#2563eb" radius={[2,2,0,0]} />
               <Bar dataKey="completed" name="Completed" fill="#059669" radius={[2,2,0,0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -217,7 +221,7 @@ const AnalyticsOverviewSection = ({
       {/* ── Row 3 ── */}
 
       {/* Career Fields */}
-      <Card title="Career Field Popularity" sub="Top categories from career database" className="col-span-12 md:col-span-6 lg:col-span-4">
+      <Card title="Career Catalog Fields" sub="Occupation categories currently stored in the database" className="col-span-12 md:col-span-6 lg:col-span-4">
         {careerFieldData.length > 0 ? (
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={careerFieldData} layout="vertical" margin={{ left: 4, right: 12 }}>

@@ -8,7 +8,7 @@ export default function RegistrationSuccess() {
   const navigate = useNavigate();
   const [showResendModal, setShowResendModal] = useState(false);
   const email = location.state?.email || '';
-  const fromRegistration = location.state?.fromRegistration || false;
+  const verificationEmailSent = location.state?.verificationEmailSent !== false;
 
   return (
     <div className="min-h-screen flex flex-col relative bg-white">
@@ -21,14 +21,14 @@ export default function RegistrationSuccess() {
         style={{ borderColor: GOV.border, backgroundColor: GOV.ministryBarBg }}
       >
         <p className={TYPO.hint} style={{ color: GOV.ministryBarText }}>
-          {MINISTRY_NAME} · {KINGDOM}
+          {MINISTRY_NAME} - {KINGDOM}
         </p>
       </div>
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         <div className="w-full max-w-[380px] flex flex-col items-center">
           <Link to="/" className={`${LOGO.marginBottom} flex-shrink-0`} aria-label="Home">
-            <img src="/siyinqaba.png" alt={LOGO_ALT} className={LOGO.className} />
+            <img src="/letterhead.png" alt={LOGO_ALT} className={LOGO.className} />
           </Link>
 
           <div
@@ -37,35 +37,33 @@ export default function RegistrationSuccess() {
           >
             <div
               className="mx-auto flex items-center justify-center h-12 w-12 rounded-full mb-3"
-              style={{ backgroundColor: GOV.blueLight }}
+              style={{ backgroundColor: verificationEmailSent ? GOV.blueLight : GOV.errorBg }}
             >
-              <svg className="h-6 w-6" style={{ color: GOV.blue }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
+              {verificationEmailSent ? (
+                <svg className="h-6 w-6" style={{ color: GOV.blue }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" style={{ color: GOV.error }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              )}
             </div>
 
             <h2 className={`${TYPO.pageTitle} mb-1`} style={{ color: GOV.text }}>
               Account created!
             </h2>
             <p className={`${TYPO.bodySmall} mb-1`} style={{ color: GOV.textMuted }}>
-              A verification link is being sent to{' '}
+              {verificationEmailSent ? 'A verification link has been sent to ' : 'The verification email could not be sent automatically to '}
               <span className="font-medium" style={{ color: GOV.text }}>{email || 'your email'}</span>.
             </p>
             <p className={`${TYPO.hint} mb-5`} style={{ color: GOV.textHint }}>
-              You can complete your profile now and verify your email later.
+              {verificationEmailSent
+                ? 'Check your inbox and verify your email before completing onboarding.'
+                : 'Use the resend button below. If it still fails, wait a moment and try again.'}
             </p>
 
             <div className="space-y-2">
-              {fromRegistration && (
-                <button
-                  type="button"
-                  onClick={() => navigate('/onboarding')}
-                  className={`w-full py-2.5 rounded-md font-medium ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
-                  style={{ backgroundColor: GOV.blue }}
-                >
-                  Complete your profile →
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => setShowResendModal(true)}

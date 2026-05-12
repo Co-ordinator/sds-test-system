@@ -1,18 +1,10 @@
 'use strict';
 
 const PDFDocument = require('pdfkit');
-const path = require('path');
-const fs = require('fs');
 const reportService = require('../services/report.service');
 const logger = require('../utils/logger');
 const { BadRequestError } = require('../utils/errors/appError');
-
-const LOGO_PATHS = [
-  path.join(__dirname, '../../assets/siyinqaba.png'),
-  path.join(__dirname, '../../../frontend/public/siyinqaba.png'),
-];
-
-const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
+const { drawLetterheadImage } = require('../utils/pdfAssets');
 
 /* ── Colours — neutral formal palette ───────────────────────────────── */
 const NAVY    = '#2D8BC4';
@@ -28,7 +20,7 @@ const REPORT_TYPES = {
   executive_summary:      { label: 'Executive Summary Report',         fetchData: (s, f) => s.getExecutiveSummary(f) },
   regional:               { label: 'Regional Distribution Report',     fetchData: (s, f) => s.getRegionalReport(f) },
   gender_demographics:    { label: 'Gender & Demographics Report',     fetchData: (s, f) => s.getGenderReport(f) },
-  career_intelligence:    { label: 'Career Intelligence Report',       fetchData: (s, f) => s.getCareerIntelligenceReport(f) },
+  career_intelligence:    { label: 'Career Overview Report',           fetchData: (s, f) => s.getCareerIntelligenceReport(f) },
   institution_performance:{ label: 'Institution Performance Report',   fetchData: (s, f) => s.getInstitutionReport(f) },
   assessment_trends:      { label: 'Assessment Trends Report',         fetchData: (s, f) => s.getTrendsReport(f) },
 };
@@ -46,44 +38,46 @@ const CONTENT_BOTTOM = PH - 55;
 
 const fmtNum   = n => Number(n || 0).toLocaleString();
 const capFirst = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '—';
+const getReportCode = row => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
+const parseHollandCodeGroups = (code) => String(code || '')
+  .toUpperCase()
+  .trim()
+  .split(/\s+/)
+  .flatMap(group => {
+    const cleaned = group.replace(/[^RIASEC/]/g, '');
+    if (!cleaned) return [];
+    if (!cleaned.includes('/')) return cleaned.split('').map(letter => [letter]);
+    return [cleaned.split('/').filter(Boolean)];
+  });
+const describeHollandCode = (code, names) => parseHollandCodeGroups(code)
+  .map(group => group.map(letter => names[letter] || letter).join('/'))
+  .join(' / ');
 
 /* drawPageHeader ──────────────────────────────────────────────────────── */
 function drawPageHeader(doc, reportLabel, dateStr, preparedBy, filterSummary) {
   doc.rect(0, 0, PW, PH).fill(WHITE);
-  doc.font('Helvetica-Bold').fontSize(18).fillColor(TEXT);
-  doc.text('GOVERNMENT OF ESWATINI', LM, 30, { width: CW, align: 'center' });
-
-  const logoPath = resolveLogoPath();
-  if (logoPath) {
-    try {
-      doc.image(logoPath, (PW - 50) / 2, 50, { width: 50 });
-    } catch (_) {}
-  }
-
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT);
-  doc.text('Tel:  +268 4041971/2/3', LM, 96);
-  doc.text('Fax: +268 4049889', LM, 108);
-  doc.text('Email: mkhaliphi@gov.sz', LM, 120);
-
-  doc.text('Principal Secretary\'s Office', LM, 96, { width: CW, align: 'right' });
-  doc.font('Helvetica').fontSize(8);
-  doc.text('Ministry of Labour & Social Security', LM, 108, { width: CW, align: 'right' });
-  doc.text('P.O. Box 198, Mbabane H100', LM, 120, { width: CW, align: 'right' });
-
-  doc.moveTo(LM, 136).lineTo(PW - RM, 136).strokeColor('#000000').lineWidth(0.7).stroke();
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 18,
+    width: PW,
+    maxHeight: 132
+  });
+  const titleY = letterhead ? Math.max(letterhead.bottom + 10, 160) : 42;
   doc.font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
-    .text(reportLabel.toUpperCase(), LM, 146, { width: CW, align: 'center' });
+    .text(reportLabel.toUpperCase(), LM, titleY, { width: CW, align: 'center' });
   doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-    .text(`Generated: ${dateStr}  |  Prepared by: ${preparedBy}`, LM, 160, { width: CW, align: 'center' });
+    .text(`Generated: ${dateStr}  |  Prepared by: ${preparedBy}`, LM, titleY + 14, { width: CW, align: 'center' });
 
-  doc.rect(LM, 174, CW, 24).lineWidth(0.5).strokeColor(BORDER).stroke();
+  const filterY = titleY + 28;
+  doc.rect(LM, filterY, CW, 24).lineWidth(0.5).strokeColor(BORDER).stroke();
   doc.fillColor(MUTED).font('Helvetica-Bold').fontSize(6.5)
-    .text('ACTIVE FILTERS', LM + 8, 182, { width: 70 });
+    .text('ACTIVE FILTERS', LM + 8, filterY + 8, { width: 70 });
   doc.fillColor(TEXT).font('Helvetica').fontSize(6.5)
-    .text(filterSummary, LM + 80, 182, { width: CW - 88, ellipsis: true });
+    .text(filterSummary, LM + 80, filterY + 8, { width: CW - 88, ellipsis: true });
 
-  doc.moveTo(LM, 206).lineTo(PW - RM, 206).strokeColor(BORDER).lineWidth(0.6).stroke();
-  return 220;
+  const ruleY = filterY + 32;
+  doc.moveTo(LM, ruleY).lineTo(PW - RM, ruleY).strokeColor(BORDER).lineWidth(0.6).stroke();
+  return ruleY + 14;
 }
 
 /* drawContinuationHeader ──────────────────────────────────────────── */
@@ -283,8 +277,8 @@ function renderExecutiveSummary(doc, data, y, lbl) {
   y = tableRow(doc, y, [hC0, hC1, hC2, hC3], ['Code', 'Personality Profile', 'Frequency', 'Count'], { isHeader: true });
   (data.hollandDist || []).forEach((row, idx) => {
     y = checkPage(doc, y, 20, lbl);
-    const code = row.holland_code || '', cnt = Number(row.count);
-    const desc = code.split('').map(c => HDESC[c] || c).join(' / ');
+    const code = getReportCode(row), cnt = Number(row.count);
+    const desc = describeHollandCode(code, HDESC);
     const bg   = idx % 2 === 1 ? STRIPE : WHITE;
     doc.rect(LM, y, CW, 20).fill(bg).rect(LM, y, CW, 20).lineWidth(0.2).strokeColor(BORDER).stroke();
     drawHBar(doc, LM + hC0 + hC1 + 3, y + 5, hC2 - 6, 10, cnt, hMax, NAVY);
@@ -421,8 +415,8 @@ function renderCareerIntelligence(doc, data, y, lbl) {
   y = tableRow(doc, y, [hD0, hD1, hD2, hD3], ['Code', 'Personality Profile', 'Frequency', 'Count'], { isHeader: true });
   (data.hollandDist || []).forEach((row, idx) => {
     y = checkPage(doc, y, 20, lbl);
-    const code = row.holland_code || '', cnt = Number(row.count);
-    const desc = code.split('').map(c => HFULL[c] || c).join(' / ');
+    const code = getReportCode(row), cnt = Number(row.count);
+    const desc = describeHollandCode(code, HFULL);
     const bg   = idx % 2 === 1 ? STRIPE : WHITE;
     doc.rect(LM, y, CW, 20).fill(bg).rect(LM, y, CW, 20).lineWidth(0.2).strokeColor(BORDER).stroke();
     drawHBar(doc, LM + hD0 + hD1 + 3, y + 5, hD2 - 6, 10, cnt, hMax2, NAVY);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { PermissionProvider } from './context/PermissionContext';
 import { AccessibilityProvider } from './context/AccessibilityContext';
@@ -35,7 +35,6 @@ import AdminEducationLevelsPage from './pages/admin/AdminEducationLevelsPage';
 import AdminCertificatesPage from './pages/admin/AdminCertificatesPage';
 import Notifications from './pages/Notifications';
 import TestAdministratorDashboard from './pages/TestAdministratorDashboard';
-import Analytics from './pages/Analytics';
 import EditUserPermissions from './pages/EditUserPermissions';
 import Unauthorized from './pages/Unauthorized';
 import NotFound from './pages/NotFound';
@@ -60,7 +59,11 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/verify-email/:token" element={<VerifyEmail />} />
-          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/onboarding" element={
+            <ProtectedRoute allowedRoles={['Test Taker']}>
+              <Onboarding />
+            </ProtectedRoute>
+          } />
           <Route path="/change-password" element={
             <ProtectedRoute allowedRoles={['Test Taker', 'System Administrator', 'Test Administrator']}>
               <ChangePassword />
@@ -200,7 +203,7 @@ function App() {
           } />
           <Route path="/admin/analytics" element={
             <ProtectedRoute allowedRoles={['System Administrator', 'Test Administrator']}>
-              <Analytics />
+              <Navigate to="/admin/dashboard" replace />
             </ProtectedRoute>
           } />
           {/* Test Administrator Routes — admin can also access test taker management */}

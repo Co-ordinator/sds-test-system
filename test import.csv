@@ -1,6 +1,0 @@
-student_number,first_name,last_name,national_id,grade,class,gender,email,institution
-TI260421001,Ayanda,Dlamini,9301015000001,Form 5,A,male,ti260421001@example.com,Mbabane Government High School
-TI260421002,Nokuthula,Simelane,9302154000002,Form 5,A,female,ti260421002@example.com,Mbabane Government High School
-TI260421003,Sibusiso,Mabuza,9403305000003,Form 4,B,male,ti260421003@example.com,Mbabane Government High School
-TI260421004,Thandeka,Ndlovu,9405124000004,Form 4,B,female,ti260421004@example.com,Mbabane Government High School
-TI260421005,Lungelo,Shongwe,9507255000005,Form 3,C,male,ti260421005@example.com,Mbabane Government High School
