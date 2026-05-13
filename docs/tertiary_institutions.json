@@ -1,0 +1,61 @@
+{
+  "hhohho": [
+    { "name": "Limkokwing University", "type": "university", "aliases": ["Limkokwing University of Creative Technology"] },
+    { "name": "Eswatini Medical Christian University", "type": "university", "aliases": [] },
+    { "name": "AMADI University College", "type": "college", "aliases": ["AMADI University"] },
+    { "name": "Emergency Medical Rescue College", "type": "college", "aliases": [] },
+    { "name": "Mananga Centre for Regional Integration and Management Development", "type": "college", "aliases": ["Mananga Centre for Management Development"] },
+    { "name": "Regent Business School", "type": "college", "aliases": [] },
+    { "name": "Springfield Research University", "type": "university", "aliases": [] },
+    { "name": "Eswatini College of Theology", "type": "college", "aliases": ["Swaziland College of Theology"] },
+    { "name": "Soft-Tech College", "type": "college", "aliases": [] },
+    { "name": "Centre for International Technology and Consultancy", "type": "college", "aliases": [] },
+    { "name": "Institute of Research Management and Development", "type": "college", "aliases": [] },
+    { "name": "NOSA", "type": "vocational", "aliases": [] },
+    { "name": "St John", "type": "vocational", "aliases": [] },
+    { "name": "Providence International Training Institute", "type": "vocational", "aliases": [] },
+    { "name": "University of Eswatini - Mbabane Campus", "type": "university", "aliases": ["University of Eswatini — Mbabane Campus"] },
+    { "name": "BSA Training Centre - Motshane/Mbabane Campus", "type": "vocational", "aliases": ["BSA Training Centre — Motshane/Mbabane Campus"] }
+  ],
+  "manzini": [
+    { "name": "Matsapha Police Academy", "type": "tvet", "aliases": [] },
+    { "name": "William Pitcher Teacher Training College", "type": "college", "aliases": ["William Pitcher College"] },
+    { "name": "Eswatini Institute of Management and Public Administration", "type": "college", "aliases": ["SIMPA"] },
+    { "name": "Advanced School of Information Technology", "type": "college", "aliases": [] },
+    { "name": "Institute of Development Management", "type": "college", "aliases": [] },
+    { "name": "Southern Africa Nazarene University", "type": "university", "aliases": [] },
+    { "name": "African Prime Institute of Science and Technology", "type": "college", "aliases": [] },
+    { "name": "African Christian College", "type": "college", "aliases": [] },
+    { "name": "Botho University Eswatini Campus", "type": "university", "aliases": ["Botho University"] },
+    { "name": "Bradford College", "type": "college", "aliases": [] },
+    { "name": "CITEC College", "type": "college", "aliases": [] },
+    { "name": "Eastern and Southern African Management Institute", "type": "college", "aliases": [] },
+    { "name": "Emmanuel Wesleyan Bible College", "type": "college", "aliases": [] },
+    { "name": "Global University College", "type": "college", "aliases": [] },
+    { "name": "MUNA Health Life Institute", "type": "college", "aliases": [] },
+    { "name": "Workers College", "type": "college", "aliases": [] },
+    { "name": "Ngwane Park TVET", "type": "tvet", "aliases": [] },
+    { "name": "Eswatini College of Technology", "type": "tvet", "aliases": [] },
+    { "name": "Eswatini Cooperative Development College", "type": "college", "aliases": [] },
+    { "name": "Gwamile Vocational and Commercial Training Institute", "type": "tvet", "aliases": [] },
+    { "name": "Resource College", "type": "college", "aliases": [] },
+    { "name": "SHAK Enterprise", "type": "vocational", "aliases": [] },
+    { "name": "University of Eswatini", "type": "university", "region": "multiple", "aliases": [] },
+    { "name": "University of Eswatini - Kwaluseni Campus", "type": "university", "aliases": ["University of Eswatini — Kwaluseni Campus"] },
+    { "name": "University of Eswatini - Luyengo Campus", "type": "university", "aliases": ["University of Eswatini — Luyengo Campus"] },
+    { "name": "BSA Training Centre - Manzini Campus", "type": "vocational", "aliases": ["BSA Training Centre — Manzini Campus"] }
+  ],
+  "lubombo": [
+    { "name": "Good Shepherd Catholic College of Health Sciences", "type": "college", "aliases": ["Good Shepherd Nursing College"] },
+    { "name": "Bosco Youth Agricultural Centre", "type": "tvet", "aliases": [] },
+    { "name": "Sicobho Skills Centre", "type": "vocational", "aliases": [] },
+    { "name": "SIMAVSHEQ", "type": "vocational", "aliases": [] },
+    { "name": "Solar Training and Renewable Energy Entrepreneurship Centre", "type": "vocational", "aliases": [] },
+    { "name": "Ubombo Technical College", "type": "tvet", "aliases": [] }
+  ],
+  "shiselweni": [
+    { "name": "Ngwane Teacher Training College", "type": "college", "aliases": [] },
+    { "name": "Bethel Vocational Centre", "type": "vocational", "aliases": [] },
+    { "name": "Hillside College", "type": "college", "aliases": [] }
+  ]
+}

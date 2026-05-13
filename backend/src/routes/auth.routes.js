@@ -14,6 +14,7 @@ router.post('/register', authLimiter, validate(authValidation.register), authCon
 
 // Email verification route
 router.get('/verify-email/:token', authController.verifyEmail);
+router.post('/verify-email-otp', authLimiter, validate(authValidation.verifyEmailOtp), authController.verifyEmailOtp);
 
 // Resend verification email
 router.post('/resend-verification', authLimiter, validate(authValidation.resendVerification), authController.resendVerificationEmail);
@@ -39,6 +40,7 @@ router.post('/forgot-password', authLimiter, validate(authValidation.forgotPassw
 
 // Reset password
 router.post('/reset-password/:token', validate(authValidation.resetPassword), authController.resetPassword);
+router.post('/reset-password-otp', authLimiter, validate(authValidation.resetPasswordWithOtp), authController.resetPasswordWithOtp);
 
 // Refresh token
 router.post('/refresh-token', authController.refreshToken);

@@ -7,6 +7,12 @@ const { Institution, User } = require('../models');
 const { Op } = require('sequelize');
 const { NotFoundError, BadRequestError } = require('../utils/errors/appError');
 
+const VALID_REGIONS = new Set(['hhohho', 'manzini', 'lubombo', 'shiselweni', 'multiple']);
+const VALID_TYPES = new Set(['university', 'college', 'tvet', 'school', 'vocational', 'other']);
+const HIGH_SCHOOL_USER_TYPES = new Set(['school_student', 'high_school_student', 'high school student']);
+const TERTIARY_USER_TYPES = new Set(['university_student', 'tertiary_student', 'university student']);
+const TERTIARY_TYPES = ['university', 'college', 'tvet', 'vocational'];
+
 const parseCsvInstitutions = (csvText) => new Promise((resolve, reject) => {
   const rows = [];
   const parser = parse({ columns: true, bom: true, trim: true, skip_empty_lines: true });
@@ -22,9 +28,43 @@ module.exports = {
     return await Institution.findAll({ order: [['name', 'ASC']] });
   },
 
-  searchInstitutions: async (query = '') => {
+  searchInstitutions: async (query = '', filters = {}) => {
     const q = query.trim();
     const where = q ? { name: { [Op.iLike]: `%${q}%` } } : {};
+
+    const normalizedUserType = String(filters.userType || '').trim().toLowerCase();
+    const region = String(filters.region || '').trim().toLowerCase();
+    const requestedTypes = String(filters.type || '')
+      .split(',')
+      .map((part) => part.trim().toLowerCase())
+      .filter(Boolean);
+
+    const requestedValidTypes = requestedTypes.filter((type) => VALID_TYPES.has(type));
+    const isHighSchoolUser = HIGH_SCHOOL_USER_TYPES.has(normalizedUserType);
+    const isTertiaryUser = TERTIARY_USER_TYPES.has(normalizedUserType);
+
+    const types = isHighSchoolUser
+      ? ['school']
+      : requestedValidTypes.length > 0
+        ? requestedValidTypes
+        : isTertiaryUser
+          ? TERTIARY_TYPES
+          : [];
+
+    if (types.length === 1) {
+      where.type = types[0];
+    } else if (types.length > 1) {
+      where.type = { [Op.in]: types };
+    }
+
+    if (VALID_REGIONS.has(region)) {
+      if (types.length === 1 && types[0] === 'school') {
+        where.region = region;
+      } else {
+        where.region = { [Op.in]: [region, 'multiple'] };
+      }
+    }
+
     return await Institution.findAll({
       where,
       attributes: ['id', 'name', 'type', 'region'],

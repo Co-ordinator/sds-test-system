@@ -101,8 +101,8 @@ const ChangePassword = () => {
                     required: 'New password is required',
                     minLength: { value: 8, message: 'Password must be at least 8 characters' },
                     pattern: {
-                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/,
-                      message: 'Password must contain both letters and numbers'
+                      value: /^(?=.*[A-Za-z])(?=.*\d).{8,}$/,
+                      message: 'Password must include letters and numbers. Symbols are allowed.'
                     }
                   })}
                   autoComplete="new-password"
@@ -122,7 +122,7 @@ const ChangePassword = () => {
                 <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.newPassword.message}</p>
               )}
               <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textMuted }}>
-                At least 8 characters with both letters and numbers
+                At least 8 characters with letters and numbers. Symbols are allowed.
               </p>
             </div>
 

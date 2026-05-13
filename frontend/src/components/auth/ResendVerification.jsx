@@ -1,35 +1,73 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import api from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 import { GOV, TYPO } from '../../theme/government';
+import api from '../../services/api';
+
+const toPositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+};
 
 export default function ResendVerification({ onClose, defaultEmail = '' }) {
+  const navigate = useNavigate();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [sentTo, setSentTo] = useState(defaultEmail || '');
+  const [resendAvailableInSeconds, setResendAvailableInSeconds] = useState(120);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue } = useForm({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    getValues
+  } = useForm({
     defaultValues: {
       email: defaultEmail
     }
   });
 
   const onSubmit = async (data) => {
+    const payload = { email: String(data.email || '').trim().toLowerCase() };
     try {
-      await api.post('/api/v1/auth/resend-verification', data);
+      const response = await api.post('/api/v1/auth/resend-verification', payload);
+      const cooldownSeconds = toPositiveInt(response?.data?.resendAvailableInSeconds, 120);
+      setResendAvailableInSeconds(cooldownSeconds);
+      setSentTo(payload.email);
       setSuccess(true);
       setError('');
     } catch (err) {
-      setError(err?.uiMessage || err?.response?.data?.message || 'Failed to resend verification');
+      const retrySeconds = toPositiveInt(
+        err?.raw?.response?.data?.resendAvailableInSeconds ?? err?.response?.data?.resendAvailableInSeconds,
+        -1
+      );
+      if (retrySeconds >= 0) {
+        setResendAvailableInSeconds(retrySeconds);
+      }
+      setError(err?.uiMessage || err?.raw?.response?.data?.message || 'Failed to resend verification code.');
       setSuccess(false);
     }
   };
 
+  const openOtpPage = () => {
+    const email = sentTo || String(getValues('email') || '').trim().toLowerCase();
+    navigate('/registration-success', {
+      state: {
+        email,
+        verificationEmailSent: true,
+        resendAvailableInSeconds,
+        message: 'A verification code was sent to your email. Enter it to continue.'
+      }
+    });
+    onClose?.();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-md border p-6 max-w-md w-full" style={{ borderColor: GOV.border }}>
-        <div className="flex justify-between items-start mb-4">
-          <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Resend Verification Link</h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-500">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-md border bg-white p-6" style={{ borderColor: GOV.border }}>
+        <div className="mb-4 flex items-start justify-between">
+          <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Resend Verification Code</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-500" aria-label="Close">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -37,30 +75,42 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
         </div>
 
         {success ? (
-          <div className="text-center py-4">
-            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
+          <div className="py-3 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
               <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className={`${TYPO.body} mb-4`} style={{ color: GOV.textMuted }}>Verification link sent. Please check your inbox.</p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-full flex justify-center py-2.5 px-4 rounded-md text-sm font-semibold text-white"
-              style={{ backgroundColor: GOV.blue }}
-            >
-              Close
-            </button>
+            <p className={`${TYPO.body} mb-4`} style={{ color: GOV.textMuted }}>
+              Verification code sent to <span className="font-semibold">{sentTo || 'your email'}</span>.
+            </p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={openOtpPage}
+                className="w-full rounded-md py-2.5 text-sm font-semibold text-white"
+                style={{ backgroundColor: GOV.blue }}
+              >
+                Enter code
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full rounded-md border py-2.5 text-sm font-semibold"
+                style={{ borderColor: GOV.border, color: GOV.text }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email Address</label>
+              <label className={`mb-1 block ${TYPO.label}`} style={{ color: GOV.text }}>Email address</label>
               <input
                 type="email"
                 {...register('email', { required: 'Email is required' })}
-                className={`w-full px-3 py-2 border rounded-md ${TYPO.body} focus:outline-none focus:ring-2 focus:ring-offset-0`}
+                className={`w-full rounded-md border px-3 py-2 ${TYPO.body} focus:outline-none focus:ring-2 focus:ring-offset-0`}
                 style={{ borderColor: errors.email ? GOV.error : GOV.border, color: GOV.text }}
               />
               {errors.email && <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.email.message}</p>}
@@ -76,7 +126,7 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border rounded-md text-sm font-semibold bg-white"
+                className="rounded-md border bg-white px-4 py-2 text-sm font-semibold"
                 style={{ borderColor: GOV.border, color: GOV.text }}
               >
                 Cancel
@@ -84,10 +134,10 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-md px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                 style={{ backgroundColor: GOV.blue }}
               >
-                {isSubmitting ? 'Sending...' : 'Resend Link'}
+                {isSubmitting ? 'Sending...' : 'Resend code'}
               </button>
             </div>
           </form>

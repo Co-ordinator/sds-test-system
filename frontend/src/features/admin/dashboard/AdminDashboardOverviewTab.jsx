@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { MapPin } from 'lucide-react';
 import {
   Area,
@@ -17,14 +17,32 @@ import {
 } from 'recharts';
 import DataTable from '../../../components/data/DataTable';
 import EswatiniLeafletMap from '../../../components/maps/EswatiniLeafletMap';
-import { adminService } from '../../../services/adminService';
 import { GOV } from '../../../theme/government';
-import { PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../../analytics/analyticsConstants';
+import { INSTITUTION_TYPE_LABELS, PIE_COLORS, REGION_COLORS, REGION_LABELS } from '../../analytics/analyticsConstants';
 
 const normalizeRegion = (value) => (value || '').toString().trim().toLowerCase();
-const normalizeValue = (value) => (value || '').toString().trim();
 const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
-const getUserType = (user = {}) => user.userType || user.user_type || user.testTakerType || user.category || '';
+const INSTITUTION_TYPE_ORDER = ['school', 'university', 'college', 'tvet', 'vocational', 'other'];
+const INSTITUTION_TYPE_SINGULARS = {
+  school: 'school',
+  university: 'university',
+  college: 'college',
+  tvet: 'TVET',
+  vocational: 'vocational',
+  other: 'other',
+};
+const INSTITUTION_TYPE_PLURALS = {
+  school: 'schools',
+  university: 'universities',
+  college: 'colleges',
+  tvet: 'TVET',
+  vocational: 'vocational',
+  other: 'other',
+};
+const formatInstitutionType = (type, count) => {
+  if (Number(count) === 1) return INSTITUTION_TYPE_SINGULARS[type] || (INSTITUTION_TYPE_LABELS[type] || type).toLowerCase();
+  return INSTITUTION_TYPE_PLURALS[type] || (INSTITUTION_TYPE_LABELS[type] || type).toLowerCase();
+};
 
 const AdminDashboardOverviewTab = ({
   analytics,
@@ -32,38 +50,67 @@ const AdminDashboardOverviewTab = ({
   mapRegionalData,
   hollandDist,
   trend,
-  institutions,
+  institutionBreakdown,
   filters,
-  refreshKey,
   onRegionSelect,
 }) => {
-  const [assessments, setAssessments] = useState([]);
-  const [tableLoading, setTableLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    const fetchAssessments = async () => {
-      setTableLoading(true);
-      try {
-        const rows = await adminService.getAssessments(1000);
-        if (mounted) setAssessments(rows || []);
-      } catch {
-        if (mounted) setAssessments([]);
-      } finally {
-        if (mounted) setTableLoading(false);
-      }
-    };
-
-    fetchAssessments();
-    return () => { mounted = false; };
-  }, [refreshKey]);
+  const institutionRows = useMemo(() => {
+    return (institutionBreakdown?.institutions || []).map((row, index) => {
+      const region = normalizeRegion(row.region) || 'unknown';
+      const type = (row.type || 'unknown').toString().trim().toLowerCase();
+      const totalAssessments = Number(row.totalAssessments || 0);
+      const completedAssessments = Number(row.completedAssessments || 0);
+      const completionRate = Number(row.completionRate ?? 0);
+      const safeInstitutionId = row.institutionId ?? `unknown-${region}-${type}-${index}`;
+      return {
+        id: String(safeInstitutionId),
+        institutionName: row.institutionName || 'Unknown Institution',
+        region,
+        type,
+        tested: totalAssessments,
+        completed: completedAssessments,
+        completionRate,
+        topCode: row.topCode || '-',
+      };
+    }).sort((a, b) => b.tested - a.tested || a.institutionName.localeCompare(b.institutionName));
+  }, [institutionBreakdown]);
 
   const completionRate = analytics?.completionRate ?? 0;
   const totalUsers = analytics?.totals?.users ?? regionalData?.summary?.totalUsers ?? 0;
   const totalCompleted = analytics?.totals?.completedAssessments ?? regionalData?.summary?.completedAssessments ?? 0;
   const totalAssessments = analytics?.totals?.assessments ?? regionalData?.summary?.totalAssessments ?? 0;
-  const schoolCount = institutions.filter(i => i.type === 'school').length;
-  const universityCount = institutions.filter(i => i.type === 'university').length;
+  const institutionTypeCounts = useMemo(() => {
+    const summaryRows = institutionBreakdown?.summary?.byType || [];
+    if (summaryRows.length > 0) {
+      return summaryRows.reduce((acc, row) => {
+        const key = row.type || 'other';
+        acc[key] = Number(row.count || 0);
+        return acc;
+      }, {});
+    }
+
+    return institutionRows.reduce((acc, row) => {
+      const key = row.type || 'other';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+  }, [institutionBreakdown, institutionRows]);
+  const institutionKpiTotal = institutionBreakdown?.summary?.totalInstitutions ?? institutionRows.length;
+  const institutionKpiHint = useMemo(() => {
+    const knownParts = INSTITUTION_TYPE_ORDER
+      .filter((type) => Number(institutionTypeCounts[type] || 0) > 0)
+      .map((type) => {
+        const count = Number(institutionTypeCounts[type]);
+        return `${count.toLocaleString()} ${formatInstitutionType(type, count)}`;
+      });
+    const extraParts = Object.entries(institutionTypeCounts)
+      .filter(([type, count]) => !INSTITUTION_TYPE_ORDER.includes(type) && Number(count || 0) > 0)
+      .map(([type, count]) => `${Number(count).toLocaleString()} ${formatInstitutionType(type, Number(count))}`);
+    const parts = [...knownParts, ...extraParts];
+
+    if (parts.length === 0) return 'No institutions matched current filters';
+    return parts.join(' - ');
+  }, [institutionTypeCounts]);
   const engagementPct = totalUsers > 0 ? Math.round((totalCompleted / totalUsers) * 100) : 0;
 
   const trendData = useMemo(
@@ -95,61 +142,11 @@ const AdminDashboardOverviewTab = ({
   );
 
   const schoolUsageRows = useMemo(() => {
-    const map = new Map();
-    const parseDate = (v) => (v ? new Date(v) : null);
-    const start = parseDate(filters.startDate);
-    const end = parseDate(filters.endDate);
-    const selectedRegion = normalizeRegion(filters.region);
-    const selectedInstitutionType = normalizeValue(filters.institutionType);
-    const selectedUserType = normalizeValue(filters.userType);
-    if (end) end.setHours(23, 59, 59, 999);
-
-    assessments.forEach((assessment) => {
-      const user = assessment.user || {};
-      const inst = user.institution;
-      const institutionRegion = normalizeRegion(inst?.region);
-      const userRegion = normalizeRegion(user.region);
-      const rowRegion = institutionRegion || userRegion || 'unknown';
-      const completedAt = parseDate(assessment.completedAt || assessment.createdAt);
-
-      if (start && completedAt && completedAt < start) return;
-      if (end && completedAt && completedAt > end) return;
-      if (selectedRegion && rowRegion !== selectedRegion) return;
-      if (filters.institutionId && String(inst?.id) !== String(filters.institutionId)) return;
-      if (selectedInstitutionType && normalizeValue(inst?.type) !== selectedInstitutionType) return;
-      if (selectedUserType && normalizeValue(getUserType(user)) !== selectedUserType) return;
-
-      const key = inst?.id || user.institutionId || 'unknown';
-      if (!map.has(key)) {
-        map.set(key, {
-          id: key,
-          institutionName: inst?.name || 'Unknown Institution',
-          region: rowRegion,
-          tested: 0,
-          completed: 0,
-          codes: {},
-        });
-      }
-
-      const row = map.get(key);
-      row.tested += 1;
-      if (assessment.status === 'completed') row.completed += 1;
-      const hollandCode = getHollandDisplayCode(assessment);
-      if (hollandCode) row.codes[hollandCode] = (row.codes[hollandCode] || 0) + 1;
-    });
-
-    return Array.from(map.values())
-      .map((row) => {
-        const topCode = Object.entries(row.codes).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
-        return {
-          ...row,
-          topCode,
-          completionRate: row.tested > 0 ? Math.round((row.completed / row.tested) * 100) : 0,
-          regionLabel: REGION_LABELS[row.region] || row.region,
-        };
-      })
-      .sort((a, b) => b.tested - a.tested);
-  }, [assessments, filters.endDate, filters.institutionId, filters.institutionType, filters.region, filters.startDate, filters.userType]);
+    return institutionRows.map((row) => ({
+      ...row,
+      regionLabel: REGION_LABELS[row.region] || row.region,
+    }));
+  }, [institutionRows]);
 
   const selectedRegionDetail = useMemo(
     () => (
@@ -215,8 +212,8 @@ const AdminDashboardOverviewTab = ({
         />
         <KpiCard
           title="Institutions"
-          value={`${schoolCount + universityCount}`}
-          hint={`${schoolCount} schools - ${universityCount} universities`}
+          value={institutionKpiTotal.toLocaleString()}
+          hint={institutionKpiHint}
         />
       </div>
 
@@ -310,7 +307,7 @@ const AdminDashboardOverviewTab = ({
           columns={schoolUsageColumns}
           rows={schoolUsageRows}
           rowKey="id"
-          loading={tableLoading}
+          loading={false}
           pageSize={7}
             emptyTitle="No institutional usage data"
           emptyMessage="Adjust filters to broaden results."

@@ -53,7 +53,7 @@ export default function VerifyEmail() {
       } catch (err) {
         if (!cancelled) {
           setStatus('error');
-          setError(err?.uiMessage || err?.response?.data?.message || 'Link expired or invalid');
+          setError(err?.uiMessage || err?.response?.data?.message || 'Verification link expired or invalid');
         }
       }
     };
@@ -151,7 +151,7 @@ export default function VerifyEmail() {
                 className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2`}
                 style={{ backgroundColor: GOV.blue }}
               >
-                Request new link
+                Request new code
               </button>
             </div>
           )}

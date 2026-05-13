@@ -69,15 +69,6 @@ const ESWATINI_TOWNS = [
   'Vuvulane',
   'Other',
 ];
-const ESWATINI_INSTITUTIONS = [
-  'University of Eswatini (UNESWA)',
-  'Southern Africa Nazarene University (SANU)',
-  'Limkokwing University of Creative Technology',
-  'Eswatini College of Technology',
-  'William Pitcher College',
-  'Ngwane Teacher Training College',
-  'Other',
-];
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -86,9 +77,6 @@ export default function Onboarding() {
   const userType = selectedUserType;
   const typeMeta = USER_TYPE_META[userType] || null;
   const [step, setStep] = useState(0);
-  const [schoolQuery, setSchoolQuery] = useState('');
-  const [schoolDropdownOpen, setSchoolDropdownOpen] = useState(false);
-  const schoolDropdownRef = useRef(null);
   const [townQuery, setTownQuery] = useState('');
   const [townDropdownOpen, setTownDropdownOpen] = useState(false);
   const townDropdownRef = useRef(null);
@@ -115,21 +103,20 @@ export default function Onboarding() {
   });
 
   const [step1Errors, setStep1Errors] = useState({});
+  const institutionTypeFilter = userType === 'school_student'
+    ? 'school'
+    : userType === 'university_student'
+      ? 'university,college,tvet,vocational'
+      : '';
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
-  const filteredSchools = ESWATINI_INSTITUTIONS.filter((inst) =>
-    inst.toLowerCase().includes(schoolQuery.toLowerCase())
-  );
   const filteredTowns = ESWATINI_TOWNS.filter((t) =>
     t.toLowerCase().includes(townQuery.toLowerCase())
   );
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (schoolDropdownRef.current && !schoolDropdownRef.current.contains(e.target)) {
-        setSchoolDropdownOpen(false);
-      }
       if (townDropdownRef.current && !townDropdownRef.current.contains(e.target)) {
         setTownDropdownOpen(false);
       }
@@ -472,8 +459,13 @@ export default function Onboarding() {
                       update('schoolUniversity', name);
                       update('institutionId', id);
                     }}
-                    placeholder="Search for your school or university..."
+                    placeholder={userType === 'school_student'
+                      ? 'Search for your high school...'
+                      : 'Search for your school or university...'}
                     inputClassName={TYPO.body}
+                    region={userType === 'school_student' ? REGION_TO_BACKEND[form.region] : ''}
+                    type={institutionTypeFilter}
+                    userType={userType}
                   />
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
                     Search registered institutions or type your school name.

@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Fingerprint, Mail, ShieldCheck, UserPlus } from 'lucide-react';
 import api from '../services/api';
-import OnboardingLayout from '../components/onboarding/OnboardingLayout';
-import { GOV, TYPO } from '../theme/government';
+import AuthShell from '../components/auth/AuthShell';
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+
+const inputClass = (hasError) =>
+  `h-11 w-full rounded-md border bg-white px-3 text-sm font-medium text-[#111827] shadow-sm outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#2d8bc4] focus:ring-2 focus:ring-[#2d8bc4]/15 ${
+    hasError ? 'border-[#fecaca] bg-[#fffafa]' : 'border-[#d8e1ea]'
+  }`;
 
 export default function Register() {
   const navigate = useNavigate();
@@ -26,10 +30,12 @@ export default function Register() {
     try {
       const response = await api.post('/api/v1/auth/register', payload);
       const verificationEmailSent = response?.data?.verificationEmailSent !== false;
+      const resendAvailableInSeconds = response?.data?.resendAvailableInSeconds;
       navigate('/registration-success', {
         state: {
           email: payload.email,
           verificationEmailSent,
+          resendAvailableInSeconds,
           message: response?.data?.message || ''
         }
       });
@@ -61,132 +67,152 @@ export default function Register() {
     }
   };
 
-  const inputClass = (hasError) =>
-    `form-control ${hasError ? '' : ''}`;
-
   return (
-    <OnboardingLayout>
-      <div className="w-full max-w-[440px] mx-auto">
-        <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
-          <form className="p-6 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="mb-2">
-              <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>Create your account</h1>
-              <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
-                Verify your email after registration to continue.
-              </p>
-            </div>
-
-            {/* National ID */}
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>National ID *</label>
-              <input
-                {...register('nationalId', {
-                  required: 'National ID is required',
-                  pattern: {
-                    value: /^\d{13}$/,
-                    message: 'National ID must be exactly 13 digits'
-                  }
-                })}
-                type="text"
-                inputMode="numeric"
-                maxLength={13}
-                placeholder="13-digit ID number"
-                className={inputClass(!!errors.nationalId)}
-                style={{ borderBottomColor: errors.nationalId ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.nationalId && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.nationalId.message}</p>}
-              {!errors.nationalId && (
-                <p className="mt-1 text-xs" style={{ color: GOV.textHint }}>
-                  Used to prevent duplicate accounts and link your profile across life stages.
-                </p>
-              )}
-            </div>
-
-            {/* Email */}
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email *</label>
-              <input
-                {...register('email', {
-                  required: 'Email is required',
-                  pattern: {
-                    value: EMAIL_REGEX,
-                    message: 'Enter a valid email address'
-                  }
-                })}
-                type="email"
-                autoComplete="username"
-                placeholder="you@example.com"
-                className={inputClass(!!errors.email)}
-                style={{ borderBottomColor: errors.email ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.email && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.email.message}</p>}
-            </div>
-
-            {/* Password */}
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Password *</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  {...register('password', {
-                    required: 'Password is required',
-                    minLength: { value: 8, message: 'At least 8 characters' },
-                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/, message: 'Use letters and numbers' }
-                  })}
-                  autoComplete="new-password"
-                  className={inputClass(!!errors.password)}
-                  style={{ borderBottomColor: errors.password ? GOV.error : GOV.border, color: GOV.text, paddingRight: '2.5rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
-                  style={{ color: GOV.textMuted }}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {errors.password && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.password.message}</p>}
-            </div>
-
-            {/* Consent */}
-            <div className="flex items-start gap-2.5 pt-2">
-              <input
-                id="reg-consent"
-                type="checkbox"
-                {...register('consent', { required: 'You must accept the terms' })}
-                className="h-4 w-4 mt-0.5 rounded shrink-0"
-                style={{ accentColor: GOV.blue }}
-              />
-              <label htmlFor="reg-consent" className="text-xs" style={{ color: GOV.text }}>
-                I consent to the processing of my data under the Eswatini Data Protection Act 2022
-              </label>
-            </div>
-            {errors.consent && <p className="text-xs" style={{ color: GOV.error }}>{errors.consent.message}</p>}
-
-            {serverError && (
-              <div className="rounded-md px-3 py-2 text-xs" style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}>
-                {serverError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-              style={{ backgroundColor: GOV.blue }}
-            >
-              {isSubmitting ? 'Creating account...' : 'Create account'}
-            </button>
-
-            <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium hover:underline" style={{ color: GOV.blue }}>Login</Link>
+    <AuthShell
+      eyebrow="Create profile"
+      title="Register for SDS"
+      subtitle="Create a secure profile first. You will verify your email before starting the assessment."
+      panelTitle="Start with a secure SDS profile"
+      panelText="Register once, verify your email, then complete the Self-Directed Search assessment when you are ready."
+    >
+      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+        <div>
+          <label htmlFor="reg-national-id" className="mb-1.5 block text-xs font-bold text-[#374151]">
+            National ID
+          </label>
+          <div className="relative">
+            <Fingerprint className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="reg-national-id"
+              {...register('nationalId', {
+                required: 'National ID is required',
+                pattern: {
+                  value: /^\d{13}$/,
+                  message: 'National ID must be exactly 13 digits'
+                }
+              })}
+              type="text"
+              inputMode="numeric"
+              maxLength={13}
+              placeholder="13-digit ID number"
+              className={`${inputClass(!!errors.nationalId)} pl-9`}
+            />
+          </div>
+          {errors.nationalId ? (
+            <p className="mt-1.5 text-xs font-medium text-[#b91c1c]">{errors.nationalId.message}</p>
+          ) : (
+            <p className="mt-1.5 text-xs font-medium text-[#6b7280]">
+              Used to prevent duplicate accounts and link your SDS profile.
             </p>
-          </form>
+          )}
         </div>
-      </div>
-    </OnboardingLayout>
+
+        <div>
+          <label htmlFor="reg-email" className="mb-1.5 block text-xs font-bold text-[#374151]">
+            Email address
+          </label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="reg-email"
+              {...register('email', {
+                required: 'Email is required',
+                pattern: {
+                  value: EMAIL_REGEX,
+                  message: 'Enter a valid email address'
+                }
+              })}
+              type="email"
+              autoComplete="username"
+              placeholder="you@example.com"
+              className={`${inputClass(!!errors.email)} pl-9`}
+            />
+          </div>
+          {errors.email && (
+            <p className="mt-1.5 text-xs font-medium text-[#b91c1c]">{errors.email.message}</p>
+          )}
+        </div>
+
+        <div>
+          <label htmlFor="reg-password" className="mb-1.5 block text-xs font-bold text-[#374151]">
+            Password
+          </label>
+          <div className="relative">
+            <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="reg-password"
+              type={showPassword ? 'text' : 'password'}
+              {...register('password', {
+                required: 'Password is required',
+                minLength: { value: 8, message: 'At least 8 characters' },
+                pattern: {
+                  value: /^(?=.*[A-Za-z])(?=.*\d).{8,}$/,
+                  message: 'Use at least 8 characters with letters and numbers. Symbols are allowed.'
+                }
+              })}
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              className={`${inputClass(!!errors.password)} pl-9 pr-10`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.password ? (
+            <p className="mt-1.5 text-xs font-medium text-[#b91c1c]">{errors.password.message}</p>
+          ) : (
+            <p className="mt-1.5 text-xs font-medium text-[#6b7280]">
+              Use at least 8 characters with letters and numbers. Symbols are allowed.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-md border border-[#d8e1ea] bg-[#f8fbfd] p-3">
+          <label htmlFor="reg-consent" className="flex items-start gap-3">
+            <input
+              id="reg-consent"
+              type="checkbox"
+              {...register('consent', { required: 'You must accept the terms' })}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded"
+              style={{ accentColor: '#2d8bc4' }}
+            />
+            <span className="text-xs font-medium leading-5 text-[#374151]">
+              I consent to the processing of my data under the Eswatini Data Protection Act 2022.
+            </span>
+          </label>
+          {errors.consent && (
+            <p className="mt-2 text-xs font-medium text-[#b91c1c]">{errors.consent.message}</p>
+          )}
+        </div>
+
+        {serverError && (
+          <div className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{serverError}</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#2d8bc4] px-4 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#256b9a] hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+        >
+          <UserPlus className="h-4 w-4" aria-hidden="true" />
+          {isSubmitting ? 'Creating account...' : 'Create account'}
+        </button>
+
+        <div className="rounded-md bg-[#f7fbff] px-3 py-3 text-center text-xs font-medium text-[#4b5563]">
+          Already have an account?{' '}
+          <Link to="/login" className="font-bold text-[#2d8bc4] hover:underline">
+            Login
+          </Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 }
-

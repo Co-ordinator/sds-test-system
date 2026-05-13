@@ -43,8 +43,9 @@ const validateNationalId = (value, helpers) => {
   return value;
 };
 
-// Password requirements: min 8 chars, at least 1 letter and 1 number
-const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
+// Password requirements: min 8 chars, at least 1 letter and 1 number.
+// Symbols and any other printable characters are allowed.
+const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 
 const phonePattern = /^\+268\d{8}$/;
 
@@ -61,7 +62,7 @@ const register = Joi.object({
     'any.required': 'Email is required'
   }),
   password: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 8 characters and contain both letters and numbers',
+    'string.pattern.base': 'Password must be at least 8 characters and include letters and numbers. Symbols are allowed.',
     'any.required': 'Password is required'
   }),
   consent: Joi.boolean().valid(true).required().messages({
@@ -82,7 +83,7 @@ const login = Joi.object({
 
 const resetPassword = Joi.object({
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 8 characters and contain both letters and numbers',
+    'string.pattern.base': 'Password must be at least 8 characters and include letters and numbers. Symbols are allowed.',
     'any.required': 'New password is required'
   }),
   confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
@@ -138,12 +139,42 @@ const resendVerification = Joi.object({
   email: Joi.string().email().required().messages({ 'any.required': 'Email is required' })
 });
 
+const verifyEmailOtp = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required'
+  }),
+  code: Joi.string().pattern(/^\d{6}$/).required().messages({
+    'string.pattern.base': 'Verification code must be 6 digits',
+    'any.required': 'Verification code is required'
+  })
+});
+
+const resetPasswordWithOtp = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required'
+  }),
+  code: Joi.string().pattern(/^\d{6}$/).required().messages({
+    'string.pattern.base': 'Reset code must be 6 digits',
+    'any.required': 'Reset code is required'
+  }),
+  newPassword: Joi.string().pattern(passwordPattern).required().messages({
+    'string.pattern.base': 'Password must be at least 8 characters and include letters and numbers. Symbols are allowed.',
+    'any.required': 'New password is required'
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
+    'any.only': 'Passwords do not match',
+    'any.required': 'Please confirm your new password'
+  })
+});
+
 const changePassword = Joi.object({
   currentPassword: Joi.string().required().messages({
     'any.required': 'Current password is required'
   }),
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'New password must be at least 8 characters and contain both letters and numbers',
+    'string.pattern.base': 'New password must be at least 8 characters and include letters and numbers. Symbols are allowed.',
     'any.required': 'New password is required'
   }),
   confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
@@ -156,8 +187,10 @@ module.exports = {
   register,
   login,
   resetPassword,
+  resetPasswordWithOtp,
   updateProfile,
   forgotPasswordBody,
   resendVerification,
+  verifyEmailOtp,
   changePassword
 };

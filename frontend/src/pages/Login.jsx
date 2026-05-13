@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
+import { AlertCircle, Eye, EyeOff, LockKeyhole, LogIn, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ResendVerification from '../components/auth/ResendVerification';
-import OnboardingLayout from '../components/onboarding/OnboardingLayout';
-import { GOV, TYPO } from '../theme/government';
+import AuthShell from '../components/auth/AuthShell';
+
+const inputClass = (hasError) =>
+  `h-11 w-full rounded-md border bg-white px-3 text-sm font-medium text-[#111827] shadow-sm outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#2d8bc4] focus:ring-2 focus:ring-[#2d8bc4]/15 ${
+    hasError ? 'border-[#fecaca] bg-[#fffafa]' : 'border-[#d8e1ea]'
+  }`;
 
 const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
   const [showResendModal, setShowResendModal] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
 
@@ -21,7 +28,6 @@ const Login = () => {
       const user = result?.data?.user ?? result?.user;
 
       if (result?.status === 'success' && user) {
-        // Check if user must change password
         if (result?.mustChangePassword) {
           navigate('/change-password');
           return;
@@ -39,12 +45,14 @@ const Login = () => {
             navigate('/dashboard');
         }
       } else if (result?.requiresVerification || result?.status === 403) {
+        setVerificationEmail(String(data.email || '').trim());
         setShowResendModal(true);
       } else {
         setServerError(result?.message || 'Login failed');
       }
     } catch (err) {
       if (err.status === 403 && err.raw?.response?.data?.requiresVerification) {
+        setVerificationEmail(String(data.email || '').trim());
         setShowResendModal(true);
       } else {
         setServerError(err.uiMessage || 'Login failed');
@@ -53,93 +61,97 @@ const Login = () => {
   };
 
   return (
-    <OnboardingLayout>
+    <AuthShell
+      eyebrow="Secure sign in"
+      title="Welcome back"
+      subtitle="Access your SDS dashboard, continue your assessment, or review your results."
+      panelTitle="Continue your career assessment"
+      panelText="Sign in to resume your questionnaire, view your Holland Code profile, and download your career guidance report."
+    >
       {showResendModal && (
-        <ResendVerification onClose={() => setShowResendModal(false)} />
+        <ResendVerification onClose={() => setShowResendModal(false)} defaultEmail={verificationEmail} />
       )}
-      <div className="w-full max-w-[420px] mx-auto">
-        <div
-          className="w-full bg-white rounded-md border overflow-hidden"
-          style={{ borderColor: GOV.border }}
-        >
-          <div className="px-6 pt-6 pb-1">
-            <h1 className={`${TYPO.pageTitle} text-center`} style={{ color: GOV.text }}>
-              Login to the SDS Assessment System
-            </h1>
-            <p className={`${TYPO.bodySmall} text-center mt-1`} style={{ color: GOV.textMuted }}>
-              Enter your credentials to securely access your account
-            </p>
+
+      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+        <div>
+          <label htmlFor="login-identifier" className="mb-1.5 block text-xs font-bold text-[#374151]">
+            Email or SDS code
+          </label>
+          <div className="relative">
+            <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="login-identifier"
+              {...register('email', {
+                required: 'Email or SDS code is required',
+              })}
+              type="text"
+              autoComplete="username"
+              placeholder="your@email.com or SDS123456"
+              className={`${inputClass(!!errors.email)} pl-9`}
+            />
           </div>
-
-          <form className="px-6 pt-5 pb-6 space-y-5" onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <label htmlFor="login-identifier" className={`block ${TYPO.label} mb-2`} style={{ color: GOV.text }}>Email or Code</label>
-              <input
-                id="login-identifier"
-                {...register('email', {
-                  required: 'Email or Code is required',
-                })}
-                type="text"
-                autoComplete="username"
-                placeholder="your@email.com or SDS123456"
-                className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: errors.email ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.email && (
-                <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.email.message}</p>
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="login-password" className={`block ${TYPO.label}`} style={{ color: GOV.text }}>Password</label>
-                <Link to="/forgot-password" className={`${TYPO.hint} font-semibold underline hover:no-underline transition-all`} style={{ color: GOV.blue }}>
-                  Forgot password?
-                </Link>
-              </div>
-              <input
-                id="login-password"
-                type="password"
-                {...register('password', { required: 'Password is required' })}
-                autoComplete="current-password"
-                className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: errors.password ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.password && (
-                <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.password.message}</p>
-              )}
-            </div>
-
-            {serverError && (
-              <div
-                className={`rounded-md px-3 py-2 ${TYPO.hint}`}
-                style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}
-              >
-                {serverError}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-              style={{ backgroundColor: GOV.blue }}
-            >
-              {isSubmitting ? 'Logging in…' : 'Login'}
-            </button>
-          </form>
-
-          <div className="px-6 pb-6 pt-0 text-center border-t" style={{ borderColor: GOV.borderLight }}>
-            <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-              Don&apos;t have an account?{' '}
-              <Link to="/register" className="font-medium hover:underline" style={{ color: GOV.blue }}>
-                Register
-              </Link>
-            </p>
-          </div>
+          {errors.email && (
+            <p className="mt-1.5 text-xs font-medium text-[#b91c1c]">{errors.email.message}</p>
+          )}
         </div>
-      </div>
-    </OnboardingLayout>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <label htmlFor="login-password" className="block text-xs font-bold text-[#374151]">
+              Password
+            </label>
+            <Link to="/forgot-password" className="text-xs font-bold text-[#2d8bc4] hover:underline">
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              {...register('password', { required: 'Password is required' })}
+              autoComplete="current-password"
+              className={`${inputClass(!!errors.password)} pl-9 pr-10`}
+              placeholder="Enter your password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+            </button>
+          </div>
+          {errors.password && (
+            <p className="mt-1.5 text-xs font-medium text-[#b91c1c]">{errors.password.message}</p>
+          )}
+        </div>
+
+        {serverError && (
+          <div className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{serverError}</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#2d8bc4] px-4 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#256b9a] hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+        >
+          <LogIn className="h-4 w-4" aria-hidden="true" />
+          {isSubmitting ? 'Logging in...' : 'Login'}
+        </button>
+
+        <div className="rounded-md bg-[#f7fbff] px-3 py-3 text-center text-xs font-medium text-[#4b5563]">
+          Don&apos;t have an account?{' '}
+          <Link to="/register" className="font-bold text-[#2d8bc4] hover:underline">
+            Create one
+          </Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 };
 

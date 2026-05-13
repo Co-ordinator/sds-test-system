@@ -63,7 +63,7 @@ export default function Home() {
   const year = new Date().getFullYear();
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#f4f9fc] text-[#111827]">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#f4f9fc] text-[#111827]">
       <header className="sticky top-0 z-40 border-b border-[#d8e7f1] bg-white/96 shadow-sm backdrop-blur">
         <div className="mx-auto max-w-[92rem] px-3 py-3 sm:px-5 lg:px-6 lg:py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
@@ -87,7 +87,7 @@ export default function Home() {
                 </p>
                 <h1 className="mt-0.5 text-[0.95rem] font-extrabold leading-[1.05] text-[#07183d] sm:text-2xl lg:text-[30px] xl:whitespace-nowrap xl:text-[34px]">
                   <span className="block sm:inline">Ministry of Labor:</span>{' '}
-                  <span className="block whitespace-nowrap text-[#c83232] sm:inline">
+                  <span className="block whitespace-nowrap text-[#07183d] sm:inline">
                     Measurement and Testing Unit
                   </span>
                 </h1>
@@ -108,7 +108,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main id="landing-content">
+      <main id="landing-content" className="flex flex-1 flex-col">
         <section className="relative isolate overflow-hidden bg-[#07183d] lg:hidden">
           <img
             src="/landing-assessment-testing.jpg"
@@ -221,7 +221,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="relative isolate hidden overflow-hidden bg-[#07183d] lg:block">
+        <section className="relative isolate hidden flex-1 overflow-hidden bg-[#07183d] lg:flex">
           <img
             src="/landing-assessment-testing.jpg"
             alt="Pencil marking an assessment answer sheet"
@@ -237,7 +237,7 @@ export default function Home() {
             <div className="flex-1 bg-[#3b82c4]" />
           </div>
 
-          <div className="mx-auto grid max-w-[92rem] justify-items-start gap-6 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_350px] lg:items-center lg:justify-items-stretch lg:gap-8 lg:py-16">
+          <div className="mx-auto grid w-full max-w-[92rem] flex-1 justify-items-start gap-6 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_350px] lg:items-center lg:justify-items-stretch lg:gap-8 lg:py-12 xl:py-16 2xl:max-w-[104rem]">
             <div className="min-w-0 max-w-[21.75rem] sm:max-w-4xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur">

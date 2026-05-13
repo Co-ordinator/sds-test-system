@@ -1,5 +1,44 @@
 # SDS Test System Changelog
 
+## 2026-05-13
+
+### Reference Data And Seeding
+- Added region source documents for Hhohho, Lubombo, Manzini, and Shiselweni high schools under `docs/`.
+- Added the tertiary institutions source document under `docs/`.
+- Added extracted JSON datasets for high schools and tertiary institutions so collaborators can inspect the data used by the seeders.
+- Added an idempotent high-school seeder that seeds schools by region, remaps user and school-student references, and archives obsolete school placeholders as `other`.
+- Added an idempotent tertiary-institution seeder that canonicalizes universities, colleges, TVET, and vocational institutions, remaps references, and archives duplicate or obsolete tertiary placeholders as `other`.
+
+### Authentication And OTP Flow
+- Replaced registration email verification links with an OTP-based verification flow.
+- Added resend timing support for email verification OTPs.
+- Updated forgot-password/reset-password to use OTP email verification as well.
+- Added password reset OTP email template and tracking fields for reset-send timing.
+- Updated auth screens around login, registration, verification, resend, forgot password, and reset password to use the newer auth flow and shared auth layout.
+
+### Institution Onboarding
+- Updated institution search/filtering so high-school users only see schools and tertiary users only see tertiary institution types.
+- Added region-aware school search for high-school onboarding so school suggestions match the selected region.
+- Kept tertiary institutions available for university/tertiary onboarding without mixing them into high-school suggestions.
+
+### Admin Dashboard And Analytics Filters
+- Merged the admin dashboard/analytics flow so the dashboard overview receives filtered analytics data.
+- Fixed `Institution Type` filtering at the analytics query root by qualifying joined columns that became ambiguous once institution joins were applied.
+- Updated the Institutions KPI to use the institution catalog count and type breakdown, not only institutions with assessment records.
+- Added institution breakdown data to dashboard fetches so institution, institution type, region, user type, and date filters stay consistent across overview KPIs and usage tables.
+- Filtered the Institution dropdown by selected Institution Type and Region to avoid conflicting filter combinations.
+
+### UI And Experience Updates
+- Updated login and registration pages with the newer auth shell.
+- Added password visibility controls and relaxed registration password validation to allow stronger passwords with special characters.
+- Updated landing/help routing so `Learn more` opens the help page.
+- Removed the cancel action from the skipped-question submit popup and kept the prompt active until skipped questions are answered.
+
+### Deployment Notes
+- For a fresh database, run `cd backend`, then `npm run migrate`, then `npm run seed`.
+- For an existing hosted database that already has earlier seeders, run the two new migrations and then run the 2026-05-13 school and tertiary seeders, or run `npm run seed` if the environment has not applied them before.
+- The 2026-05-13 institution seeders are designed to preserve references by remapping users, workplace links, school-student rows, and course-institution rows before archiving duplicates/placeholders.
+
 ## 2026-04-16
 
 ### Registration and Email Verification

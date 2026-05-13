@@ -70,8 +70,8 @@ export default function ResetPassword() {
                     required: 'Required',
                     minLength: { value: 8, message: 'At least 8 characters' },
                     pattern: {
-                      value: /^(?=.*[a-zA-Z])(?=.*[0-9])/,
-                      message: 'Use letters and numbers'
+                      value: /^(?=.*[A-Za-z])(?=.*\d).{8,}$/,
+                      message: 'Use at least 8 characters with letters and numbers. Symbols are allowed.'
                     }
                   })}
                   className={`form-control ${TYPO.body}`}

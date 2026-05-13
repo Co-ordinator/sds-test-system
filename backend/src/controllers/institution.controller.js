@@ -14,7 +14,11 @@ const listInstitutions = async (req, res, next) => {
 
 const searchInstitutions = async (req, res, next) => {
   try {
-    const institutions = await institutionService.searchInstitutions(req.query.q);
+    const institutions = await institutionService.searchInstitutions(req.query.q, {
+      region: req.query.region,
+      type: req.query.type,
+      userType: req.query.userType
+    });
     res.status(200).json({ status: 'success', data: { institutions } });
   } catch (error) {
     logger.error({ actionType: 'INSTITUTION_SEARCH_FAILED', message: 'Failed to search institutions', req });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2 } from 'lucide-react';
 import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
@@ -348,7 +348,7 @@ const buildQuestionReviewItems = (questionsBySection = {}) => {
   ));
 };
 
-const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
+const SkippedQuestionsPanel = ({ skippedQuestions, onJump }) => {
   if (!skippedQuestions.length) return null;
 
   return (
@@ -358,7 +358,7 @@ const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
       role="complementary"
       aria-label="Skipped questions review panel"
     >
-      <div className="flex items-start justify-between gap-2 border-b px-3 py-2.5" style={{ borderColor: GOV.borderLight }}>
+      <div className="flex items-start gap-2 border-b px-3 py-2.5" style={{ borderColor: GOV.borderLight }}>
         <div className="flex min-w-0 items-start gap-2">
           <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: '#fef3c7' }}>
             <AlertTriangle className="h-3.5 w-3.5" style={{ color: '#d97706' }} aria-hidden />
@@ -370,15 +370,6 @@ const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md p-1 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          style={{ color: GOV.textMuted }}
-          aria-label="Close skipped questions panel"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
       </div>
 
       <div className="max-h-[calc(34vh-5.75rem)] overflow-y-auto px-2.5 py-2.5 md:max-h-[calc(100vh-13rem)]">
@@ -1027,7 +1018,6 @@ const Questionnaire = () => {
         <SkippedQuestionsPanel
           skippedQuestions={skippedQuestions}
           onJump={jumpToSkippedQuestion}
-          onClose={() => setShowSkippedReviewPanel(false)}
         />
       )}
 

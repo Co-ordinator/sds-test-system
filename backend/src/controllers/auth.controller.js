@@ -5,6 +5,14 @@ const { sendEmail } = require('../config/email.config');
 const logger = require('../utils/logger');
 const { AppError } = require('../utils/errors/appError');
 
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const OTP_EXPIRY_MINUTES = Math.max(1, Math.round(parsePositiveInt(process.env.EMAIL_OTP_TTL_MS, 10 * 60 * 1000) / 60000));
+const RESET_OTP_EXPIRY_MINUTES = Math.max(1, Math.round(parsePositiveInt(process.env.PASSWORD_RESET_OTP_TTL_MS, 10 * 60 * 1000) / 60000));
+
 const ACCESS_COOKIE_OPTIONS = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
@@ -35,15 +43,6 @@ const clearAccessTokenCookie = (res) => {
   res.clearCookie('accessToken', { ...ACCESS_COOKIE_OPTIONS, maxAge: undefined });
 };
 
-const resolveFrontendBaseUrl = (req) => {
-  const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
-  const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
-  const hostProtocol = forwardedProto || req.protocol;
-  const hostBasedUrl = `${hostProtocol}://${req.get('host')}`;
-  const shouldFallbackToHost = process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/i.test(configuredFrontendUrl);
-  return configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
-};
-
 const createEmailAudit = async (req, user, description, details = {}) => {
   await AuditLog.create({
     userId: user.id,
@@ -61,20 +60,16 @@ const createEmailAudit = async (req, user, description, details = {}) => {
   }).catch(() => {});
 };
 
-const sendVerificationEmail = async (req, user, emailToken, { subject, successDescription, failureDescription, successLogMessage, failureLogMessage }) => {
-  const frontendBaseUrl = resolveFrontendBaseUrl(req);
-
+const sendVerificationCodeEmail = async (req, user, emailOtp, { subject, successDescription, failureDescription, successLogMessage, failureLogMessage }) => {
   try {
     const delivery = await sendEmail({
       email: user.email,
       subject,
-      template: 'welcome-verify',
+      template: 'verify-email',
       context: {
-        firstName: user.firstName || 'Student',
-        lastName: user.lastName || '',
-        email: user.email,
-        region: user.region,
-        verificationUrl: `${frontendBaseUrl}/verify-email/${emailToken}`
+        firstName: user.firstName || 'Test Taker',
+        verificationCode: emailOtp,
+        otpExpiresMinutes: OTP_EXPIRY_MINUTES
       }
     });
 
@@ -107,18 +102,18 @@ const sendVerificationEmail = async (req, user, emailToken, { subject, successDe
 
 const register = async (req, res, next) => {
   try {
-    const { user, emailToken } = await authService.register(req.body);
+    const { user, emailOtp, resendAvailableInSeconds } = await authService.register(req.body);
     logger.info({ actionType: 'REGISTER', message: `User registered: ${user.email}`, req, details: { email: user.email, role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
 
     let emailResult = { sent: false };
     if (user.email) {
-      emailResult = await sendVerificationEmail(req, user, emailToken, {
+      emailResult = await sendVerificationCodeEmail(req, user, emailOtp, {
         subject: 'Welcome to SDS Test System - Verify Your Email',
-        successDescription: 'Welcome email sent',
-        failureDescription: 'Failed to send welcome email',
-        successLogMessage: `Welcome verification email sent to: ${user.email}`,
-        failureLogMessage: 'Welcome email failed'
+        successDescription: 'Verification code sent',
+        failureDescription: 'Failed to send verification code',
+        successLogMessage: `Verification code sent to: ${user.email}`,
+        failureLogMessage: 'Verification code email failed'
       });
     }
 
@@ -126,13 +121,15 @@ const register = async (req, res, next) => {
     res.status(201).json({
       status: 'success',
       message: verificationEmailSent
-        ? 'Account created. Please verify your email to continue.'
-        : 'Account created, but the verification email could not be sent right now. Please use resend verification link.',
+        ? 'Account created. Enter the verification code sent to your email to continue.'
+        : 'Account created, but the verification code email could not be sent right now. Please use resend verification code.',
       requiresEmailVerification: true,
       verificationEmailSent,
       emailDelivery: verificationEmailSent ? 'sent' : 'failed',
+      resendAvailableInSeconds: verificationEmailSent ? resendAvailableInSeconds : 0,
       data: {
         user: user.toJSON(),
+        resendAvailableInSeconds: verificationEmailSent ? resendAvailableInSeconds : 0,
         emailDelivery: verificationEmailSent
           ? { attempts: emailResult.delivery.attempts }
           : null
@@ -140,6 +137,35 @@ const register = async (req, res, next) => {
     });
   } catch (error) {
     logger.error({ actionType: 'REGISTER_FAILED', message: 'User registration failed', req, details: { error: error.message, stack: error.stack } });
+    next(error);
+  }
+};
+
+const verifyEmailOtp = async (req, res, next) => {
+  try {
+    const { user, token, refreshToken, alreadyVerified } = await authService.verifyEmailOtp(req.body);
+    logger.info({ actionType: 'VERIFY_EMAIL_OTP', message: `Email verified via OTP for user: ${user.email}`, req, details: { userId: user.id } });
+    if (!alreadyVerified) {
+      await AuditLog.create({
+        userId: user.id,
+        actionType: 'SYSTEM',
+        description: 'Email verified via OTP',
+        details: { resourceType: 'user', resourceId: user.id, requestMethod: 'POST', requestPath: '/api/v1/auth/verify-email-otp' },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      }).catch(() => {});
+    }
+
+    if (token) setAccessTokenCookie(res, token);
+    if (refreshToken) setRefreshTokenCookie(res, refreshToken);
+    res.status(200).json({
+      status: 'success',
+      message: alreadyVerified ? 'Your email is already verified. Continuing to onboarding.' : 'Email successfully verified.',
+      ...(token ? { token } : {}),
+      data: { user: user.toJSON() }
+    });
+  } catch (error) {
+    logger.error({ actionType: 'VERIFY_EMAIL_OTP_FAILED', message: 'Email OTP verification failed', req, details: { error: error.message, stack: error.stack } });
     next(error);
   }
 };
@@ -206,23 +232,16 @@ const updateProfile = async (req, res, next) => {
 const forgotPassword = async (req, res, next) => {
   try {
     const identifier = (req.body.identifier || req.body.email || '').trim();
-    const { user, resetToken } = await authService.forgotPassword(identifier);
-
-    const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
-    const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
-    const hostProtocol = forwardedProto || req.protocol;
-    const hostBasedUrl = `${hostProtocol}://${req.get('host')}`;
-    const shouldFallbackToHost = process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/i.test(configuredFrontendUrl);
-    const resetUrlBase = configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
-    const resetUrl = `${resetUrlBase}/reset-password/${resetToken}`;
+    const { user, resetOtp, resendAvailableInSeconds } = await authService.forgotPassword(identifier);
 
     await sendEmail({
       email: user.email,
-      subject: 'Password Reset Request',
-      template: 'reset-password',
+      subject: 'Your SDS password reset code',
+      template: 'reset-password-otp',
       context: {
-        firstName: user.firstName || 'Student',
-        resetUrl
+        firstName: user.firstName || 'Test Taker',
+        verificationCode: resetOtp,
+        otpExpiresMinutes: RESET_OTP_EXPIRY_MINUTES
       }
     });
 
@@ -242,14 +261,36 @@ const forgotPassword = async (req, res, next) => {
 
     logger.info({
       actionType: 'FORGOT_PASSWORD',
-      message: `Password reset email sent to: ${user.email}`,
+      message: `Password reset code sent to: ${user.email}`,
       req,
-      details: { userId: user.id, resetUrlBase }
+      details: { userId: user.id, resendAvailableInSeconds }
     });
 
-    res.status(200).json({ status: 'success', message: 'Reset link sent to email!' });
+    res.status(200).json({
+      status: 'success',
+      message: 'Reset code sent to email.',
+      resendAvailableInSeconds,
+      data: {
+        email: user.email,
+        resendAvailableInSeconds
+      }
+    });
   } catch (error) {
-    logger.error({ actionType: 'FORGOT_PASSWORD_FAILED', message: 'Failed to send password reset token', req, details: { error: error.message } });
+    logger.error({ actionType: 'FORGOT_PASSWORD_FAILED', message: 'Failed to send password reset code', req, details: { error: error.message } });
+    next(error);
+  }
+};
+
+const resetPasswordWithOtp = async (req, res, next) => {
+  try {
+    const { user, token, refreshToken } = await authService.resetPasswordWithOtp(req.body);
+    logger.info({ actionType: 'RESET_PASSWORD_OTP', message: `Password reset via OTP for user: ${user.email}`, req, details: { userId: user.id } });
+    await logAuthAction(req, 'PASSWORD_CHANGE', user.id);
+    setRefreshTokenCookie(res, refreshToken);
+    setAccessTokenCookie(res, token);
+    res.status(200).json({ status: 'success', token, message: 'Password reset successfully.' });
+  } catch (error) {
+    logger.error({ actionType: 'RESET_PASSWORD_OTP_FAILED', message: 'Failed OTP password reset', req, details: { error: error.message } });
     next(error);
   }
 };
@@ -321,22 +362,23 @@ const deleteUserAccount = async (req, res, next) => {
 
 const resendVerificationEmail = async (req, res, next) => {
   try {
-    const { user, emailToken, previousVerification } = await authService.resendVerificationEmail(req.body.email);
+    const { user, emailOtp, previousVerification, resendAvailableInSeconds } = await authService.resendVerificationEmail(req.body.email);
 
-    const emailResult = await sendVerificationEmail(req, user, emailToken, {
-      subject: 'Verify Your Email Address',
-      successDescription: 'Verification email resent',
-      failureDescription: 'Failed to resend verification email',
-      successLogMessage: `Verification email resent to: ${user.email}`,
-      failureLogMessage: 'Resend verification email failed'
+    const emailResult = await sendVerificationCodeEmail(req, user, emailOtp, {
+      subject: 'Your SDS verification code',
+      successDescription: 'Verification code resent',
+      failureDescription: 'Failed to resend verification code',
+      successLogMessage: `Verification code resent to: ${user.email}`,
+      failureLogMessage: 'Resend verification code failed'
     });
 
     if (!emailResult.sent) {
       await user.update({
         emailVerificationToken: previousVerification.token,
-        emailVerificationExpires: previousVerification.expires
+        emailVerificationExpires: previousVerification.expires,
+        emailVerificationSentAt: previousVerification.sentAt
       }).catch(() => {});
-      throw new AppError('We could not send the verification email right now. Please wait a moment and try again.', {
+      throw new AppError('We could not send the verification code right now. Please wait a moment and try again.', {
         status: 503,
         code: 'EMAIL_DELIVERY_FAILED',
         expose: true
@@ -345,9 +387,11 @@ const resendVerificationEmail = async (req, res, next) => {
 
     res.status(200).json({
       status: 'success',
-      message: 'Verification email sent',
+      message: 'Verification code sent',
       emailDelivery: 'sent',
+      resendAvailableInSeconds,
       data: {
+        resendAvailableInSeconds,
         emailDelivery: { attempts: emailResult.delivery.attempts }
       }
     });
@@ -375,7 +419,9 @@ module.exports = {
   getMe,
   updateProfile,
   forgotPassword,
+  resetPasswordWithOtp,
   resetPassword,
+  verifyEmailOtp,
   verifyEmail,
   resendVerificationEmail,
   refreshToken,

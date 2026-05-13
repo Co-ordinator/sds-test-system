@@ -21,6 +21,9 @@ const errorHandler = (err, req, res, next) => {
   if (err.requiresVerification) {
     responseBody.requiresVerification = true;
   }
+  if (Number.isFinite(err.resendAvailableInSeconds)) {
+    responseBody.resendAvailableInSeconds = err.resendAvailableInSeconds;
+  }
 
   logger.error({
     actionType: 'SYSTEM',

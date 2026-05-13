@@ -8,6 +8,17 @@ const { generateStudentCode } = require('../utils/generateStudentCode');
 const { hashValue } = require('../utils/security.util');
 const { BadRequestError, ConflictError, AuthError, NotFoundError } = require('../utils/errors/appError');
 
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const EMAIL_OTP_LENGTH = 6;
+const EMAIL_OTP_TTL_MS = parsePositiveInt(process.env.EMAIL_OTP_TTL_MS, 10 * 60 * 1000);
+const EMAIL_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.EMAIL_OTP_RESEND_COOLDOWN_MS, 2 * 60 * 1000);
+const PASSWORD_RESET_OTP_TTL_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_TTL_MS, EMAIL_OTP_TTL_MS);
+const PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS, EMAIL_OTP_RESEND_COOLDOWN_MS);
+
 // Grade level text → education_levels.level mapping
 const GRADE_TO_EDUCATION_LEVEL = {
   'Form 3 (Junior Secondary)': 1,
@@ -68,6 +79,42 @@ const hashToken = (tokenValue) => {
   return crypto.createHash('sha256').update(tokenValue).digest('hex');
 };
 
+const createEmailOtp = () =>
+  crypto.randomInt(0, 10 ** EMAIL_OTP_LENGTH).toString().padStart(EMAIL_OTP_LENGTH, '0');
+
+const createEmailVerificationRecord = () => {
+  const sentAt = new Date();
+  const otp = createEmailOtp();
+  return {
+    otpCode: otp,
+    otpHash: hashToken(otp),
+    sentAt,
+    expiresAt: new Date(sentAt.getTime() + EMAIL_OTP_TTL_MS)
+  };
+};
+
+const createPasswordResetRecord = () => {
+  const sentAt = new Date();
+  const otp = createEmailOtp();
+  return {
+    otpCode: otp,
+    otpHash: hashToken(otp),
+    sentAt,
+    expiresAt: new Date(sentAt.getTime() + PASSWORD_RESET_OTP_TTL_MS)
+  };
+};
+
+const toSeconds = (milliseconds) => Math.max(0, Math.ceil(milliseconds / 1000));
+
+const issueAuthTokens = async (user) => {
+  const token = signToken(user.id, user.role);
+  const refreshToken = signRefreshToken(user.id, user.role);
+  user.refreshToken = hashToken(refreshToken);
+  user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await user.save();
+  return { token, refreshToken };
+};
+
 module.exports = {
   signToken,
   signRefreshToken,
@@ -97,8 +144,7 @@ module.exports = {
       throw new ConflictError('An account with this email already exists. Please login instead.', 'EMAIL_EXISTS');
     }
 
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    const emailTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const verificationRecord = createEmailVerificationRecord();
     const studentCode = await generateStudentCode();
     const { dateOfBirth, gender } = parseNationalId(cleanNationalId);
 
@@ -117,8 +163,9 @@ module.exports = {
         studentCode,
         isConsentGiven: true,
         consentDate: new Date(),
-        emailVerificationToken: hashToken(emailToken),
-        emailVerificationExpires: emailTokenExpires
+        emailVerificationToken: verificationRecord.otpHash,
+        emailVerificationExpires: verificationRecord.expiresAt,
+        emailVerificationSentAt: verificationRecord.sentAt
       });
     } catch (error) {
       if (error?.name === 'SequelizeUniqueConstraintError') {
@@ -137,7 +184,11 @@ module.exports = {
       throw error;
     }
 
-    return { user, emailToken };
+    return {
+      user,
+      emailOtp: verificationRecord.otpCode,
+      resendAvailableInSeconds: toSeconds(EMAIL_OTP_RESEND_COOLDOWN_MS)
+    };
   },
 
   /* ─── Verify Email ────────────────────────────────────────────────────── */
@@ -176,19 +227,61 @@ module.exports = {
     user.isEmailVerified = true;
     user.emailVerificationToken = null;
     user.emailVerificationExpires = null;
+    user.emailVerificationSentAt = null;
     await user.save();
 
     let token = null;
     let refreshToken = null;
     try {
-      token = signToken(user.id, user.role);
-      refreshToken = signRefreshToken(user.id, user.role);
-      user.refreshToken = hashToken(refreshToken);
-      user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-      await user.save();
+      ({ token, refreshToken } = await issueAuthTokens(user));
     } catch (_) {}
 
     return { user, token, refreshToken };
+  },
+
+  verifyEmailOtp: async ({ email, code }) => {
+    if (!email?.trim()) {
+      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    }
+    if (!code?.trim()) {
+      throw new BadRequestError('Verification code is required', 'OTP_REQUIRED');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      throw new BadRequestError('Verification code must be 6 digits', 'INVALID_OTP_FORMAT');
+    }
+
+    const user = await User.findOne({
+      where: { email: { [Op.iLike]: cleanEmail } }
+    });
+
+    if (!user) {
+      throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
+    }
+
+    if (user.isEmailVerified) {
+      const { token, refreshToken } = await issueAuthTokens(user);
+      return { user, token, refreshToken, alreadyVerified: true };
+    }
+
+    if (!user.emailVerificationToken || !user.emailVerificationExpires || user.emailVerificationExpires <= new Date()) {
+      throw new BadRequestError('Verification code has expired. Request a new code and try again.', 'OTP_EXPIRED');
+    }
+
+    if (hashToken(cleanCode) !== user.emailVerificationToken) {
+      throw new BadRequestError('Incorrect verification code. Please check and try again.', 'INVALID_OTP');
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    user.emailVerificationSentAt = null;
+    await user.save();
+
+    const { token, refreshToken } = await issueAuthTokens(user);
+    return { user, token, refreshToken, alreadyVerified: false };
   },
 
   /* ─── Login ───────────────────────────────────────────────────────────── */
@@ -207,7 +300,7 @@ module.exports = {
 
     const requiresVerification = user.email && !user.isEmailVerified && !user.createdByTestAdministrator;
     if (requiresVerification) {
-      const error = new AuthError('Your email address is not verified. Please check your inbox for the verification link.', 'EMAIL_NOT_VERIFIED', 403);
+      const error = new AuthError('Your email address is not verified. Enter the verification code sent to your email.', 'EMAIL_NOT_VERIFIED', 403);
       error.requiresVerification = true;
       throw error;
     }
@@ -356,14 +449,76 @@ module.exports = {
       where: { [Op.or]: [{ studentCode: identifier }, { email: identifier }, { username: identifier }, { studentNumber: identifier }] }
     });
     if (!user) throw new NotFoundError('No user found with that login number, email, username, or student number', 'USER_NOT_FOUND');
-    if (!user.email) throw new BadRequestError('Cannot send reset link: no email on file', 'EMAIL_MISSING');
+    if (!user.email) throw new BadRequestError('Cannot send reset code: no email on file', 'EMAIL_MISSING');
 
-    const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    user.passwordResetToken = hashToken(resetToken);
-    user.passwordResetExpires = new Date(Date.now() + 3600000);
+    const now = Date.now();
+    if (user.passwordResetSentAt) {
+      const resendAvailableAtMs = new Date(user.passwordResetSentAt).getTime() + PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS;
+      const remainingMs = resendAvailableAtMs - now;
+      if (remainingMs > 0) {
+        const cooldownError = new AuthError(
+          `Please wait ${toSeconds(remainingMs)} seconds before requesting another reset code.`,
+          'PASSWORD_RESET_OTP_RESEND_COOLDOWN',
+          429
+        );
+        cooldownError.resendAvailableInSeconds = toSeconds(remainingMs);
+        throw cooldownError;
+      }
+    }
+
+    const resetRecord = createPasswordResetRecord();
+    user.passwordResetToken = resetRecord.otpHash;
+    user.passwordResetExpires = resetRecord.expiresAt;
+    user.passwordResetSentAt = resetRecord.sentAt;
     await user.save();
 
-    return { user, resetToken };
+    return {
+      user,
+      resetOtp: resetRecord.otpCode,
+      resendAvailableInSeconds: toSeconds(PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS),
+      otpExpiresInSeconds: toSeconds(PASSWORD_RESET_OTP_TTL_MS)
+    };
+  },
+
+  resetPasswordWithOtp: async ({ email, code, newPassword }) => {
+    if (!email?.trim()) {
+      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    }
+    if (!code?.trim()) {
+      throw new BadRequestError('Reset code is required', 'OTP_REQUIRED');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      throw new BadRequestError('Reset code must be 6 digits', 'INVALID_OTP_FORMAT');
+    }
+
+    const user = await User.findOne({
+      where: { email: { [Op.iLike]: cleanEmail } }
+    });
+
+    if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
+    if (!user.passwordResetToken || !user.passwordResetExpires || user.passwordResetExpires <= new Date()) {
+      throw new BadRequestError('Reset code has expired. Request a new code and try again.', 'OTP_EXPIRED');
+    }
+
+    if (hashToken(cleanCode) !== user.passwordResetToken) {
+      throw new BadRequestError('Incorrect reset code. Please check and try again.', 'INVALID_OTP');
+    }
+
+    user.password = newPassword;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.passwordResetSentAt = null;
+    await user.save();
+
+    const token = signToken(user.id, user.role);
+    const refreshToken = signRefreshToken(user.id, user.role);
+    user.refreshToken = hashToken(refreshToken);
+    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await user.save();
+    return { user, token, refreshToken };
   },
 
   /* ─── Reset Password ──────────────────────────────────────────────────── */
@@ -430,20 +585,50 @@ module.exports = {
 
   /* ─── Resend Verification ─────────────────────────────────────────────── */
   resendVerificationEmail: async (email) => {
-    const user = await User.findOne({ where: { email } });
+    if (!email?.trim()) {
+      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const user = await User.findOne({
+      where: { email: { [Op.iLike]: cleanEmail } }
+    });
     if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
     if (user.isEmailVerified) throw new BadRequestError('Email is already verified', 'EMAIL_ALREADY_VERIFIED');
 
+    const now = Date.now();
+    if (user.emailVerificationSentAt) {
+      const resendAvailableAtMs = new Date(user.emailVerificationSentAt).getTime() + EMAIL_OTP_RESEND_COOLDOWN_MS;
+      const remainingMs = resendAvailableAtMs - now;
+      if (remainingMs > 0) {
+        const cooldownError = new AuthError(
+          `Please wait ${toSeconds(remainingMs)} seconds before requesting another code.`,
+          'OTP_RESEND_COOLDOWN',
+          429
+        );
+        cooldownError.resendAvailableInSeconds = toSeconds(remainingMs);
+        throw cooldownError;
+      }
+    }
+
     const previousVerification = {
       token: user.emailVerificationToken,
-      expires: user.emailVerificationExpires
+      expires: user.emailVerificationExpires,
+      sentAt: user.emailVerificationSentAt
     };
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = hashToken(emailToken);
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const verificationRecord = createEmailVerificationRecord();
+    user.emailVerificationToken = verificationRecord.otpHash;
+    user.emailVerificationExpires = verificationRecord.expiresAt;
+    user.emailVerificationSentAt = verificationRecord.sentAt;
     await user.save();
 
-    return { user, emailToken, previousVerification };
+    return {
+      user,
+      emailOtp: verificationRecord.otpCode,
+      previousVerification,
+      resendAvailableInSeconds: toSeconds(EMAIL_OTP_RESEND_COOLDOWN_MS)
+    };
   },
 
   /* ─── Change Password ─────────────────────────────────────────────────── */
