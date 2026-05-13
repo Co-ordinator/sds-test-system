@@ -5,6 +5,7 @@ import { AlertCircle, Eye, EyeOff, LockKeyhole, LogIn, UserRound } from 'lucide-
 import { useAuth } from '../context/AuthContext';
 import ResendVerification from '../components/auth/ResendVerification';
 import AuthShell from '../components/auth/AuthShell';
+import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 
 const inputClass = (hasError) =>
   `h-11 w-full rounded-md border bg-white px-3 text-sm font-medium text-[#111827] shadow-sm outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#2d8bc4] focus:ring-2 focus:ring-[#2d8bc4]/15 ${
@@ -34,6 +35,11 @@ const Login = () => {
         }
 
         const userRole = user.role;
+        if (userRole === 'Test Taker' && profileNeedsOnboarding(user)) {
+          navigate('/onboarding');
+          return;
+        }
+
         switch (userRole) {
           case 'System Administrator':
             navigate('/admin/dashboard');

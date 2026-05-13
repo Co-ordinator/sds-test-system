@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 
 export const AuthContext = createContext();
 
@@ -104,14 +105,18 @@ export const useAuth = () => {
 export const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Require email verification only for self-registered accounts.
   const needsEmailVerification = user?.email && !user?.isEmailVerified && !user?.createdByTestAdministrator;
-  const isOnVerifyPage = window.location.pathname.includes('/verify-email');
+  const isOnVerifyPage = location.pathname.includes('/verify-email');
+  const needsOnboarding = user?.role === 'Test Taker' && profileNeedsOnboarding(user);
+  const isOnboardingPage = location.pathname === '/onboarding';
   
   const roleDashboard = (role) => {
     if (role === 'System Administrator') return '/admin';
     if (role === 'Test Administrator') return '/test-administrator';
+    if (role === 'Test Taker' && profileNeedsOnboarding(user)) return '/onboarding';
     return '/dashboard';
   };
 
@@ -126,17 +131,23 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
             requiresVerification: true
           }
         });
+      } else if (needsOnboarding && !isOnboardingPage) {
+        navigate('/onboarding', {
+          replace: true,
+          state: { message: 'Complete your profile before continuing.' }
+        });
       } else if (allowedRoles && !allowedRoles.includes(user?.role)) {
         navigate(roleDashboard(user?.role));
       }
     }
-  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage]);
+  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage, needsOnboarding, isOnboardingPage]);
 
   if (
     loading ||
     !isAuthenticated ||
     (allowedRoles && !allowedRoles.includes(user?.role)) ||
-    (needsEmailVerification && !isOnVerifyPage)
+    (needsEmailVerification && !isOnVerifyPage) ||
+    (needsOnboarding && !isOnboardingPage)
   ) {
     return null;
   }

@@ -9,6 +9,7 @@ import { GOV, TYPO } from '../theme/government';
 import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 import OccupationSearchInput from '../components/ui/OccupationSearchInput';
 import InstitutionSearchInput from '../components/ui/InstitutionSearchInput';
+import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 
 const USER_TYPE_META = {
   school_student: { label: 'High School Student', Icon: GraduationCap, color: '#F44336', step2Label: 'Your School', step3Label: 'Academic Details', description: 'Discover careers and choose the right subjects for your future.' },
@@ -22,6 +23,17 @@ const USER_TYPE_OPTIONS = [
   { id: 'professional', ...USER_TYPE_META.professional }
 ];
 
+const BACKEND_TO_FRONTEND_USER_TYPE = {
+  'High School Student': 'school_student',
+  'University Student': 'university_student',
+  Professional: 'professional',
+  school_student: 'school_student',
+  university_student: 'university_student',
+  professional: 'professional',
+};
+
+const normalizeUserType = (value) => BACKEND_TO_FRONTEND_USER_TYPE[value] || '';
+
 const GENDERS = ['Male', 'Female'];
 const LANGUAGES = ['English', 'SiSwati'];
 const GRADES = [
@@ -29,13 +41,17 @@ const GRADES = [
   'Form 5 / O-Level (Senior Secondary)',
   'A-Level',
   'Certificate / Diploma',
-  'Bachelor’s degree',
+  "Bachelor's degree",
   'Postgraduate',
 ];
 
 const ESWATINI_REGIONS = ['Hhohho', 'Manzini', 'Lubombo', 'Shiselweni'];
 const REGION_TO_BACKEND = { Hhohho: 'hhohho', Manzini: 'manzini', Lubombo: 'lubombo', Shiselweni: 'shiselweni' };
+const REGION_FROM_BACKEND = { hhohho: 'Hhohho', manzini: 'Manzini', lubombo: 'Lubombo', shiselweni: 'Shiselweni' };
 const LANGUAGE_TO_BACKEND = { English: 'en', SiSwati: 'ss' };
+const LANGUAGE_FROM_BACKEND = { en: 'English', ss: 'SiSwati' };
+const GENDER_FROM_BACKEND = { male: 'Male', female: 'Female' };
+const DEFAULT_GRADE = 'Form 5 / O-Level (Senior Secondary)';
 const ESWATINI_TOWNS = [
   'Big Bend',
   'Bhunya',
@@ -70,10 +86,32 @@ const ESWATINI_TOWNS = [
   'Other',
 ];
 
+const isBlank = (value) => String(value ?? '').trim() === '';
+const hasSelectionValue = (value) => value !== null && value !== undefined && String(value).trim() !== '';
+
+const buildInitialForm = (user = {}) => ({
+  fullName: [user.firstName, user.lastName].filter((part) => !isBlank(part)).join(' '),
+  gender: GENDER_FROM_BACKEND[user.gender] || '',
+  region: REGION_FROM_BACKEND[user.region] || 'Hhohho',
+  townCity: user.district || '',
+  areaNeighborhood: user.address || '',
+  schoolUniversity: user.currentInstitution || '',
+  institutionId: user.institutionId || null,
+  workplaceName: user.workplaceName || '',
+  workplaceInstitutionId: user.workplaceInstitutionId || null,
+  preferredLanguage: LANGUAGE_FROM_BACKEND[user.preferredLanguage] || 'English',
+  highestGrade: user.gradeLevel || DEFAULT_GRADE,
+  degreeProgram: user.degreeProgram || '',
+  yearOfStudy: hasSelectionValue(user.yearOfStudy) ? String(user.yearOfStudy) : '',
+  currentOccupation: user.currentOccupation || '',
+  currentOccupationId: user.currentOccupationId || null,
+  yearsExperience: hasSelectionValue(user.yearsExperience) ? String(user.yearsExperience) : '',
+});
+
 export default function Onboarding() {
   const navigate = useNavigate();
   const { setSession, user } = useAuth();
-  const [selectedUserType, setSelectedUserType] = useState(user?.userType || '');
+  const [selectedUserType, setSelectedUserType] = useState(() => normalizeUserType(user?.userType));
   const userType = selectedUserType;
   const typeMeta = USER_TYPE_META[userType] || null;
   const [step, setStep] = useState(0);
@@ -83,33 +121,24 @@ export default function Onboarding() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  const [form, setForm] = useState({
-    fullName: '',
-    gender: '',
-    region: 'Hhohho',
-    townCity: '',
-    areaNeighborhood: '',
-    schoolUniversity: '',
-    institutionId: null,
-    workplaceName: '',
-    workplaceInstitutionId: null,
-    preferredLanguage: 'English',
-    highestGrade: 'Form 5 / O-Level (Senior Secondary)',
-    degreeProgram: '',
-    yearOfStudy: '',
-    currentOccupation: '',
-    currentOccupationId: null,
-    yearsExperience: '',
-  });
-
-  const [step1Errors, setStep1Errors] = useState({});
+  const [form, setForm] = useState(() => buildInitialForm(user || {}));
+  const [errors, setErrors] = useState({});
   const institutionTypeFilter = userType === 'school_student'
     ? 'school'
     : userType === 'university_student'
       ? 'university,college,tvet,vocational'
       : '';
 
-  const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+  const update = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    if (submitError) setSubmitError('');
+  };
 
   const filteredTowns = ESWATINI_TOWNS.filter((t) =>
     t.toLowerCase().includes(townQuery.toLowerCase())
@@ -125,8 +154,114 @@ export default function Onboarding() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const selectUserType = (id) => {
+    setSelectedUserType(id);
+    setSubmitError('');
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.userType;
+      return next;
+    });
+  };
+
+  const addRequired = (target, key, label) => {
+    if (isBlank(form[key])) target[key] = `${label} is required.`;
+  };
+
+  const getStepErrors = (stepNumber) => {
+    const next = {};
+
+    if (stepNumber === 0) {
+      if (!selectedUserType) next.userType = 'Select whether you are a high school student, tertiary student, or professional.';
+      return next;
+    }
+
+    if (stepNumber === 1) {
+      addRequired(next, 'fullName', 'Full legal name');
+      if (!next.fullName && form.fullName.trim().split(/\s+/).length < 2) {
+        next.fullName = 'Enter both first name and surname.';
+      }
+      addRequired(next, 'gender', 'Gender');
+      return next;
+    }
+
+    if (stepNumber === 2) {
+      addRequired(next, 'region', 'Region');
+      addRequired(next, 'townCity', 'Town or city');
+      addRequired(next, 'areaNeighborhood', 'Area or neighborhood');
+
+      if (userType === 'professional') {
+        addRequired(next, 'workplaceName', 'Workplace or employer');
+      } else {
+        addRequired(next, 'schoolUniversity', 'Institution');
+        if (!next.schoolUniversity && !form.institutionId) {
+          next.schoolUniversity = 'Select your institution from the search results.';
+        }
+      }
+      return next;
+    }
+
+    if (stepNumber === 3) {
+      addRequired(next, 'preferredLanguage', 'Preferred language');
+      addRequired(next, 'highestGrade', 'Current or highest grade');
+
+      if (userType === 'university_student') {
+        addRequired(next, 'degreeProgram', 'Degree programme');
+        addRequired(next, 'yearOfStudy', 'Year of study');
+      }
+
+      if (userType === 'professional') {
+        addRequired(next, 'currentOccupation', 'Current occupation');
+        addRequired(next, 'yearsExperience', 'Years of experience');
+      }
+
+      return next;
+    }
+
+    return next;
+  };
+
+  const validateStep = (stepNumber = step) => {
+    const next = getStepErrors(stepNumber);
+    setErrors(next);
+    if (Object.keys(next).length > 0) {
+      setSubmitError('Please complete the required fields before continuing.');
+      return false;
+    }
+    setSubmitError('');
+    return true;
+  };
+
+  const validateAllSteps = () => {
+    const allErrors = {};
+    let firstInvalidStep = null;
+
+    [0, 1, 2, 3].forEach((stepNumber) => {
+      const stepErrors = getStepErrors(stepNumber);
+      if (Object.keys(stepErrors).length > 0 && firstInvalidStep === null) {
+        firstInvalidStep = stepNumber;
+      }
+      Object.assign(allErrors, stepErrors);
+    });
+
+    setErrors(allErrors);
+    if (firstInvalidStep !== null) {
+      setStep(firstInvalidStep);
+      setSubmitError('Complete all required fields before submitting your profile.');
+      return false;
+    }
+    setSubmitError('');
+    return true;
+  };
+
+  const fieldError = (name) => errors[name]
+    ? <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors[name]}</p>
+    : null;
+
+  const fieldBorder = (name) => errors[name] ? GOV.error : GOV.border;
+
   const handleBack = () => {
-    if (step > 1) setStep((s) => s - 1);
+    if (step > 0) setStep((s) => s - 1);
     else navigate('/');
   };
 
@@ -166,9 +301,10 @@ export default function Onboarding() {
   };
 
   const handleSubmitProfile = async () => {
+    if (!validateAllSteps()) return;
+
     setSubmitError('');
     setSubmitting(true);
-    let shouldGoToDashboard = true;
     try {
       const payload = buildProfilePayload();
       const res = await api.patch('/api/v1/auth/me', payload);
@@ -176,25 +312,26 @@ export default function Onboarding() {
       if (updatedUser && setSession) {
         setSession(null, updatedUser);
       }
+
+      if (!updatedUser || profileNeedsOnboarding(updatedUser)) {
+        setSubmitError('Your profile is still incomplete. Please check the required fields and submit again.');
+        return;
+      }
+
+      navigate('/dashboard');
     } catch (err) {
       if (err.response?.status === 401) {
-        shouldGoToDashboard = false;
         navigate('/login', { state: { message: 'Please Login to complete your profile.' } });
         return;
       }
-      setSubmitError('Profile save is optional for now. You can complete it later from Profile.');
+      setSubmitError(err?.uiMessage || err?.raw?.response?.data?.message || err?.response?.data?.message || 'Unable to save your profile. Please review the required fields and try again.');
     } finally {
       setSubmitting(false);
-      if (shouldGoToDashboard) {
-        navigate('/dashboard');
-      }
     }
   };
 
   const handleContinue = () => {
-    if (step === 0) {
-      if (!selectedUserType) return;
-    }
+    if (!validateStep(step)) return;
     if (step < 4) setStep((s) => s + 1);
     else handleSubmitProfile();
   };
@@ -222,7 +359,7 @@ export default function Onboarding() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setSelectedUserType(id)}
+                    onClick={() => selectUserType(id)}
                     className="w-full flex items-center gap-4 p-4 rounded-md border-2 text-left transition-all"
                     style={{
                       borderColor: selectedUserType === id ? color : GOV.border,
@@ -239,6 +376,7 @@ export default function Onboarding() {
                   </button>
                 ))}
               </div>
+              {fieldError('userType')}
 
               <button
                 type="button"
@@ -276,13 +414,13 @@ export default function Onboarding() {
               <input
                 type="text"
                 value={form.fullName}
-                onChange={(e) => { update('fullName', e.target.value); setStep1Errors(p => ({ ...p, fullName: '' })); }}
+                onChange={(e) => update('fullName', e.target.value)}
                 placeholder="e.g. Thabo Dlamini"
                 className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: step1Errors.fullName ? GOV.error : GOV.border, color: GOV.text }}
+                style={{ borderBottomColor: fieldBorder('fullName'), color: GOV.text }}
               />
-              {step1Errors.fullName
-                ? <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{step1Errors.fullName}</p>
+              {errors.fullName
+                ? fieldError('fullName')
                 : <p className={`mt-1 flex items-center gap-1.5 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
                     <span className="w-3 h-3 rounded-full border flex items-center justify-center text-[9px] font-bold flex-shrink-0" style={{ borderColor: GOV.textHint, color: GOV.textHint }}>i</span>
                     Use the name exactly as it appears on your national ID.
@@ -293,7 +431,7 @@ export default function Onboarding() {
 
             <div>
               <label className={`block ${TYPO.label} mb-1.5`} style={{ color: GOV.text }}>
-                Gender Identity
+                Gender *
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {GENDERS.map((g) => (
@@ -303,7 +441,7 @@ export default function Onboarding() {
                     onClick={() => update('gender', g)}
                     className={`py-2.5 px-3 rounded-md border ${TYPO.bodySmall} font-medium transition-colors`}
                     style={{
-                      borderColor: form.gender === g ? GOV.blue : GOV.border,
+                      borderColor: form.gender === g ? GOV.blue : fieldBorder('gender'),
                       backgroundColor: form.gender === g ? GOV.blueLight : '#fff',
                       color: GOV.text,
                     }}
@@ -312,6 +450,7 @@ export default function Onboarding() {
                   </button>
                 ))}
               </div>
+              {fieldError('gender')}
             </div>
           </div>
 
@@ -362,14 +501,21 @@ export default function Onboarding() {
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Region *</label>
                 <select
                   value={form.region}
-                  onChange={(e) => update('region', e.target.value)}
+                  onChange={(e) => {
+                    update('region', e.target.value);
+                    if (userType === 'school_student') {
+                      update('schoolUniversity', '');
+                      update('institutionId', null);
+                    }
+                  }}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ borderBottomColor: fieldBorder('region'), color: GOV.text }}
                 >
                   {ESWATINI_REGIONS.map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
+                {fieldError('region')}
               </div>
               <div className="relative" ref={townDropdownRef}>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Town / City *</label>
@@ -380,6 +526,7 @@ export default function Onboarding() {
                     value={townDropdownOpen ? townQuery : form.townCity}
                     onChange={(e) => {
                       setTownQuery(e.target.value);
+                      update('townCity', e.target.value);
                       setTownDropdownOpen(true);
                     }}
                     onFocus={() => {
@@ -388,10 +535,11 @@ export default function Onboarding() {
                     }}
                     placeholder="Search or select town..."
                     className={`form-control-with-icon pl-8 ${TYPO.body}`}
-                    style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                    style={{ borderBottomColor: fieldBorder('townCity'), color: GOV.text }}
                     autoComplete="off"
                   />
                 </div>
+                {fieldError('townCity')}
                 {townDropdownOpen && (
                   <ul
                     className="absolute z-10 left-0 right-0 mt-0.5 py-0.5 rounded-md border overflow-auto max-h-40 bg-white"
@@ -423,19 +571,20 @@ export default function Onboarding() {
                 )}
               </div>
               <div className="sm:col-span-2">
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Area / Neighborhood</label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Area / Neighborhood *</label>
                 <input
                   type="text"
                   value={form.areaNeighborhood}
                   onChange={(e) => update('areaNeighborhood', e.target.value)}
                   placeholder="e.g. Msunduza, Fonteyn"
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ borderBottomColor: fieldBorder('areaNeighborhood'), color: GOV.text }}
                 />
+                {fieldError('areaNeighborhood')}
               </div>
               {userType === 'professional' ? (
                 <div className="sm:col-span-2">
-                  <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Workplace / Employer</label>
+                  <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Workplace / Employer *</label>
                   <WorkplaceSearchInput
                     value={form.workplaceName}
                     institutionId={form.workplaceInstitutionId}
@@ -444,7 +593,9 @@ export default function Onboarding() {
                       update('workplaceInstitutionId', id);
                     }}
                     placeholder="Search for your employer or organisation..."
+                    error={!!errors.workplaceName}
                   />
+                  {fieldError('workplaceName')}
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
                     Type to search registered organisations, or enter your workplace name.
                   </p>
@@ -466,9 +617,11 @@ export default function Onboarding() {
                     region={userType === 'school_student' ? REGION_TO_BACKEND[form.region] : ''}
                     type={institutionTypeFilter}
                     userType={userType}
+                    error={!!errors.schoolUniversity}
                   />
+                  {fieldError('schoolUniversity')}
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                    Search registered institutions or type your school name.
+                    Select your institution from the filtered search results.
                   </p>
                 </div>
               )}
@@ -524,31 +677,33 @@ export default function Onboarding() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Preferred Language</label>
+              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Preferred Language *</label>
               <select
                 value={form.preferredLanguage}
                 onChange={(e) => update('preferredLanguage', e.target.value)}
                 className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ borderBottomColor: fieldBorder('preferredLanguage'), color: GOV.text }}
               >
                 {LANGUAGES.map((l) => (
                   <option key={l} value={l}>{l}</option>
                 ))}
               </select>
+              {fieldError('preferredLanguage')}
               <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>Default interface language.</p>
             </div>
             <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current/Highest Grade Passed</label>
+              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current/Highest Grade Passed *</label>
               <select
                 value={form.highestGrade}
                 onChange={(e) => update('highestGrade', e.target.value)}
                 className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ borderBottomColor: fieldBorder('highestGrade'), color: GOV.text }}
               >
                 {GRADES.map((g) => (
                   <option key={g} value={g}>{g}</option>
                 ))}
               </select>
+              {fieldError('highestGrade')}
               <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>Used for career recommendations.</p>
             </div>
           </div>
@@ -560,27 +715,29 @@ export default function Onboarding() {
                 <p className="text-xs font-semibold mb-3" style={{ color: GOV.textMuted }}>Programme details</p>
               </div>
               <div className="sm:col-span-2">
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Degree Programme</label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Degree Programme *</label>
                 <input
                   type="text"
                   value={form.degreeProgram}
                   onChange={(e) => update('degreeProgram', e.target.value)}
                   placeholder="e.g. Bachelor of Commerce in Accounting"
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ borderBottomColor: fieldBorder('degreeProgram'), color: GOV.text }}
                 />
+                {fieldError('degreeProgram')}
               </div>
               <div>
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Year of Study</label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Year of Study *</label>
                 <select
                   value={form.yearOfStudy}
                   onChange={(e) => update('yearOfStudy', e.target.value)}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ borderBottomColor: fieldBorder('yearOfStudy'), color: GOV.text }}
                 >
-                  <option value="">— Select —</option>
+                  <option value="">-- Select --</option>
                   {[1,2,3,4,5,6].map(y => <option key={y} value={y}>Year {y}</option>)}
                 </select>
+                {fieldError('yearOfStudy')}
               </div>
             </div>
           )}
@@ -592,7 +749,7 @@ export default function Onboarding() {
                 <p className="text-xs font-semibold mb-3" style={{ color: GOV.textMuted }}>Career background</p>
               </div>
               <div className="sm:col-span-2">
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current Occupation</label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Current Occupation *</label>
                 <OccupationSearchInput
                   value={form.currentOccupation}
                   occupationId={form.currentOccupationId}
@@ -602,19 +759,22 @@ export default function Onboarding() {
                   }}
                   placeholder="Search for your occupation..."
                   inputClassName={TYPO.body}
+                  error={!!errors.currentOccupation}
                 />
+                {fieldError('currentOccupation')}
               </div>
               <div>
-                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Years of Experience</label>
+                <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Years of Experience *</label>
                 <select
                   value={form.yearsExperience}
                   onChange={(e) => update('yearsExperience', e.target.value)}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ borderBottomColor: fieldBorder('yearsExperience'), color: GOV.text }}
                 >
-                  <option value="">— Select —</option>
+                  <option value="">-- Select --</option>
                   {[1,2,3,4,5,6,7,8,9,10,15,20].map(y => <option key={y} value={y}>{y}{y === 20 ? '+' : ''} year{y !== 1 ? 's' : ''}</option>)}
                 </select>
+                {fieldError('yearsExperience')}
               </div>
             </div>
           )}
@@ -672,11 +832,11 @@ export default function Onboarding() {
                 <tbody>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} w-1/3`} style={{ color: GOV.textHint }}>Full name</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.fullName || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.fullName || '-'}</td>
                   </tr>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Gender</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.gender || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.gender || '-'}</td>
                   </tr>
                 </tbody>
               </table>
@@ -693,21 +853,21 @@ export default function Onboarding() {
                 <tbody>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} w-1/3`} style={{ color: GOV.textHint }}>Region</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.region || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.region || '-'}</td>
                   </tr>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Town / City</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.townCity || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.townCity || '-'}</td>
                   </tr>
                   {userType === 'professional' ? (
                     <tr className="border-b" style={{ borderColor: GOV.border }}>
                       <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Workplace</td>
-                      <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.workplaceName || '—'}</td>
+                      <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.workplaceName || '-'}</td>
                     </tr>
                   ) : (
                     <tr className="border-b" style={{ borderColor: GOV.border }}>
                       <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>School / University</td>
-                      <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.schoolUniversity || '—'}</td>
+                      <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.schoolUniversity || '-'}</td>
                     </tr>
                   )}
                 </tbody>
@@ -725,11 +885,11 @@ export default function Onboarding() {
                 <tbody>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} w-1/3`} style={{ color: GOV.textHint }}>Preferred language</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.preferredLanguage || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.preferredLanguage || '-'}</td>
                   </tr>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Highest grade passed</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.highestGrade || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.highestGrade || '-'}</td>
                   </tr>
                 </tbody>
               </table>
@@ -766,7 +926,7 @@ export default function Onboarding() {
                   className={`flex-1 py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
                   style={{ backgroundColor: GOV.blue }}
                 >
-                  {submitting ? 'Submitting…' : 'Submit Profile'}
+                  {submitting ? 'Submitting...' : 'Submit Profile'}
                 </button>
               </div>
             </div>

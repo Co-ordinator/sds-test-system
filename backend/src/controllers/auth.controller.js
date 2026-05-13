@@ -100,15 +100,20 @@ const sendVerificationCodeEmail = async (req, user, emailOtp, { subject, success
   }
 };
 
+const queueVerificationCodeEmail = (...args) => {
+  setImmediate(() => {
+    sendVerificationCodeEmail(...args).catch(() => {});
+  });
+};
+
 const register = async (req, res, next) => {
   try {
     const { user, emailOtp, resendAvailableInSeconds } = await authService.register(req.body);
     logger.info({ actionType: 'REGISTER', message: `User registered: ${user.email}`, req, details: { email: user.email, role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
 
-    let emailResult = { sent: false };
     if (user.email) {
-      emailResult = await sendVerificationCodeEmail(req, user, emailOtp, {
+      queueVerificationCodeEmail(req, user, emailOtp, {
         subject: 'Welcome to SDS Test System - Verify Your Email',
         successDescription: 'Verification code sent',
         failureDescription: 'Failed to send verification code',
@@ -117,22 +122,17 @@ const register = async (req, res, next) => {
       });
     }
 
-    const verificationEmailSent = Boolean(emailResult.sent);
     res.status(201).json({
       status: 'success',
-      message: verificationEmailSent
-        ? 'Account created. Enter the verification code sent to your email to continue.'
-        : 'Account created, but the verification code email could not be sent right now. Please use resend verification code.',
+      message: 'Account created. We are sending a verification code to your email. If it does not arrive shortly, use resend verification code.',
       requiresEmailVerification: true,
-      verificationEmailSent,
-      emailDelivery: verificationEmailSent ? 'sent' : 'failed',
-      resendAvailableInSeconds: verificationEmailSent ? resendAvailableInSeconds : 0,
+      verificationEmailSent: true,
+      emailDelivery: 'queued',
+      resendAvailableInSeconds,
       data: {
         user: user.toJSON(),
-        resendAvailableInSeconds: verificationEmailSent ? resendAvailableInSeconds : 0,
-        emailDelivery: verificationEmailSent
-          ? { attempts: emailResult.delivery.attempts }
-          : null
+        resendAvailableInSeconds,
+        emailDelivery: { status: 'queued' }
       }
     });
   } catch (error) {

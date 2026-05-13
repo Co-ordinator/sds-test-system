@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { AuditLog } = require('../models');
+const { AuditLog, User } = require('../models');
 
 // Error handler for JWT verification
 const handleJWTError = () => {
@@ -37,6 +37,28 @@ const restrictTo = (...roles) => {
   };
 };
 
+const requireCompletedOnboarding = async (req, res, next) => {
+  try {
+    if (req.user?.role !== 'Test Taker') return next();
+
+    const user = await User.findByPk(req.user.id, {
+      attributes: ['id', 'role', 'onboardingCompleted']
+    });
+
+    if (!user?.onboardingCompleted) {
+      return res.status(403).json({
+        status: 'fail',
+        code: 'ONBOARDING_REQUIRED',
+        message: 'Complete onboarding before accessing the assessment.'
+      });
+    }
+
+    return next();
+  } catch (error) {
+    return next(error);
+  }
+};
+
 // Log authentication actions (AuditLog schema: actionType, description, details)
 // optionalUserId: use when the acting user is not in req.user (e.g. REGISTER)
 const logAuthAction = async (req, actionType, optionalUserId = null) => {
@@ -57,5 +79,6 @@ const logAuthAction = async (req, actionType, optionalUserId = null) => {
 module.exports = {
   verifyToken,
   restrictTo,
+  requireCompletedOnboarding,
   logAuthAction
 };

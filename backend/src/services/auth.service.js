@@ -30,19 +30,29 @@ const GRADE_TO_EDUCATION_LEVEL = {
 };
 
 /** All required onboarding fields captured for Test Takers (no placeholder names — use onboarding_completed flag). */
+const hasOnboardingText = (value) => String(value ?? '').trim() !== '';
+const hasOnboardingNumber = (value) => value !== null && value !== undefined && String(value).trim() !== '';
+
 function computeTestTakerOnboardingComplete(u) {
   if (!u || u.role !== 'Test Taker') return true;
-  const fn = (u.firstName || '').trim();
-  const ln = (u.lastName || '').trim();
-  if (!fn || !ln) return false;
+  if (!hasOnboardingText(u.firstName) || !hasOnboardingText(u.lastName)) return false;
+  if (!u.gender) return false;
   if (!u.userType) return false;
   if (!u.region) return false;
-  if (!((u.district || '').trim())) return false;
+  if (!hasOnboardingText(u.district)) return false;
+  if (!hasOnboardingText(u.address)) return false;
+  if (!u.preferredLanguage) return false;
+  if (!hasOnboardingText(u.gradeLevel)) return false;
+
   if (u.userType === 'Professional') {
-    return !!(((u.workplaceName || '').trim()) || u.workplaceInstitutionId);
+    const hasWorkplace = hasOnboardingText(u.workplaceName) || !!u.workplaceInstitutionId;
+    const hasOccupation = hasOnboardingText(u.currentOccupation) || !!u.currentOccupationId;
+    return hasWorkplace && hasOccupation && hasOnboardingNumber(u.yearsExperience);
   }
   if (u.userType === 'High School Student' || u.userType === 'University Student') {
-    return !!(((u.currentInstitution || '').trim()) || u.institutionId);
+    const hasInstitution = hasOnboardingText(u.currentInstitution) || !!u.institutionId;
+    if (u.userType === 'High School Student') return hasInstitution;
+    return hasInstitution && hasOnboardingText(u.degreeProgram) && hasOnboardingNumber(u.yearOfStudy);
   }
   return true;
 }
