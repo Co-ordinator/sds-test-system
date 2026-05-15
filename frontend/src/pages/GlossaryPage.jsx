@@ -16,7 +16,7 @@ const GlossaryPage = () => {
   const [selectedTerm, setSelectedTerm] = useState(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   
-  const { getAriaLabel, screenReaderMode, highContrast } = useAccessibility();
+  const { getAriaLabel, highContrast } = useAccessibility();
   const { user } = useAuth();
   const { glossaryUtils, markTermAsLearned, glossaryTerms, handleTermView, getStats } = useGlossary();
 
@@ -96,7 +96,7 @@ const GlossaryPage = () => {
 
   return (
     <AppShell breadcrumbs={[{ label: 'Dashboard', to: backTo }, { label: 'Glossary' }]}>
-    <div style={{ backgroundColor: GOV.background }}>
+    <div style={{ backgroundColor: highContrast ? '#000000' : GOV.background }}>
       {/* Page title */}
       <div className="bg-white shadow-sm border-b" style={{ borderColor: GOV.borderLight }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -138,6 +138,7 @@ const GlossaryPage = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
                 style={{ borderColor: GOV.border, color: GOV.text }}
+                aria-label={getAriaLabel('Search glossary terms', 'Glossary search')}
               />
             </div>
 
@@ -311,18 +312,17 @@ const GlossaryPage = () => {
                   )}
 
                   {/* Text-to-speech */}
-                  {!screenReaderMode && (
-                    <div>
-                      <button
-                        onClick={() => speakText(`${selectedTerm.term}. ${selectedTerm.definition}${selectedTerm.example ? `. Example: ${selectedTerm.example}` : ''}`)}
-                        disabled={isSpeaking}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      >
-                        <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
-                        {isSpeaking ? 'Speaking...' : 'Read Aloud'}
-                      </button>
-                    </div>
-                  )}
+                  <div>
+                    <button
+                      onClick={() => speakText(`${selectedTerm.term}. ${selectedTerm.definition}${selectedTerm.example ? `. Example: ${selectedTerm.example}` : ''}`)}
+                      disabled={isSpeaking}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      aria-label={isSpeaking ? 'Reading selected glossary term aloud' : 'Read selected glossary term aloud'}
+                    >
+                      <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
+                      {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (

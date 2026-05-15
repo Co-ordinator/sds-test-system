@@ -47,7 +47,7 @@ export default function ResetPassword() {
           </div>
 
           {success ? (
-            <div className="px-6 py-6 text-center">
+            <div className="px-6 py-6 text-center" role="status" aria-live="polite">
               <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
                 Password updated successfully. Redirecting to Login…
               </p>
@@ -103,6 +103,8 @@ export default function ResetPassword() {
                 <div
                   className={`rounded-md px-3 py-2 ${TYPO.hint}`}
                   style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}
+                  role="alert"
+                  aria-live="assertive"
                 >
                   {error}
                 </div>

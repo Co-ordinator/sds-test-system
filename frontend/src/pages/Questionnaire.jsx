@@ -963,7 +963,7 @@ const Questionnaire = () => {
             to={dashboardPath}
             className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
             style={{ color: GOV.textMuted }}
-            aria-label="Go to dashboard"
+            aria-label={getAriaLabel('Go to dashboard', 'Questionnaire navigation')}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0" aria-hidden />
             Dashboard
@@ -973,7 +973,7 @@ const Questionnaire = () => {
             onClick={() => navigate('/glossary')}
             className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
             style={{ color: GOV.textMuted }}
-            aria-label="Open SDS glossary"
+            aria-label={getAriaLabel('Open SDS glossary', 'Questionnaire navigation')}
           >
             <HelpCircle className="w-4 h-4 shrink-0" aria-hidden />
             Glossary
@@ -1348,7 +1348,17 @@ const Questionnaire = () => {
       })()}
 
       {!isPaused && !sectionTransition && !shouldShowInitialSectionIntro && !shouldShowResumeSectionIntro && currentQuestion && (
-        <div className="bg-white rounded-md p-6 md:p-8">
+        <div
+          className="bg-white rounded-md p-6 md:p-8"
+          style={highContrast ? { border: '2px solid #000000' } : undefined}
+        >
+          {screenReaderMode && (
+            <p className="sr-only" aria-live="polite">
+              {`Section ${currentSectionMeta?.num}, ${currentSectionMeta?.label}. Question ${currentQuestionIndex + 1} of ${sectionQuestions.length}. ${
+                isSelfEstimates ? 'Select a rating from one to six.' : 'Select yes or no.'
+              }`}
+            </p>
+          )}
           <div className="mb-6">
             <div
               className="mb-4 rounded-md border bg-white px-4 py-3"
@@ -1414,6 +1424,7 @@ const Questionnaire = () => {
                   style={currentAnswer === value
                     ? { borderColor: GOV.blue, backgroundColor: GOV.blueLightAlt, color: GOV.blue }
                     : { borderColor: GOV.borderLight, backgroundColor: '#ffffff', color: GOV.text }}
+                  aria-label={getAriaLabel(`Select rating ${value}: ${label}`, `Question ${currentQuestionIndex + 1}`)}
                 >
                   <span className="font-mono mr-3 text-base">{value}</span><span className="text-base">{label}</span>
                 </button>
@@ -1437,6 +1448,7 @@ const Questionnaire = () => {
                   style={currentAnswer === opt
                     ? { borderColor: GOV.blue, backgroundColor: GOV.blueLightAlt, color: GOV.blue }
                     : { borderColor: GOV.borderLight, backgroundColor: '#ffffff', color: GOV.text }}
+                  aria-label={getAriaLabel(`Select ${opt}`, `Question ${currentQuestionIndex + 1}`)}
                 >
                   {opt}
                 </button>
@@ -1472,6 +1484,7 @@ const Questionnaire = () => {
               disabled={saving || isAdvancing || submitting || (currentSectionIndex === 0 && currentQuestionIndex === 0)}
               className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none border bg-white`}
               style={{ color: GOV.textMuted, borderColor: GOV.border }}
+              aria-label={getAriaLabel('Go to previous question', 'Question navigation')}
             >
               <ChevronLeft className="w-4 h-4 shrink-0" aria-hidden /> Back
             </button>
@@ -1484,6 +1497,7 @@ const Questionnaire = () => {
                   disabled={saving || isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: '#16a34a' }}
+                  aria-label={getAriaLabel('Submit completed test', 'Question navigation')}
                 >
                   {submitting ? 'Submitting...' : 'Submit test'}
                 </button>
@@ -1495,6 +1509,7 @@ const Questionnaire = () => {
                   disabled={!canAdvance || saving || isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: GOV.blue }}
+                  aria-label={getAriaLabel('Go to next question', 'Question navigation')}
                 >
                   Next <ChevronRight className="w-4 h-4 shrink-0" aria-hidden />
                 </button>

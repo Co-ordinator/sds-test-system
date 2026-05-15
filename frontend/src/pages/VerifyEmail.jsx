@@ -72,7 +72,7 @@ export default function VerifyEmail() {
           style={{ borderColor: GOV.border }}
         >
           {status === 'loading' && (
-            <div className="space-y-4">
+            <div className="space-y-4" role="status" aria-live="polite">
               <div
                 className="animate-spin rounded-full h-10 w-10 border-2 border-t-transparent mx-auto"
                 style={{ borderColor: GOV.blue }}
@@ -84,7 +84,7 @@ export default function VerifyEmail() {
           )}
 
           {status === 'success' && (
-            <div className="space-y-4">
+            <div className="space-y-4" role="status" aria-live="polite">
               <div
                 className="mx-auto flex items-center justify-center h-12 w-12 rounded-full"
                 style={{ backgroundColor: GOV.blueLight }}
@@ -109,7 +109,7 @@ export default function VerifyEmail() {
           )}
 
           {status === 'alreadyVerified' && (
-            <div className="space-y-4">
+            <div className="space-y-4" role="status" aria-live="polite">
               <div
                 className="mx-auto flex items-center justify-center h-12 w-12 rounded-full"
                 style={{ backgroundColor: GOV.blueLight }}
@@ -134,7 +134,7 @@ export default function VerifyEmail() {
           )}
 
           {status === 'error' && (
-            <div className="space-y-4">
+            <div className="space-y-4" role="alert" aria-live="assertive">
               {showResend && <ResendVerification onClose={() => setShowResend(false)} />}
               <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
                 <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -63,10 +63,10 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="resend-verification-title">
       <div className="w-full max-w-md rounded-md border bg-white p-6" style={{ borderColor: GOV.border }}>
         <div className="mb-4 flex items-start justify-between">
-          <h3 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Resend Verification Code</h3>
+          <h3 id="resend-verification-title" className={TYPO.sectionTitle} style={{ color: GOV.text }}>Resend Verification Code</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-500" aria-label="Close">
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -75,7 +75,7 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
         </div>
 
         {success ? (
-          <div className="py-3 text-center">
+          <div className="py-3 text-center" role="status" aria-live="polite">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
               <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -117,7 +117,12 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
             </div>
 
             {error && (
-              <div className={`rounded-md px-3 py-2 ${TYPO.hint}`} style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}>
+              <div
+                className={`rounded-md px-3 py-2 ${TYPO.hint}`}
+                style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}
+                role="alert"
+                aria-live="assertive"
+              >
                 {error}
               </div>
             )}

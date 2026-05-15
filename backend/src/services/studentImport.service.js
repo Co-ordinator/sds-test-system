@@ -2,6 +2,7 @@ const { parse } = require('csv-parse/sync');
 const { User, EducationLevel, SchoolStudent } = require('../models');
 const { generateStudentCode } = require('../utils/generateStudentCode');
 const { sendEmail } = require('../config/email.config');
+const { Op, where, fn, col } = require('sequelize');
 const logger = require('../utils/logger');
 const { ValidationError } = require('../utils/errors/appError');
 
@@ -74,6 +75,93 @@ const mapSequelizeImportError = (error, rowNumber) => {
   }
 
   return null;
+};
+
+const normalizeInstitutionLookup = (value) => {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const stripCommonInstitutionWords = (value) => {
+  return normalizeInstitutionLookup(value)
+    .replace(
+      /\b(school|high|secondary|college|university|institute|institution|campus|academy|centre|center)\b/g,
+      ' '
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const resolveInstitutionByName = async (Institution, inputName, transaction) => {
+  const raw = String(inputName || '').trim();
+  if (!raw) return null;
+
+  // 1) Exact match (case-insensitive)
+  const exact = await Institution.findOne({
+    where: where(fn('LOWER', col('name')), raw.toLowerCase()),
+    transaction
+  });
+  if (exact) return exact;
+
+  // 2) Direct contains starts/contains
+  const directCandidates = await Institution.findAll({
+    where: {
+      [Op.or]: [
+        { name: { [Op.iLike]: `${raw}%` } },
+        { name: { [Op.iLike]: `%${raw}%` } }
+      ]
+    },
+    attributes: ['id', 'name', 'type', 'region'],
+    order: [['name', 'ASC']],
+    transaction
+  });
+  if (directCandidates.length === 1) return directCandidates[0];
+
+  // 3) Normalized token match (handles "good shepherd high" vs "Good Shepherd High School")
+  const normalizedRaw = normalizeInstitutionLookup(raw);
+  const strippedRaw = stripCommonInstitutionWords(raw);
+  const rawTokens = new Set(
+    strippedRaw
+      .split(' ')
+      .map((t) => t.trim())
+      .filter(Boolean)
+  );
+
+  const pooledCandidates = directCandidates.length > 0
+    ? directCandidates
+    : await Institution.findAll({
+        attributes: ['id', 'name', 'type', 'region'],
+        order: [['name', 'ASC']],
+        transaction
+      });
+
+  const fuzzyMatches = pooledCandidates.filter((institution) => {
+    const normalizedName = normalizeInstitutionLookup(institution.name);
+    const strippedName = stripCommonInstitutionWords(institution.name);
+
+    if (normalizedName === normalizedRaw || strippedName === strippedRaw) {
+      return true;
+    }
+
+    if (!rawTokens.size) return false;
+    const nameTokens = new Set(
+      strippedName
+        .split(' ')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    );
+    return Array.from(rawTokens).every((token) => nameTokens.has(token));
+  });
+
+  if (fuzzyMatches.length === 1) return fuzzyMatches[0];
+  if (fuzzyMatches.length === 0) return null;
+
+  // Ambiguous; caller should raise a clear validation error.
+  return { __ambiguous: true, matches: fuzzyMatches };
 };
 
 /**
@@ -149,15 +237,18 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
         throw new ValidationError(`Row ${rowNumber}: institution is required.`);
       }
 
-      // Find institution by exact name match
+      // Find institution by exact/case-insensitive/fuzzy-safe match
       const { Institution } = require('../models');
-      const institution = await Institution.findOne({
-        where: { name: institutionName },
-        transaction
-      });
+      const institution = await resolveInstitutionByName(Institution, institutionName, transaction);
 
       if (!institution) {
         throw new ValidationError(`Row ${rowNumber}: Institution "${institutionName}" not found. Check that the institution name exactly matches an existing institution.`);
+      }
+      if (institution.__ambiguous) {
+        const options = institution.matches.slice(0, 5).map((m) => m.name).join(', ');
+        throw new ValidationError(
+          `Row ${rowNumber}: Institution "${institutionName}" matched multiple institutions. Please use a clearer name. Matches: ${options}`
+        );
       }
       if (scopedInstitutionId && institution.id !== scopedInstitutionId) {
         throw new ValidationError(
@@ -192,6 +283,9 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
           userType: 'High School Student',
           employmentStatus: 'student',
           institutionId: institution.id,
+          currentInstitution: institution.name,
+          region: institution.region || null,
+          district: institution.district || null,
           gradeLevel: grade,
           className,
           studentNumber: studentNumber || null,
@@ -201,7 +295,7 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
           isConsentGiven: true,
           consentDate: new Date(),
           isEmailVerified: true,
-          createdByCounselor: true,
+          createdByTestAdministrator: true,
           mustChangePassword: true,
           onboardingCompleted: true
         }, { transaction });
@@ -234,6 +328,7 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
         studentCode: user.studentCode,
         username: user.username,
         email: user.email || null,
+        password,
         firstName: user.firstName,
         lastName: user.lastName,
         grade: grade || null,
@@ -258,6 +353,7 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
                 firstName: c.firstName,
                 lastName: c.lastName,
                 studentCode: c.studentCode,
+                password: c.password,
                 grade: c.grade || null,
                 className: c.className || null,
                 loginUrl
@@ -272,7 +368,7 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
 
     return {
       importedCount: importedStudents.length,
-      students: importedStudents
+      students: importedStudents.map(({ password, ...rest }) => rest)
     };
   } catch (error) {
     await transaction.rollback();

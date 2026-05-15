@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, HelpCircle, ShieldCheck } from 'lucide-react';
 import { LOGO_ALT } from '../../theme/government';
+import { useAccessibility } from '../../context/AccessibilityContext';
 
 const trustPoints = [
   'Secure account access',
@@ -16,9 +17,15 @@ export default function AuthShell({
   panelTitle = 'Self-Directed Search',
   panelText = 'A national career assessment system for understanding interests, abilities, and education pathways.',
 }) {
+  const { getAriaLabel } = useAccessibility();
+
   return (
     <div className="min-h-screen bg-[#eef6fb] text-[#111827]">
       <div className="relative isolate flex min-h-screen flex-col overflow-hidden">
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+
         <img
           src="/landing-assessment-testing.jpg"
           alt=""
@@ -27,7 +34,7 @@ export default function AuthShell({
         />
         <div className="absolute inset-0 -z-10 bg-gradient-to-br from-white via-[#eef6fb]/96 to-[#d8eaf7]/92" />
 
-        <header className="shrink-0 border-b border-[#d8e7f1] bg-white/90 backdrop-blur">
+        <header className="shrink-0 border-b border-[#d8e7f1] bg-white/90 backdrop-blur" role="banner">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
             <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="Back to landing page">
               <img
@@ -49,6 +56,7 @@ export default function AuthShell({
               <Link
                 to="/"
                 className="hidden h-9 items-center gap-2 rounded-md border border-[#d8e1ea] bg-white px-3 text-xs font-bold text-[#4b5563] transition-colors hover:bg-[#f8fafc] sm:inline-flex"
+                aria-label={getAriaLabel('Back to home page', 'Authentication navigation')}
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 Home
@@ -56,6 +64,7 @@ export default function AuthShell({
               <Link
                 to="/help"
                 className="inline-flex h-9 items-center gap-2 rounded-md border border-[#d8e1ea] bg-white px-3 text-xs font-bold text-[#2d8bc4] transition-colors hover:bg-[#f7fbff]"
+                aria-label={getAriaLabel('Open help page', 'Authentication navigation')}
               >
                 <HelpCircle className="h-4 w-4" aria-hidden="true" />
                 Help
@@ -64,7 +73,7 @@ export default function AuthShell({
           </div>
         </header>
 
-        <main className="flex flex-1 items-center px-4 py-6 sm:px-6 lg:py-10">
+        <main className="flex flex-1 items-center px-4 py-6 sm:px-6 lg:py-10" id="main-content" role="main">
           <div className="mx-auto grid w-full max-w-6xl gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,440px)] lg:items-stretch">
             <section className="relative hidden overflow-hidden rounded-lg border border-white/30 bg-[#07183d] p-7 text-white shadow-2xl shadow-[#07183d]/20 lg:flex lg:flex-col lg:justify-between">
               <img

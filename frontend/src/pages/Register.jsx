@@ -191,7 +191,11 @@ export default function Register() {
         </div>
 
         {serverError && (
-          <div className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+          <div
+            className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]"
+            role="alert"
+            aria-live="assertive"
+          >
             <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{serverError}</span>
           </div>

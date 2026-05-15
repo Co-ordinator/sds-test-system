@@ -7,6 +7,7 @@ import { analyticsService } from '../services/analyticsService';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import FilterDialog from '../components/ui/FilterDialog';
+import { useAccessibility } from '../context/AccessibilityContext';
 import {
   RIASEC_LABELS, REGION_LABELS, INSTITUTION_TYPE_LABELS, USER_TYPE_LABELS
 } from '../features/analytics/analyticsConstants';
@@ -43,6 +44,7 @@ const QUICK_DATE_RANGES = [
 ];
 
 export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) => {
+  const { announce } = useAccessibility();
   const hasDashboardOverview = typeof dashboardOverview === 'function';
   const [activeTab, setActiveTab] = useState(() => (hasDashboardOverview ? 'dashboard' : 'overview'));
   const [analytics, setAnalytics] = useState(null);
@@ -76,6 +78,12 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
       ? [{ key: 'dashboard', label: 'Overview' }, ...analyticsTabs]
       : analyticsTabs;
   }, [hasDashboardOverview]);
+
+  const handleTabChange = (tab) => {
+    if (tab.key === activeTab) return;
+    setActiveTab(tab.key);
+    announce(`Switched to ${tab.label} tab`);
+  };
 
   const hasActiveFilters = useMemo(
     () => Object.values(filters).some(Boolean),
@@ -252,9 +260,9 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
               <Download className="w-3.5 h-3.5" /> PDF
             </button>
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-2" role="tablist" aria-label="Analytics sections">
             {tabs.map(tab => (
-              <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
+              <button key={tab.key} type="button" onClick={() => handleTabChange(tab)}
                 className={`px-3 py-2 rounded-md text-xs whitespace-nowrap transition-colors border ${activeTab === tab.key ? 'font-bold' : 'font-medium'}`}
                 style={activeTab === tab.key
                   ? {
@@ -266,7 +274,11 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                     color: GOV.textMuted,
                     backgroundColor: 'transparent',
                     borderColor: 'transparent'
-                  }}>
+                  }}
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                aria-label={`${tab.label} tab`}
+              >
                 {tab.label}
               </button>
             ))}

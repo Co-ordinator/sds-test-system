@@ -32,7 +32,7 @@ const CounselorLoginCardsPanel = ({ isAdmin, institutions = [], userInstitutionI
         <div className="bg-white rounded-md border p-6" style={{ borderColor: GOV.border }}>
           <h3 className={`${TYPO.sectionTitle} mb-1`} style={{ color: GOV.text }}>Generate Login Cards</h3>
           <p className="text-xs mb-5" style={{ color: GOV.textMuted }}>
-            Generate a printable PDF of student login cards. Cards show the student's name, username, and instructions for the career test.
+            Generate a printable PDF of student login cards. Cards show the student's name, login number, temporary password, and instructions.
           </p>
 
           {isAdmin && (
@@ -85,10 +85,11 @@ const CounselorLoginCardsPanel = ({ isAdmin, institutions = [], userInstitutionI
             <p className="text-xs mb-2" style={{ color: GOV.textMuted }}>Form 5 · Class A</p>
             <hr className="mb-2" style={{ borderColor: GOV.border }} />
             <p className="text-xs font-bold mb-1" style={{ color: GOV.text }}>LOGIN DETAILS</p>
-            <p className="text-xs font-mono" style={{ color: GOV.text }}>Username: 2026001</p>
+            <p className="text-xs font-mono" style={{ color: GOV.text }}>Login Number: SDS244111</p>
+            <p className="text-xs font-mono" style={{ color: GOV.text }}>Password: Tm7!a4Qw</p>
             <p className="text-xs" style={{ color: GOV.textMuted }}>Website: careers.gov.sz</p>
             <div className="mt-2 space-y-0.5">
-              {['1. Go to website and click Login', '2. Enter your username', '3. Complete the Career Test', '4. Download your Career Report'].map((s, i) => (
+              {['1. Go to website and click Login', '2. Enter login number and password', '3. Change password at first login', '4. Complete the Career Test'].map((s, i) => (
                 <p key={i} className="text-[10px]" style={{ color: GOV.textHint }}>{s}</p>
               ))}
             </div>

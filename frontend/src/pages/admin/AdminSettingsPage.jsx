@@ -15,6 +15,7 @@ import AdminEducationLevelsPanel from '../../features/admin/educationLevels/Admi
 import AdminFundingPrioritiesPanel from '../../features/admin/funding/AdminFundingPrioritiesPanel';
 import { useInstitutions } from '../../hooks/useInstitutions';
 import { usePermissions, PermissionGate } from '../../context/PermissionContext';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import { GOV } from '../../theme/government';
 
 const SETTINGS_TABS = [
@@ -105,6 +106,7 @@ const AdminSettingsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
+  const { announce } = useAccessibility();
   const { allInstitutions, load: loadInstitutions } = useInstitutions();
   const [isTransitioning, setIsTransitioning] = useState(false);
 
@@ -124,6 +126,10 @@ const AdminSettingsPage = () => {
     if (id === activeTab) return;
     setIsTransitioning(true);
     setSearchParams({ tab: id });
+    const selectedTab = visibleTabs.find((tab) => tab.id === id);
+    if (selectedTab) {
+      announce(`Switched to ${selectedTab.label} tab`);
+    }
     setTimeout(() => setIsTransitioning(false), 50);
   };
 
@@ -194,7 +200,7 @@ const AdminSettingsPage = () => {
 
         <div className="flex gap-6">
           {/* Sidebar */}
-          <nav className="w-64 flex-shrink-0">
+          <nav className="w-64 flex-shrink-0" role="tablist" aria-label="Admin settings sections">
             <div className="bg-white border rounded-md overflow-hidden" style={{ borderColor: GOV.border }}>
               {visibleTabs.map((tab, idx) => {
                 const isActive = activeTab === tab.id;
@@ -204,6 +210,9 @@ const AdminSettingsPage = () => {
                     type="button"
                     onClick={() => setTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-3 py-3 text-left transition-all duration-200 ease-in-out ${idx > 0 ? 'border-t' : ''} ${!isActive ? 'hover:bg-gray-50' : ''}`}
+                    role="tab"
+                    aria-selected={isActive}
+                    aria-label={`${tab.label} tab`}
                     style={{
                       borderColor: GOV.borderLight,
                       backgroundColor: isActive ? GOV.blueLightAlt : 'transparent',

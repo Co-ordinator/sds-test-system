@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { BookOpen, X, Volume2, ChevronRight } from 'lucide-react';
 import { GOV, TYPO } from '../../theme/government';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -26,6 +26,7 @@ const InlineGlossaryTooltip = ({
   const tooltipRef = useRef(null);
   const buttonRef = useRef(null);
   const timeoutRef = useRef(null);
+  const tooltipId = useId();
 
   // Get term data with learning tracking
   const termData = getTermDefinition(term.toLowerCase());
@@ -182,7 +183,7 @@ const InlineGlossaryTooltip = ({
         `}
         aria-label={getAriaLabel(`Get definition for ${term}`, 'Glossary')}
         aria-expanded={tooltipOpen}
-        aria-describedby={tooltipOpen ? 'glossary-tooltip-content' : undefined}
+        aria-describedby={tooltipOpen ? tooltipId : undefined}
       >
         <span className="font-medium">{children}</span>
         {showIcon && (
@@ -200,7 +201,7 @@ const InlineGlossaryTooltip = ({
             ${isMobileViewport ? 'max-h-[70vh] overflow-y-auto' : ''}
           `}
           style={getPositionStyles()}
-          id="glossary-tooltip-content"
+          id={tooltipId}
           role="tooltip"
         >
           {/* Header */}
@@ -231,18 +232,16 @@ const InlineGlossaryTooltip = ({
             
             <div className="flex items-center gap-1">
               {/* Text-to-speech button */}
-              {!screenReaderMode && (
-                <button
-                  type="button"
-                  onClick={() => speakText(`${termData.term}. ${termData.definition}`)}
-                  disabled={isSpeaking}
-                  className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
-                  aria-label="Speak definition"
-                  title="Read definition aloud"
-                >
-                  <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => speakText(`${termData.term}. ${termData.definition}`)}
+                disabled={isSpeaking}
+                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                aria-label={isSpeaking ? 'Reading definition aloud' : 'Read definition aloud'}
+                title="Read definition aloud"
+              >
+                <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
+              </button>
               
               {/* Close button */}
               <button

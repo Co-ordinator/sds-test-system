@@ -13,6 +13,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { LOGO_ALT } from '../theme/government';
+import { useAccessibility } from '../context/AccessibilityContext';
 
 const heroHighlights = [
   {
@@ -60,11 +61,16 @@ const steps = [
 ];
 
 export default function Home() {
+  const { getAriaLabel } = useAccessibility();
   const year = new Date().getFullYear();
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#f4f9fc] text-[#111827]">
-      <header className="sticky top-0 z-40 border-b border-[#d8e7f1] bg-white/96 shadow-sm backdrop-blur">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
+      <header className="sticky top-0 z-40 border-b border-[#d8e7f1] bg-white/96 shadow-sm backdrop-blur" role="banner">
         <div className="mx-auto max-w-[92rem] px-3 py-3 sm:px-5 lg:px-6 lg:py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
             <div className="flex min-w-0 items-center gap-2.5 text-left sm:gap-4">
@@ -100,6 +106,7 @@ export default function Home() {
             <Link
               to="/help"
               className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-[#d8e1ea] bg-white px-4 text-sm font-semibold text-[#2d8bc4] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#7fbeeb] hover:bg-[#f7fbff] hover:shadow-md sm:h-10 sm:w-fit lg:self-auto"
+              aria-label={getAriaLabel('Open help page', 'Home actions')}
             >
               <HelpCircle className="h-4 w-4" aria-hidden="true" />
               Learn more
@@ -108,7 +115,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main id="landing-content" className="flex flex-1 flex-col">
+      <main id="main-content" className="flex flex-1 flex-col" role="main">
         <section className="relative isolate overflow-hidden bg-[#07183d] lg:hidden">
           <img
             src="/landing-assessment-testing.jpg"
@@ -334,7 +341,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="bg-[#333b4c] px-6 py-3 text-center text-xs font-normal text-white">
+      <footer className="bg-[#333b4c] px-6 py-3 text-center text-xs font-normal text-white" role="contentinfo">
         <p>
           &copy; {year} All rights reserved. SDS Career Assessment System{' '}
           <span className="font-bold text-[#f44336]">|</span> Powered By:{' '}

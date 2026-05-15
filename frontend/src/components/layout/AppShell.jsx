@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useId } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
+import { useAccessibility } from '../../context/AccessibilityContext';
 import { GOV } from '../../theme/government';
 import { useNotificationCount } from '../../hooks/useNotificationCount';
 
-// All possible admin nav links with required permissions
 const ADMIN_NAV_LINKS = [
   { to: '/admin/dashboard', label: 'Dashboard', Icon: Home, permission: null },
   { to: '/admin/results', label: 'Results', Icon: Award, permission: 'results.view' },
@@ -65,9 +65,13 @@ const BREADCRUMB_MAP = {
 export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hideBreadcrumbs = false }) {
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
+  const { getAriaLabel } = useAccessibility();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const userMenuId = useId();
+  const mobileNavId = useId();
+
   const role = user?.role || 'Test Taker';
   const isTestTaker = role === 'Test Taker';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
@@ -76,6 +80,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
     : role === 'Test Administrator'
       ? '/test-administrator'
       : '/dashboard';
+
   const navLinks = useMemo(() => {
     if (isAdminLike) {
       if (role === 'Test Administrator') {
@@ -84,19 +89,20 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
       const adminDashboardPath = role === 'Test Administrator' ? '/test-administrator' : '/admin/dashboard';
       return ADMIN_NAV_LINKS
         .map((link) => (link.label === 'Dashboard' ? { ...link, to: adminDashboardPath } : link))
-        .filter(link => !link.permission || hasPermission(link.permission));
+        .filter((link) => !link.permission || hasPermission(link.permission));
     }
     return TEST_TAKER_NAV;
   }, [isAdminLike, hasPermission, role]);
+
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const notificationCount = useNotificationCount(isAdminLike);
   const roleLabel = ROLE_LABELS[role] || 'Test Taker';
   const roleColor = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
-
   const breadcrumbs = customBreadcrumbs || BREADCRUMB_MAP[location.pathname] || [];
 
-  // Close mobile nav on route change
-  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
 
   const isActive = useCallback((to) => {
     if (to === '/test-administrator') {
@@ -116,28 +122,35 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
 
   return (
     <div className={`min-h-screen flex flex-col ${isTestTaker ? 'bg-[#fbfdff]' : 'bg-white'}`}>
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       <div
         className={isTestTaker ? 'hidden' : 'flex-shrink-0 py-0.5 border-b'}
         style={{ backgroundColor: GOV.ministryBarBg, borderColor: GOV.border }}
       >
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-[11px] font-medium tracking-normal" style={{ color: GOV.ministryBarText }}>
-            Ministry of Labour &amp; Social Security · Kingdom of Eswatini
+            Ministry of Labour &amp; Social Security | Kingdom of Eswatini
           </p>
         </div>
       </div>
 
-      {/* ── Primary nav bar ── */}
       <header
         className="sticky top-0 z-20 border-b h-14"
         style={{ borderColor: GOV.border, backgroundColor: '#ffffff' }}
+        role="banner"
       >
         <div className={`relative h-full ${isTestTaker ? 'px-3 sm:px-6' : 'px-4 lg:px-6'}`}>
           <div className={`absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:gap-3 ${isTestTaker ? 'left-3 sm:left-6' : 'left-3 sm:left-4 lg:left-6'}`}>
             <button
               type="button"
               className="lg:hidden p-1.5 rounded-md hover:bg-gray-100"
-              onClick={() => setMobileNavOpen(o => !o)}
+              onClick={() => setMobileNavOpen((open) => !open)}
+              aria-expanded={mobileNavOpen}
+              aria-controls={mobileNavId}
+              aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
             >
               {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
             </button>
@@ -156,7 +169,11 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
           </div>
 
           <div className={isTestTaker ? 'mx-auto hidden h-full max-w-7xl items-center lg:flex lg:pl-[190px] lg:pr-[190px]' : 'max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center'}>
-            <nav className={isTestTaker ? 'hidden h-full w-full min-w-0 items-center gap-5 overflow-x-auto lg:flex custom-scrollbar' : 'hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar'}>
+            <nav
+              className={isTestTaker ? 'hidden h-full w-full min-w-0 items-center gap-5 overflow-x-auto lg:flex custom-scrollbar' : 'hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar'}
+              role="navigation"
+              aria-label="Primary navigation"
+            >
               {navLinks.map(({ to, label, Icon, badge }) => {
                 const active = isActive(to);
                 return (
@@ -169,6 +186,8 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                         ? { color: GOV.blue, fontWeight: 700, borderColor: isTestTaker ? GOV.blue : undefined }
                         : { color: GOV.textMuted, fontWeight: isTestTaker ? 600 : 500, borderColor: isTestTaker ? 'transparent' : undefined }
                     }
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={getAriaLabel(`${label} page`, 'Primary navigation')}
                   >
                     <Icon className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} />
                     {label}
@@ -188,7 +207,11 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
               <button
                 type="button"
                 className={isTestTaker ? 'flex max-w-[180px] items-center gap-2 rounded-md px-2.5 py-1.5 transition-colors hover:bg-gray-50' : 'flex max-w-[170px] items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors'}
-                onClick={() => setUserMenuOpen(o => !o)}
+                onClick={() => setUserMenuOpen((open) => !open)}
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+                aria-controls={userMenuId}
+                aria-label={getAriaLabel(`User menu for ${displayName}`, 'User menu')}
               >
                 <div
                   className={isTestTaker ? 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full' : 'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0'}
@@ -197,18 +220,21 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                   <User className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} style={{ color: GOV.blue }} />
                 </div>
                 <div className="hidden sm:block min-w-0 text-left">
-                  <p className={isTestTaker ? 'truncate text-xs font-semibold leading-none' : 'truncate text-xs font-semibold leading-none'} style={{ color: GOV.text }}>{displayName}</p>
-                  <p className={isTestTaker ? 'truncate text-[10px] mt-0.5 leading-none' : 'truncate text-[10px] mt-0.5 leading-none'} style={{ color: GOV.textMuted }}>{roleLabel}</p>
+                  <p className="truncate text-xs font-semibold leading-none" style={{ color: GOV.text }}>{displayName}</p>
+                  <p className="truncate text-[10px] mt-0.5 leading-none" style={{ color: GOV.textMuted }}>{roleLabel}</p>
                 </div>
                 <ChevronDown className={isTestTaker ? 'h-3.5 w-3.5' : 'w-3.5 h-3.5'} style={{ color: GOV.textMuted }} />
               </button>
 
               {userMenuOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} aria-hidden="true" />
                   <div
+                    id={userMenuId}
                     className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border rounded-md shadow-lg py-1"
                     style={{ borderColor: GOV.border }}
+                    role="menu"
+                    aria-label="User menu"
                   >
                     <div className="px-3 py-2 border-b" style={{ borderColor: GOV.borderLight }}>
                       <p className="text-xs font-semibold" style={{ color: GOV.text }}>{displayName}</p>
@@ -228,6 +254,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                       className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
                       style={{ color: GOV.text }}
                       onClick={() => setUserMenuOpen(false)}
+                      role="menuitem"
                     >
                       <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
                     </Link>
@@ -238,6 +265,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                         className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
                         style={{ color: GOV.text }}
                         onClick={() => setUserMenuOpen(false)}
+                        role="menuitem"
                       >
                         <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Dashboard
                       </Link>
@@ -249,6 +277,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-red-50 text-left"
                       style={{ color: '#dc2626' }}
                       onClick={() => { setUserMenuOpen(false); logout(); }}
+                      role="menuitem"
                     >
                       <LogOut className="w-3.5 h-3.5" /> Sign Out
                     </button>
@@ -260,9 +289,14 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
         </div>
       </header>
 
-      {/* ── Mobile nav drawer ── */}
       {mobileNavOpen && (
-        <div className="lg:hidden border-b bg-white" style={{ borderColor: GOV.border }}>
+        <div
+          id={mobileNavId}
+          className="lg:hidden border-b bg-white"
+          style={{ borderColor: GOV.border }}
+          role="navigation"
+          aria-label="Mobile navigation"
+        >
           <div className="max-w-7xl mx-auto px-6 py-2 space-y-1">
             {navLinks.map(({ to, label, Icon, badge }) => {
               const active = isActive(to);
@@ -272,6 +306,8 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                   to={to}
                   className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
                   style={active ? { backgroundColor: GOV.blueLightAlt, color: GOV.blue } : { color: GOV.textMuted }}
+                  aria-current={active ? 'page' : undefined}
+                  aria-label={getAriaLabel(`${label} page`, 'Mobile navigation')}
                 >
                   <Icon className="w-4 h-4" />
                   {label}
@@ -287,9 +323,8 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
         </div>
       )}
 
-      {/* ── Breadcrumbs ── */}
       {!hideBreadcrumbs && breadcrumbs.length > 0 && (
-        <div className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }}>
+        <nav className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }} aria-label="Breadcrumb">
           <div className="max-w-7xl mx-auto px-6 py-1.5 flex items-center gap-1">
             {breadcrumbs.map((crumb, idx) => (
               <React.Fragment key={idx}>
@@ -304,11 +339,14 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
               </React.Fragment>
             ))}
           </div>
-        </div>
+        </nav>
       )}
 
-      {/* ── Page content ── */}
-      <main className="flex-1 overflow-auto custom-scrollbar">
+      <main className="flex-1 overflow-auto custom-scrollbar" id="main-content" role="main">
+        <div id="glossary-section" className="sr-only">
+          <h2>Glossary Navigation</h2>
+          <p>Open the glossary page from navigation for complete SDS term explanations.</p>
+        </div>
         {children}
       </main>
     </div>

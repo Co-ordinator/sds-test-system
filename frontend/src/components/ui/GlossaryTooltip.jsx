@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useId } from 'react';
 import { BookOpen, X } from 'lucide-react';
 import { GOV, TYPO } from '../../theme/government';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -12,6 +12,7 @@ const GlossaryTooltip = ({ term, children, className = '' }) => {
   const { getAriaLabel, screenReaderMode } = useAccessibility();
   const tooltipRef = useRef(null);
   const buttonRef = useRef(null);
+  const tooltipId = useId();
 
   const fetchDefinition = useCallback(async () => {
     if (!term) return;
@@ -88,7 +89,7 @@ const GlossaryTooltip = ({ term, children, className = '' }) => {
         className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 rounded px-1 py-0.5 transition-colors"
         aria-label={getAriaLabel(`Get definition for ${term}`, 'Glossary')}
         aria-expanded={tooltipOpen}
-        aria-describedby={tooltipOpen ? 'glossary-tooltip-content' : undefined}
+        aria-describedby={tooltipOpen ? tooltipId : undefined}
       >
         {children}
         <BookOpen className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
@@ -99,7 +100,7 @@ const GlossaryTooltip = ({ term, children, className = '' }) => {
           ref={tooltipRef}
           className="absolute z-50 w-80 p-4 bg-white border border-gray-200 rounded-lg shadow-lg"
           style={{ top: '100%', left: 0, marginTop: '4px' }}
-          id="glossary-tooltip-content"
+          id={tooltipId}
           role="tooltip"
         >
           <div className="flex items-start justify-between mb-2">

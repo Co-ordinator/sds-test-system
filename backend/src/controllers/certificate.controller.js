@@ -8,13 +8,25 @@ const certificateService = require('../services/certificate.service');
 const logger = require('../utils/logger');
 const { drawLetterheadImage } = require('../utils/pdfAssets');
 
-const LOGO_PATHS = [
-  path.join(__dirname, '../../../docs/letterhead.png'),
-  path.join(__dirname, '../../assets/letterhead.png'),
-  path.join(__dirname, '../../../frontend/public/letterhead.png'),
+const WATERMARK_PATHS = [
+  path.join(__dirname, '../../../frontend/public/watermark.png'),
+  path.join(__dirname, '../../../docs/watermark.png'),
+  path.join(__dirname, '../../assets/watermark.png'),
 ];
 
-const resolveLogoPath = () => LOGO_PATHS.find((logoPath) => fs.existsSync(logoPath));
+const resolveWatermarkPath = () => WATERMARK_PATHS.find((imagePath) => fs.existsSync(imagePath));
+
+const drawWatermark = (doc, pageW, pageH) => {
+  const watermarkPath = resolveWatermarkPath();
+  if (!watermarkPath) return;
+  try {
+    const watermarkW = 330;
+    doc.save();
+    doc.opacity(0.075);
+    doc.image(watermarkPath, (pageW - watermarkW) / 2, (pageH - watermarkW) / 2 + 12, { width: watermarkW });
+    doc.restore();
+  } catch (_) {}
+};
 
 const SECTION_MAP = { activities: 'I', competencies: 'II', occupations: 'III', self_estimates: 'IV' };
 const SECTION_LABELS = { activities: 'Activity', competencies: 'Competence', occupations: 'Occupation', self_estimates: 'Abilities' };
@@ -71,6 +83,7 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   const rm = 60;   // right margin
   const contentW = pageW - lm - rm;
   const border = '#6b7280';
+  drawWatermark(doc, pageW, pageH);
 
   // ── HEADER ─────────────────────────────────────────────────────────────
   const letterhead = drawLetterheadImage(doc, {
@@ -245,16 +258,7 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
     C: assessment.scoreC || 0
   };
 
-  const logoPath = resolveLogoPath();
-  if (logoPath) {
-    try {
-      const watermarkW = 330;
-      doc.save();
-      doc.opacity(0.075);
-      doc.image(logoPath, (pageW - watermarkW) / 2, (pageH - watermarkW) / 2 + 12, { width: watermarkW });
-      doc.restore();
-    } catch (_) {}
-  }
+  drawWatermark(doc, pageW, pageH);
 
   const letterhead = drawLetterheadImage(doc, {
     x: 0,

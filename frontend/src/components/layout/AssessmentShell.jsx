@@ -195,6 +195,10 @@ export default function AssessmentShell({
       ) : null}
 
       <main className="flex-1" id="main-content" role="main">
+        <div id="glossary-section" className="sr-only">
+          <h2>Glossary Navigation</h2>
+          <p>Use the Glossary action in the header to open full SDS term definitions.</p>
+        </div>
         <div className={contentClassName}>{children}</div>
       </main>
     </div>

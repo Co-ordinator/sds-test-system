@@ -170,21 +170,33 @@ export default function RegistrationSuccess() {
         </div>
 
         {verificationMessage && (
-          <div className="flex gap-2 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs font-medium text-[#1d4ed8]">
+          <div
+            className="flex gap-2 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 text-xs font-medium text-[#1d4ed8]"
+            role="status"
+            aria-live="polite"
+          >
             <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{verificationMessage}</span>
           </div>
         )}
 
         {verificationError && (
-          <div className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+          <div
+            className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]"
+            role="alert"
+            aria-live="assertive"
+          >
             <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{verificationError}</span>
           </div>
         )}
 
         {resendError && (
-          <div className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]">
+          <div
+            className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]"
+            role="alert"
+            aria-live="assertive"
+          >
             <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{resendError}</span>
           </div>

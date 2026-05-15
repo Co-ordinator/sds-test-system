@@ -1,0 +1,3 @@
+student_number,first_name,last_name,national_id,grade,class,gender,email,institution,password
+GSHF3TEST001,Nokulunga,Dlamini,9203155509081,Form3,A,female,,Good Shepherd High School,Form3Test!01
+GSHF3TEST002,Sibusiso,Mamba,0311226609082,Form3,B,male,,Good Shepherd High School,Form3Test!02

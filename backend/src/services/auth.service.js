@@ -338,7 +338,10 @@ module.exports = {
     const { Permission } = require('../models');
     const user = await User.findByPk(userId, {
       attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken'] },
-      include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
+      include: [
+        { model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } },
+        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region', 'district'], required: false }
+      ]
     });
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     return user;
