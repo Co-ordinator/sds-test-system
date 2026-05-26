@@ -1,5 +1,28 @@
 # SDS Test System Changelog
 
+## 2026-05-26
+
+### Startup Loading Experience
+- Added a branded startup screen so users no longer see a blank page while the app initializes.
+- Added a static pre-React loading state in `frontend/public/index.html` so the loader appears before the React bundle finishes loading.
+- Added a React startup screen in `frontend/src/components/ui/StartupScreen.jsx` for the auth session check.
+- Updated auth initialization to show the startup screen while `/api/v1/auth/me` checks the current session.
+- Updated the loader design to use the ministry letterhead logo with a clean rotating tricolor ring.
+
+### Login Page Copy
+- Replaced the login panel title from "Continue your career assessment" to "Access Your Account".
+- Broadened the login supporting text to cover dashboard access, continuing assessments, viewing results, and profile management.
+
+### Region And Town Filtering
+- Added a shared Eswatini location dataset in `frontend/src/data/eswatiniLocations.js`.
+- Updated onboarding so the Town / City suggestions filter by the selected region.
+- Updated profile editing so District / Town suggestions also filter by the selected region.
+- Centralized region label/backend value handling so onboarding and profile use the same location source.
+
+### Deployment Notes
+- No database migration or seed step is required for these changes.
+- Rebuild and redeploy the frontend so the startup screen and filtered location dropdowns are included in the hosted build.
+
 ## 2026-05-13
 
 ### Reference Data And Seeding
