@@ -74,9 +74,10 @@ export default function Profile() {
     requiresAccessibility: Joi.boolean().optional().allow(null).label('Requires Accessibility')
   });
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
     resolver: joiResolver(schema)
   });
+  const selectedRegion = watch('region');
 
   const handlePhoneNumberChange = (e) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
@@ -382,6 +383,7 @@ export default function Profile() {
   const FieldError = ({ error }) =>
     error ? <p className="mt-1" style={{ color: GOV.error, fontSize: '0.75rem' }}>{error.message}</p> : null;
 
+  const regionField = register('region');
   const role = authUser?.role || userData?.role || 'Test Taker';
   const rc = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
   const backTo = role === 'System Administrator' || role === 'Test Administrator' ? '/admin/dashboard' : '/dashboard';
@@ -464,7 +466,11 @@ export default function Profile() {
               <div>
                 <FieldLabel>Region</FieldLabel>
                 <select
-                  {...register('region')}
+                  {...regionField}
+                  onChange={(e) => {
+                    regionField.onChange(e);
+                    setDistrict('');
+                  }}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.region ? errorInputStyle : {}) }}
                 >
@@ -482,6 +488,7 @@ export default function Profile() {
                 <DistrictSearchInput
                   value={district}
                   onChange={(name) => setDistrict(name)}
+                  region={selectedRegion}
                   placeholder="Search for district or town..."
                   error={!!errors.district}
                 />

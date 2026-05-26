@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes sdsStartupSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Custom base styles */
 @layer base {
   body {

@@ -10,6 +10,13 @@ import WorkplaceSearchInput from '../components/ui/WorkplaceSearchInput';
 import OccupationSearchInput from '../components/ui/OccupationSearchInput';
 import InstitutionSearchInput from '../components/ui/InstitutionSearchInput';
 import { profileNeedsOnboarding } from '../utils/profileOnboarding';
+import {
+  ESWATINI_REGIONS,
+  REGION_FROM_BACKEND,
+  REGION_TO_BACKEND,
+  getTownsForRegion,
+  townBelongsToRegion,
+} from '../data/eswatiniLocations';
 
 const USER_TYPE_META = {
   school_student: { label: 'High School Student', Icon: GraduationCap, color: '#F44336', step2Label: 'Your School', step3Label: 'Academic Details', description: 'Discover careers and choose the right subjects for your future.' },
@@ -45,46 +52,10 @@ const GRADES = [
   'Postgraduate',
 ];
 
-const ESWATINI_REGIONS = ['Hhohho', 'Manzini', 'Lubombo', 'Shiselweni'];
-const REGION_TO_BACKEND = { Hhohho: 'hhohho', Manzini: 'manzini', Lubombo: 'lubombo', Shiselweni: 'shiselweni' };
-const REGION_FROM_BACKEND = { hhohho: 'Hhohho', manzini: 'Manzini', lubombo: 'Lubombo', shiselweni: 'Shiselweni' };
 const LANGUAGE_TO_BACKEND = { English: 'en', SiSwati: 'ss' };
 const LANGUAGE_FROM_BACKEND = { en: 'English', ss: 'SiSwati' };
 const GENDER_FROM_BACKEND = { male: 'Male', female: 'Female' };
 const DEFAULT_GRADE = 'Form 5 / O-Level (Senior Secondary)';
-const ESWATINI_TOWNS = [
-  'Big Bend',
-  'Bhunya',
-  'Bulembu',
-  'Ezulwini',
-  'Hlatikulu',
-  'Hluti',
-  'Kubuta',
-  'Kwaluseni',
-  'Lavumisa',
-  'Lobamba',
-  'Malkerns',
-  'Mankayane',
-  'Manzini',
-  'Matsapha',
-  'Mbabane',
-  'Mhlambanyatsi',
-  'Mhlume',
-  'Mondi',
-  'Mpaka',
-  'Ngwenya',
-  'Ngomane',
-  'Nhlangano',
-  'Nsoko',
-  'Piggs Peak',
-  'Sidvokodvo',
-  'Simunye',
-  'Siteki',
-  'Tabankulu',
-  'Tjaneni',
-  'Vuvulane',
-  'Other',
-];
 
 const isBlank = (value) => String(value ?? '').trim() === '';
 const hasSelectionValue = (value) => value !== null && value !== undefined && String(value).trim() !== '';
@@ -140,7 +111,22 @@ export default function Onboarding() {
     if (submitError) setSubmitError('');
   };
 
-  const filteredTowns = ESWATINI_TOWNS.filter((t) =>
+  const handleRegionChange = (region) => {
+    const shouldClearTown = form.townCity && !townBelongsToRegion(form.townCity, region);
+    update('region', region);
+    if (shouldClearTown) {
+      update('townCity', '');
+      setTownQuery('');
+    }
+    if (userType === 'school_student') {
+      update('schoolUniversity', '');
+      update('institutionId', null);
+    }
+    setTownDropdownOpen(false);
+  };
+
+  const regionTowns = getTownsForRegion(form.region);
+  const filteredTowns = regionTowns.filter((t) =>
     t.toLowerCase().includes(townQuery.toLowerCase())
   );
 
@@ -501,13 +487,7 @@ export default function Onboarding() {
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Region *</label>
                 <select
                   value={form.region}
-                  onChange={(e) => {
-                    update('region', e.target.value);
-                    if (userType === 'school_student') {
-                      update('schoolUniversity', '');
-                      update('institutionId', null);
-                    }
-                  }}
+                  onChange={(e) => handleRegionChange(e.target.value)}
                   className={`form-control ${TYPO.body}`}
                   style={{ borderBottomColor: fieldBorder('region'), color: GOV.text }}
                 >
@@ -564,7 +544,7 @@ export default function Onboarding() {
                       ))
                     ) : (
                       <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                        No town found. Type to search.
+                        No town found for {form.region}. Type to search or choose Other.
                       </li>
                     )}
                   </ul>

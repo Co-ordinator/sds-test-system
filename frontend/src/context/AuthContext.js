@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { profileNeedsOnboarding } from '../utils/profileOnboarding';
+import StartupScreen from '../components/ui/StartupScreen';
 
 export const AuthContext = createContext();
 
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {loading ? <StartupScreen /> : children}
     </AuthContext.Provider>
   );
 };

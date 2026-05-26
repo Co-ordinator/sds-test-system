@@ -71,8 +71,8 @@ const Login = () => {
       eyebrow="Secure sign in"
       title="Welcome back"
       subtitle="Access your SDS dashboard, continue your assessment, or review your results."
-      panelTitle="Continue your career assessment"
-      panelText="Sign in to resume your questionnaire, view your Holland Code profile, and download your career guidance report."
+      panelTitle="Access Your Account"
+      panelText="Sign in to access your SDS dashboard, continue your assessment, view results, and manage your profile."
     >
       {showResendModal && (
         <ResendVerification onClose={() => setShowResendModal(false)} defaultEmail={verificationEmail} />
