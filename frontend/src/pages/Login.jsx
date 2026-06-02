@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
+import { AlertCircle, Eye, EyeOff, LockKeyhole, LogIn, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
 import { GOV } from '../theme/government';
@@ -41,6 +42,11 @@ const Login = () => {
         }
 
         const userRole = user.role;
+        if (userRole === 'Test Taker' && profileNeedsOnboarding(user)) {
+          navigate('/onboarding');
+          return;
+        }
+
         switch (userRole) {
           case 'System Administrator':
             navigate('/admin/dashboard');

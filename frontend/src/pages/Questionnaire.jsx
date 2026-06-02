@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2 } from 'lucide-react';
 import api from '../services/api';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
@@ -348,7 +348,7 @@ const buildQuestionReviewItems = (questionsBySection = {}) => {
   ));
 };
 
-const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
+const SkippedQuestionsPanel = ({ skippedQuestions, onJump }) => {
   if (!skippedQuestions.length) return null;
 
   return (
@@ -358,7 +358,7 @@ const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
       role="complementary"
       aria-label="Skipped questions review panel"
     >
-      <div className="flex items-start justify-between gap-2 border-b px-3 py-2.5" style={{ borderColor: GOV.borderLight }}>
+      <div className="flex items-start gap-2 border-b px-3 py-2.5" style={{ borderColor: GOV.borderLight }}>
         <div className="flex min-w-0 items-start gap-2">
           <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: '#fef3c7' }}>
             <AlertTriangle className="h-3.5 w-3.5" style={{ color: '#d97706' }} aria-hidden />
@@ -370,15 +370,6 @@ const SkippedQuestionsPanel = ({ skippedQuestions, onJump, onClose }) => {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md p-1 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-          style={{ color: GOV.textMuted }}
-          aria-label="Close skipped questions panel"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
       </div>
 
       <div className="max-h-[calc(34vh-5.75rem)] overflow-y-auto px-2.5 py-2.5 md:max-h-[calc(100vh-13rem)]">
@@ -972,7 +963,7 @@ const Questionnaire = () => {
             to={dashboardPath}
             className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
             style={{ color: GOV.textMuted }}
-            aria-label="Go to dashboard"
+            aria-label={getAriaLabel('Go to dashboard', 'Questionnaire navigation')}
           >
             <LayoutDashboard className="w-4 h-4 shrink-0" aria-hidden />
             Dashboard
@@ -982,7 +973,7 @@ const Questionnaire = () => {
             onClick={() => navigate('/glossary')}
             className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
             style={{ color: GOV.textMuted }}
-            aria-label="Open SDS glossary"
+            aria-label={getAriaLabel('Open SDS glossary', 'Questionnaire navigation')}
           >
             <HelpCircle className="w-4 h-4 shrink-0" aria-hidden />
             Glossary
@@ -1027,7 +1018,6 @@ const Questionnaire = () => {
         <SkippedQuestionsPanel
           skippedQuestions={skippedQuestions}
           onJump={jumpToSkippedQuestion}
-          onClose={() => setShowSkippedReviewPanel(false)}
         />
       )}
 
@@ -1358,7 +1348,17 @@ const Questionnaire = () => {
       })()}
 
       {!isPaused && !sectionTransition && !shouldShowInitialSectionIntro && !shouldShowResumeSectionIntro && currentQuestion && (
-        <div className="bg-white rounded-md p-6 md:p-8">
+        <div
+          className="bg-white rounded-md p-6 md:p-8"
+          style={highContrast ? { border: '2px solid #000000' } : undefined}
+        >
+          {screenReaderMode && (
+            <p className="sr-only" aria-live="polite">
+              {`Section ${currentSectionMeta?.num}, ${currentSectionMeta?.label}. Question ${currentQuestionIndex + 1} of ${sectionQuestions.length}. ${
+                isSelfEstimates ? 'Select a rating from one to six.' : 'Select yes or no.'
+              }`}
+            </p>
+          )}
           <div className="mb-6">
             <div
               className="mb-4 rounded-md border bg-white px-4 py-3"
@@ -1424,6 +1424,7 @@ const Questionnaire = () => {
                   style={currentAnswer === value
                     ? { borderColor: GOV.blue, backgroundColor: GOV.blueLightAlt, color: GOV.blue }
                     : { borderColor: GOV.borderLight, backgroundColor: '#ffffff', color: GOV.text }}
+                  aria-label={getAriaLabel(`Select rating ${value}: ${label}`, `Question ${currentQuestionIndex + 1}`)}
                 >
                   <span className="font-mono mr-3 text-base">{value}</span><span className="text-base">{label}</span>
                 </button>
@@ -1447,6 +1448,7 @@ const Questionnaire = () => {
                   style={currentAnswer === opt
                     ? { borderColor: GOV.blue, backgroundColor: GOV.blueLightAlt, color: GOV.blue }
                     : { borderColor: GOV.borderLight, backgroundColor: '#ffffff', color: GOV.text }}
+                  aria-label={getAriaLabel(`Select ${opt}`, `Question ${currentQuestionIndex + 1}`)}
                 >
                   {opt}
                 </button>
@@ -1482,6 +1484,7 @@ const Questionnaire = () => {
               disabled={saving || isAdvancing || submitting || (currentSectionIndex === 0 && currentQuestionIndex === 0)}
               className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none border bg-white`}
               style={{ color: GOV.textMuted, borderColor: GOV.border }}
+              aria-label={getAriaLabel('Go to previous question', 'Question navigation')}
             >
               <ChevronLeft className="w-4 h-4 shrink-0" aria-hidden /> Back
             </button>
@@ -1494,6 +1497,7 @@ const Questionnaire = () => {
                   disabled={saving || isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: '#16a34a' }}
+                  aria-label={getAriaLabel('Submit completed test', 'Question navigation')}
                 >
                   {submitting ? 'Submitting...' : 'Submit test'}
                 </button>
@@ -1505,6 +1509,7 @@ const Questionnaire = () => {
                   disabled={!canAdvance || saving || isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: GOV.blue }}
+                  aria-label={getAriaLabel('Go to next question', 'Question navigation')}
                 >
                   Next <ChevronRight className="w-4 h-4 shrink-0" aria-hidden />
                 </button>

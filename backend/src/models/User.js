@@ -271,6 +271,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'password_reset_expires'
     },
+    passwordResetSentAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'password_reset_sent_at'
+    },
     refreshToken: {
       type: DataTypes.STRING,
       allowNull: true,
@@ -472,7 +477,10 @@ module.exports = (sequelize, DataTypes) => {
     delete values.password;
     delete values.passwordResetToken;
     delete values.passwordResetExpires;
+    delete values.passwordResetSentAt;
     delete values.emailVerificationToken;
+    delete values.emailVerificationSentAt;
+    delete values.emailVerificationExpires;
     delete values.refreshToken;
     delete values.refreshTokenExpires;
     delete values.previousRefreshToken;

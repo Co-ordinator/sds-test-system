@@ -71,13 +71,13 @@ export default function Profile() {
     ).optional().allow('', null).label('Employment Status'),
     currentOccupation: Joi.string().optional().allow('', null).label('Current Occupation'),
     preferredLanguage: Joi.string().valid('en', 'ss').optional().allow('', null).label('Preferred Language'),
-    requiresAccessibility: Joi.boolean().optional().allow(null).label('Requires Accessibility'),
-    accessibilityNeeds: Joi.object().pattern(/.*/, Joi.any()).optional().allow(null).label('Accessibility Needs')
+    requiresAccessibility: Joi.boolean().optional().allow(null).label('Requires Accessibility')
   });
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
     resolver: joiResolver(schema)
   });
+  const selectedRegion = watch('region');
 
   const handlePhoneNumberChange = (e) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
@@ -105,7 +105,6 @@ export default function Profile() {
             currentOccupation: user.currentOccupation || '',
             preferredLanguage: user.preferredLanguage || 'en',
             requiresAccessibility: Boolean(user.requiresAccessibility),
-            accessibilityNeeds: user.accessibilityNeeds || {},
           });
           const rawPhone = (user.phoneNumber || '').toString();
           const parsedPhoneDigits = rawPhone.startsWith('+268')
@@ -122,7 +121,7 @@ export default function Profile() {
             occupationId: user.currentOccupationId || null,
           });
           setInstitution({
-            name: user.currentInstitution || '',
+            name: user.currentInstitution || user.institution?.name || '',
             institutionId: user.institutionId || null,
           });
           setDistrict(user.district || '');
@@ -258,7 +257,6 @@ export default function Profile() {
       currentOccupationId: occupation.occupationId || null,
       preferredLanguage: data.preferredLanguage || 'en',
       requiresAccessibility: Boolean(data.requiresAccessibility),
-      accessibilityNeeds: data.accessibilityNeeds || {},
       phoneNumber: normalizedPhone,
       ...(isProfessional ? {
         workplaceName: normalizeText(workplace.name),
@@ -385,6 +383,7 @@ export default function Profile() {
   const FieldError = ({ error }) =>
     error ? <p className="mt-1" style={{ color: GOV.error, fontSize: '0.75rem' }}>{error.message}</p> : null;
 
+  const regionField = register('region');
   const role = authUser?.role || userData?.role || 'Test Taker';
   const rc = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
   const backTo = role === 'System Administrator' || role === 'Test Administrator' ? '/admin/dashboard' : '/dashboard';
@@ -467,7 +466,11 @@ export default function Profile() {
               <div>
                 <FieldLabel>Region</FieldLabel>
                 <select
-                  {...register('region')}
+                  {...regionField}
+                  onChange={(e) => {
+                    regionField.onChange(e);
+                    setDistrict('');
+                  }}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.region ? errorInputStyle : {}) }}
                 >
@@ -485,6 +488,7 @@ export default function Profile() {
                 <DistrictSearchInput
                   value={district}
                   onChange={(name) => setDistrict(name)}
+                  region={selectedRegion}
                   placeholder="Search for district or town..."
                   error={!!errors.district}
                 />
@@ -621,7 +625,7 @@ export default function Profile() {
           {/* Accessibility Settings Section */}
           <SectionCard icon={Settings} title="Accessibility Settings">
             <p className={`${TYPO.bodySmall} mb-4`} style={{ color: GOV.textMuted }}>
-              Customize your experience with accessibility options. These settings are saved locally and will apply across all pages.
+              Customize your experience with accessibility options. These settings apply across pages and sync to your profile.
             </p>
             <button
               type="button"

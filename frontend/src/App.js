@@ -1,8 +1,8 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { PermissionProvider } from './context/PermissionContext';
-import { AccessibilityProvider } from './context/AccessibilityContext';
+import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -42,12 +42,62 @@ import Help from './pages/Help';
 import GlossaryPage from './pages/GlossaryPage';
 import './index.css';
 
+const ROUTE_LABELS = [
+  { match: (path) => path === '/', label: 'Home' },
+  { match: (path) => path === '/help', label: 'Help center' },
+  { match: (path) => path === '/login', label: 'Login' },
+  { match: (path) => path === '/register', label: 'Registration' },
+  { match: (path) => path === '/registration-success', label: 'Email verification' },
+  { match: (path) => path === '/forgot-password', label: 'Forgot password' },
+  { match: (path) => path.startsWith('/reset-password'), label: 'Reset password' },
+  { match: (path) => path.startsWith('/verify-email'), label: 'Verify email' },
+  { match: (path) => path === '/onboarding', label: 'Onboarding' },
+  { match: (path) => path === '/change-password', label: 'Change password' },
+  { match: (path) => path === '/dashboard', label: 'Test taker dashboard' },
+  { match: (path) => path === '/questionnaire-intro', label: 'Questionnaire introduction' },
+  { match: (path) => path === '/questionnaire', label: 'Questionnaire' },
+  { match: (path) => path === '/test-complete', label: 'Test completion' },
+  { match: (path) => path === '/results', label: 'Results' },
+  { match: (path) => path === '/profile', label: 'Profile' },
+  { match: (path) => path === '/glossary', label: 'Glossary' },
+  { match: (path) => path === '/accessibility', label: 'Accessibility settings' },
+  { match: (path) => path === '/admin/dashboard' || path === '/admin', label: 'Admin dashboard' },
+  { match: (path) => path.startsWith('/admin/results'), label: 'Admin results' },
+  { match: (path) => path.startsWith('/admin/reports'), label: 'Admin reports' },
+  { match: (path) => path.startsWith('/admin/audit'), label: 'Admin audit log' },
+  { match: (path) => path.startsWith('/admin/notifications'), label: 'Admin notifications' },
+  { match: (path) => path.startsWith('/admin/settings'), label: 'Admin settings' },
+  { match: (path) => path.startsWith('/admin/users'), label: 'Admin users' },
+  { match: (path) => path.startsWith('/admin/institutions'), label: 'Admin institutions' },
+  { match: (path) => path.startsWith('/admin/occupations'), label: 'Admin occupations' },
+  { match: (path) => path.startsWith('/test-administrator') || path.startsWith('/counselor'), label: 'Test administrator dashboard' },
+];
+
+const resolveRouteLabel = (pathname) => {
+  const match = ROUTE_LABELS.find((route) => route.match(pathname));
+  return match?.label || 'Page';
+};
+
+function AccessibilityRouteAnnouncer() {
+  const location = useLocation();
+  const { screenReaderMode, announce } = useAccessibility();
+
+  useEffect(() => {
+    if (!screenReaderMode) return;
+    const label = resolveRouteLabel(location.pathname);
+    announce(`Navigated to ${label}`);
+  }, [announce, location.pathname, screenReaderMode]);
+
+  return null;
+}
+
 function App() {
   return (
     <Router>
       <AuthProvider>
       <PermissionProvider>
       <AccessibilityProvider>
+        <AccessibilityRouteAnnouncer />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />

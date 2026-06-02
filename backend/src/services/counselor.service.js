@@ -6,6 +6,25 @@ const { bulkCreateStudents } = require('./studentImport.service');
 const scoringService = require('./scoring.service');
 const { BadRequestError, NotFoundError, ForbiddenError } = require('../utils/errors/appError');
 
+const generateTempCardPassword = () => {
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*';
+  let pwd = '';
+  for (let i = 0; i < 10; i += 1) {
+    pwd += charset.charAt(Math.floor(Math.random() * charset.length));
+  }
+  if (!/[A-Z]/.test(pwd)) pwd = `A${pwd.slice(1)}`;
+  if (!/[a-z]/.test(pwd)) pwd = `${pwd.slice(0, 1)}a${pwd.slice(2)}`;
+  if (!/\d/.test(pwd)) pwd = `${pwd.slice(0, pwd.length - 1)}7`;
+  if (!/[!@#$%^&*]/.test(pwd)) pwd = `${pwd.slice(0, pwd.length - 2)}!${pwd.slice(-1)}`;
+  return pwd;
+};
+
+const normalizeGradeToken = (value) => {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+};
+
 const resolveInstitutionId = (actor, queryParam) => {
   if (!actor) {
     return null;
@@ -150,12 +169,17 @@ module.exports = {
     }
 
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
-    if (!institutionId) {
-      throw new BadRequestError('Institution is required for student import', 'INSTITUTION_REQUIRED');
+    // System Administrators may import without an explicit scope and rely on
+    // institution names provided in the CSV rows.
+    if (!institutionId && actor?.role !== 'System Administrator') {
+      throw new BadRequestError(
+        'Institution is required for student import. Assign this test administrator to an institution or provide institutionId.',
+        'INSTITUTION_REQUIRED'
+      );
     }
 
-    const importReport = await bulkCreateStudents(csvData, institutionId);
-    return { importReport, actor, institutionId };
+    const importReport = await bulkCreateStudents(csvData, institutionId || null);
+    return { importReport, actor, institutionId: institutionId || null };
   },
 
   deleteStudent: async (actorId, studentId) => {
@@ -249,9 +273,6 @@ module.exports = {
     if (!institution) throw new NotFoundError('Institution not found', 'INSTITUTION_NOT_FOUND');
 
     const where = { institutionId, role: 'Test Taker' };
-    if (grade) {
-      where[Op.or] = [{ gradeLevel: grade }, { className: grade }];
-    }
 
     const students = await User.findAll({
       where,
@@ -263,9 +284,38 @@ module.exports = {
       order: [['lastName', 'ASC'], ['firstName', 'ASC']]
     });
 
-    if (students.length === 0) throw new NotFoundError('No students found for these criteria', 'NO_STUDENTS_FOUND');
+    const filteredStudents = grade
+      ? students.filter((student) => {
+          const wanted = normalizeGradeToken(grade);
+          const userGrade = normalizeGradeToken(student.gradeLevel || '');
+          const userClass = normalizeGradeToken(student.className || '');
+          const schoolGrade = normalizeGradeToken(student.schoolStudent?.grade || '');
+          const schoolClass = normalizeGradeToken(student.schoolStudent?.className || '');
+          return [userGrade, userClass, schoolGrade, schoolClass].some((value) => value && value === wanted);
+        })
+      : students;
 
-    return { students, institution, actor };
+    if (filteredStudents.length === 0) {
+      throw new NotFoundError('No students found for these criteria', 'NO_STUDENTS_FOUND');
+    }
+
+    const transaction = await User.sequelize.transaction();
+    try {
+      for (const student of filteredStudents) {
+        const tempPassword = generateTempCardPassword();
+        await student.update({
+          password: tempPassword,
+          mustChangePassword: true
+        }, { transaction });
+        student.setDataValue('loginCardPassword', tempPassword);
+      }
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+
+    return { students: filteredStudents, institution, actor };
   },
 
   markLoginCardsPrinted: async (students) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useId } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
@@ -75,9 +75,13 @@ const BREADCRUMB_MAP = {
 export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hideBreadcrumbs = false }) {
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
+  const { getAriaLabel } = useAccessibility();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const userMenuId = useId();
+  const mobileNavId = useId();
+
   const role = user?.role || 'Test Taker';
   const isTestTaker = role === 'Test Taker';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
@@ -86,6 +90,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
     : role === 'Test Administrator'
       ? '/test-administrator'
       : '/dashboard';
+
   const navLinks = useMemo(() => {
     if (isAdminLike) {
       if (role === 'Test Administrator') {
@@ -94,15 +99,15 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
       const adminDashboardPath = role === 'Test Administrator' ? '/test-administrator' : '/admin/dashboard';
       return ADMIN_NAV_LINKS
         .map((link) => (link.label === 'Dashboard' ? { ...link, to: adminDashboardPath } : link))
-        .filter(link => !link.permission || hasPermission(link.permission));
+        .filter((link) => !link.permission || hasPermission(link.permission));
     }
     return TEST_TAKER_NAV;
   }, [isAdminLike, hasPermission, role]);
+
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const notificationCount = useNotificationCount(isAdminLike);
   const roleLabel = ROLE_LABELS[role] || 'Test Taker';
   const roleColor = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
-
   const breadcrumbs = customBreadcrumbs || BREADCRUMB_MAP[location.pathname] || [];
 
   const isActive = useCallback((to) => {
@@ -441,9 +446,8 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
         </>
       )}
 
-      {/* ── Breadcrumbs ── */}
       {!hideBreadcrumbs && breadcrumbs.length > 0 && (
-        <div className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }}>
+        <nav className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }} aria-label="Breadcrumb">
           <div className="max-w-7xl mx-auto px-6 py-1.5 flex items-center gap-1">
             {breadcrumbs.map((crumb, idx) => (
               <React.Fragment key={idx}>
@@ -458,11 +462,14 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
               </React.Fragment>
             ))}
           </div>
-        </div>
+        </nav>
       )}
 
-      {/* ── Page content ── */}
-      <main className="flex-1 overflow-auto custom-scrollbar">
+      <main className="flex-1 overflow-auto custom-scrollbar" id="main-content" role="main">
+        <div id="glossary-section" className="sr-only">
+          <h2>Glossary Navigation</h2>
+          <p>Open the glossary page from navigation for complete SDS term explanations.</p>
+        </div>
         {children}
       </main>
     </div>

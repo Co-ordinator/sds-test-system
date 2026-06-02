@@ -5,6 +5,7 @@ import { GOV, TYPO } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import { useStudentManagement } from '../hooks/useStudentManagement';
 import { useInstitutions } from '../hooks/useInstitutions';
+import { useAccessibility } from '../context/AccessibilityContext';
 import CounselorOverviewPanel from '../features/counselor/CounselorOverviewPanel';
 import CounselorStudentsPanel from '../features/counselor/CounselorStudentsPanel';
 import CounselorImportPanel from '../features/counselor/CounselorImportPanel';
@@ -21,6 +22,7 @@ const TABS = [
 
 const TestAdministratorDashboard = () => {
   const { user } = useAuth();
+  const { announce } = useAccessibility();
   const [activeTab, setActiveTab] = useState('overview');
   const [instFilter, setInstFilter] = useState('');
 
@@ -57,6 +59,12 @@ const TestAdministratorDashboard = () => {
     const q = search.toLowerCase();
     return students.filter(s => `${s.firstName} ${s.lastName} ${s.email || ''}`.toLowerCase().includes(q));
   }, [students, search]);
+
+  const handleTabChange = (tab) => {
+    if (tab.id === activeTab) return;
+    setActiveTab(tab.id);
+    announce(`Switched to ${tab.label} tab`);
+  };
 
   return (
     <AppShell>
@@ -109,12 +117,15 @@ const TestAdministratorDashboard = () => {
         )}
 
         {/* Tab nav */}
-        <div className="w-full flex gap-1 p-1 rounded-full" style={{ backgroundColor: GOV.blueLightAlt }}>
+        <div className="w-full flex gap-1 p-1 rounded-full" style={{ backgroundColor: GOV.blueLightAlt }} role="tablist" aria-label="Test administrator sections">
           {TABS.map(({ id, label, Icon: TabIcon }) => (
             <button key={id} type="button"
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold transition-colors rounded-full"
               style={activeTab === id ? { backgroundColor: '#ffffff', color: GOV.blue } : { color: GOV.textMuted }}
-              onClick={() => setActiveTab(id)}
+              onClick={() => handleTabChange({ id, label })}
+              role="tab"
+              aria-selected={activeTab === id}
+              aria-label={`${label} tab`}
             >
               <TabIcon className="w-3.5 h-3.5" /> {label}
             </button>

@@ -13,6 +13,84 @@
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        @keyframes sdsStartupSpin {
+          to { transform: rotate(360deg); }
+        }
+        .sds-startup {
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: #eef5fb;
+          font-family: Arial, Helvetica, sans-serif;
+          box-sizing: border-box;
+        }
+        .sds-startup-content {
+          text-align: center;
+        }
+        .sds-startup-mark {
+          position: relative;
+          width: 112px;
+          height: 112px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .sds-startup-ring,
+        .sds-startup-ring-spin {
+          position: absolute;
+          inset: 0;
+          border-radius: 999px;
+          box-sizing: border-box;
+        }
+        .sds-startup-ring {
+          border: 2px solid #cfe3f2;
+        }
+        .sds-startup-ring-spin {
+          border: 2px solid transparent;
+          border-top-color: #2d8bc4;
+          border-right-color: #ffeb3b;
+          border-bottom-color: #f44336;
+          animation: sdsStartupSpin 1s linear infinite;
+        }
+        .sds-startup-logo {
+          position: relative;
+          width: 64px;
+          height: 48px;
+          object-fit: contain;
+        }
+        .sds-startup-title {
+          margin: 16px 0 0;
+          color: #111827;
+          font-size: 14px;
+          font-weight: 700;
+        }
+        .sds-startup-subtitle {
+          margin: 6px 0 0;
+          color: #6b7280;
+          font-size: 12px;
+          font-weight: 600;
+        }
+      </style>
+      <div class="sds-startup" role="status" aria-live="polite">
+        <div class="sds-startup-content">
+          <div class="sds-startup-mark">
+            <div class="sds-startup-ring"></div>
+            <div class="sds-startup-ring-spin"></div>
+            <img
+              class="sds-startup-logo"
+              src="%PUBLIC_URL%/letterhead.png"
+              alt="Government of Eswatini - Ministry of Labour and Social Security"
+            />
+          </div>
+          <p class="sds-startup-title">Loading SDS Test System...</p>
+          <p class="sds-startup-subtitle">Please wait while we prepare your session.</p>
+        </div>
+      </div>
+    </div>
   </body>
 </html>

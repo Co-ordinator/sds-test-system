@@ -17,7 +17,7 @@ const AccessibilityDialog = ({ isOpen, onClose, className = '' }) => {
 
   const dialogRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const firstFocusableRef = useRef(null);
+  const previouslyFocusedElementRef = useRef(null);
 
   const fontSizes = [
     { value: 'small', label: 'Small', size: '14px', description: 'Default text size' },
@@ -62,6 +62,8 @@ const AccessibilityDialog = ({ isOpen, onClose, className = '' }) => {
   // Set up focus trap and keyboard listeners
   useEffect(() => {
     if (isOpen && dialogRef.current) {
+      previouslyFocusedElementRef.current = document.activeElement;
+
       // Focus first focusable element when dialog opens
       const focusableElements = dialogRef.current.querySelectorAll(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -84,10 +86,10 @@ const AccessibilityDialog = ({ isOpen, onClose, className = '' }) => {
     }
   }, [isOpen, trapFocus, handleEscape]);
 
-  // Return focus to trigger element when dialog closes
+  // Return focus to the previously-focused element when dialog closes.
   useEffect(() => {
-    if (!isOpen && closeButtonRef.current) {
-      closeButtonRef.current.focus();
+    if (!isOpen && previouslyFocusedElementRef.current && typeof previouslyFocusedElementRef.current.focus === 'function') {
+      previouslyFocusedElementRef.current.focus();
     }
   }, [isOpen]);
 
@@ -146,7 +148,7 @@ const AccessibilityDialog = ({ isOpen, onClose, className = '' }) => {
             </div>
             
             <button
-              ref={firstFocusableRef}
+              ref={closeButtonRef}
               type="button"
               onClick={onClose}
               className="p-2 rounded-md transition-colors focus:outline-none focus:ring-2"

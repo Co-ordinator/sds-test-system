@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const path = require('path');
+const dns = require('dns');
 const logger = require('../utils/logger');
 
 const parsePositiveInt = (value, fallback) => {
@@ -8,21 +9,29 @@ const parsePositiveInt = (value, fallback) => {
 };
 
 const smtpPort = Number.parseInt(process.env.SMTP_PORT, 10);
+const smtpHost = process.env.SMTP_HOST;
 const maxConnections = parsePositiveInt(process.env.SMTP_MAX_CONNECTIONS, 1);
 const maxMessages = parsePositiveInt(process.env.SMTP_MAX_MESSAGES, 100);
-const retryAttempts = parsePositiveInt(process.env.SMTP_RETRY_ATTEMPTS, 3);
-const retryBaseDelayMs = parsePositiveInt(process.env.SMTP_RETRY_BASE_DELAY_MS, 1500);
-const retryMaxDelayMs = parsePositiveInt(process.env.SMTP_RETRY_MAX_DELAY_MS, 8000);
+const retryAttempts = parsePositiveInt(process.env.SMTP_RETRY_ATTEMPTS, 2);
+const retryBaseDelayMs = parsePositiveInt(process.env.SMTP_RETRY_BASE_DELAY_MS, 1000);
+const retryMaxDelayMs = parsePositiveInt(process.env.SMTP_RETRY_MAX_DELAY_MS, 3000);
 const queueIntervalMs = parsePositiveInt(process.env.SMTP_QUEUE_INTERVAL_MS, 250);
+const dnsTimeoutMs = parsePositiveInt(process.env.SMTP_DNS_TIMEOUT_MS, 5000);
+const connectionTimeoutMs = parsePositiveInt(process.env.SMTP_CONNECTION_TIMEOUT_MS, 10000);
+const greetingTimeoutMs = parsePositiveInt(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
+const socketTimeoutMs = parsePositiveInt(process.env.SMTP_SOCKET_TIMEOUT_MS, 20000);
 
 // Create transporter
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
+  host: smtpHost,
   port: Number.isFinite(smtpPort) ? smtpPort : undefined,
   secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
   pool: true,
   maxConnections,
   maxMessages,
+  connectionTimeout: connectionTimeoutMs,
+  greetingTimeout: greetingTimeoutMs,
+  socketTimeout: socketTimeoutMs,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
@@ -34,6 +43,29 @@ let hbsInitPromise = null;
 let emailQueue = Promise.resolve();
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const resolveSmtpHost = async () => {
+  if (!smtpHost) {
+    const error = new Error('SMTP_HOST is not configured');
+    error.code = 'SMTP_HOST_MISSING';
+    throw error;
+  }
+
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error(`SMTP host lookup timed out after ${dnsTimeoutMs}ms: ${smtpHost}`);
+      error.code = 'EDNSTIMEOUT';
+      reject(error);
+    }, dnsTimeoutMs);
+  });
+
+  try {
+    await Promise.race([dns.promises.lookup(smtpHost), timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
 
 const enqueueEmail = (task) => {
   const run = emailQueue.then(async () => {
@@ -70,7 +102,7 @@ const isRetryableEmailError = (error) => {
   if (responseCode >= 400 && responseCode < 500) return true;
 
   const errorCode = String(error?.code || '').toUpperCase();
-  if (['ECONNECTION', 'ECONNRESET', 'ECONNREFUSED', 'ESOCKET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(errorCode)) {
+  if (['ECONNECTION', 'ECONNRESET', 'ECONNREFUSED', 'ESOCKET', 'ETIMEDOUT', 'EAI_AGAIN', 'EDNSTIMEOUT'].includes(errorCode)) {
     return true;
   }
 
@@ -88,6 +120,7 @@ const sendWithRetry = async (mailOptions) => {
 
   for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
     try {
+      await resolveSmtpHost();
       const info = await transporter.sendMail(mailOptions);
       return { success: true, messageId: info.messageId, attempts: attempt };
     } catch (error) {

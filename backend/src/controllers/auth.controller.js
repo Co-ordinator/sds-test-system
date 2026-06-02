@@ -90,7 +90,7 @@ const sendVerificationEmail = async (req, user, emailOtp, { subject, successDesc
     const delivery = await sendEmail({
       email: user.email,
       subject,
-      template: 'welcome-verify',
+      template: 'verify-email',
       context: {
         firstName: user.firstName || 'Student',
         lastName: user.lastName || '',
@@ -128,13 +128,18 @@ const sendVerificationEmail = async (req, user, emailOtp, { subject, successDesc
   }
 };
 
+const queueVerificationCodeEmail = (...args) => {
+  setImmediate(() => {
+    sendVerificationCodeEmail(...args).catch(() => {});
+  });
+};
+
 const register = async (req, res, next) => {
   try {
     const { user, emailOtp } = await authService.register(req.body);
     logger.info({ actionType: 'REGISTER', message: `User registered: ${maskEmailForLog(user.email)}`, req, details: { emailHint: maskEmailForLog(user.email), role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
 
-    let emailResult = { sent: false };
     if (user.email) {
       emailResult = await sendVerificationEmail(req, user, emailOtp, {
         subject: 'Welcome to SDS Test System - Verify Your Email',
@@ -145,15 +150,15 @@ const register = async (req, res, next) => {
       });
     }
 
-    const verificationEmailSent = Boolean(emailResult.sent);
     res.status(201).json({
       status: 'success',
       message: verificationEmailSent
         ? 'Account created. Enter the verification code we just emailed you to continue.'
         : 'Account created, but the verification code could not be sent right now. Please request a new code.',
       requiresEmailVerification: true,
-      verificationEmailSent,
-      emailDelivery: verificationEmailSent ? 'sent' : 'failed',
+      verificationEmailSent: true,
+      emailDelivery: 'queued',
+      resendAvailableInSeconds,
       data: {
         user: user.toJSON(),
         email: user.email,
@@ -168,7 +173,7 @@ const register = async (req, res, next) => {
   }
 };
 
-const verifyEmail = async (req, res, next) => {
+const verifyEmailOtp = async (req, res, next) => {
   try {
     const { user, token, refreshToken } = await authService.verifyEmail({
       email: req.body.email,
@@ -289,11 +294,12 @@ const forgotPassword = async (req, res, next) => {
 
     await sendEmail({
       email: user.email,
-      subject: 'Password Reset Request',
-      template: 'reset-password',
+      subject: 'Your SDS password reset code',
+      template: 'reset-password-otp',
       context: {
-        firstName: user.firstName || 'Student',
-        resetUrl
+        firstName: user.firstName || 'Test Taker',
+        verificationCode: resetOtp,
+        otpExpiresMinutes: RESET_OTP_EXPIRY_MINUTES
       }
     });
 
@@ -315,7 +321,7 @@ const forgotPassword = async (req, res, next) => {
       actionType: 'FORGOT_PASSWORD',
       message: `Password reset email sent to: ${maskEmailForLog(user.email)}`,
       req,
-      details: { userId: user.id, resetUrlBase }
+      details: { userId: user.id, resendAvailableInSeconds }
     });
 
     return res.status(200).json(genericResponse);
@@ -477,6 +483,7 @@ const resendVerificationEmail = async (req, res, next) => {
         emailVerificationResendWindowStartedAt: previousVerification.resendWindowStartedAt
       }).catch(() => {});
       throw new AppError('We could not send the verification code right now. Please wait a moment and try again.', {
+      throw new AppError('We could not send the verification code right now. Please wait a moment and try again.', {
         status: 503,
         code: 'EMAIL_DELIVERY_FAILED',
         expose: true
@@ -510,7 +517,9 @@ module.exports = {
   getMe,
   updateProfile,
   forgotPassword,
+  resetPasswordWithOtp,
   resetPassword,
+  verifyEmailOtp,
   verifyEmail,
   resendVerificationEmail,
   refreshToken,

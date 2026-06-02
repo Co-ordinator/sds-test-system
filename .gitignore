@@ -10,6 +10,7 @@ npm-debug.log*
 # Build outputs
 dist/
 build/
+.turbo/
 
 # IDEs
 .vscode/

@@ -7,6 +7,11 @@ import { GOV, MINISTRY_NAME } from '../theme/government';
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
+const inputClass = (hasError) =>
+  `h-11 w-full rounded-md border bg-white px-3 text-sm font-medium text-[#111827] shadow-sm outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#2d8bc4] focus:ring-2 focus:ring-[#2d8bc4]/15 ${
+    hasError ? 'border-[#fecaca] bg-[#fffafa]' : 'border-[#d8e1ea]'
+  }`;
+
 export default function Register() {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
@@ -33,6 +38,7 @@ export default function Register() {
         state: {
           email: verifiedEmail,
           verificationEmailSent,
+          resendAvailableInSeconds,
           message: response?.data?.message || ''
         }
       });
@@ -287,8 +293,8 @@ export default function Register() {
 
           </form>
         </div>
-      </div>
-    </OnboardingLayout>
+      </form>
+    </AuthShell>
   );
 }
 

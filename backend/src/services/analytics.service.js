@@ -47,6 +47,21 @@ const buildFilters = (query = {}) => {
   return { userWhere, institutionWhere, assessmentWhere, userInclude, assessmentInclude };
 };
 
+const buildInstitutionCatalogWhere = (query = {}) => {
+  const { institutionId, institutionType, region } = query;
+  const where = {};
+
+  if (institutionId) where.id = institutionId;
+  if (institutionType) where.type = institutionType;
+  if (region) {
+    where.region = institutionType === 'school'
+      ? region
+      : { [Op.in]: [region, 'multiple'] };
+  }
+
+  return where;
+};
+
 /**
  * Count users matching combined where + include constraints.
  */
@@ -183,7 +198,7 @@ const analyticsService = {
       attributes: [
         [Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt), 'month'],
         [Assessment.sequelize.fn('COUNT', assessmentId), 'total'],
-        [Assessment.sequelize.fn('SUM', Assessment.sequelize.literal("CASE WHEN status='completed' THEN 1 ELSE 0 END")), 'completed']
+        [Assessment.sequelize.fn('SUM', Assessment.sequelize.literal("CASE WHEN \"Assessment\".\"status\"='completed' THEN 1 ELSE 0 END")), 'completed']
       ],
       group: [Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt)],
       order: [[Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt), 'ASC']],
@@ -205,8 +220,8 @@ const analyticsService = {
     const [usersByRegion, assessmentsByRegion, completedByRegion, hollandByRegion, userTypeDistribution] = await Promise.all([
       User.findAll({
         where: userWhere, include: userInclude,
-        attributes: ['region', [fn('COUNT', col('User.id')), 'totalUsers']],
-        group: ['region'], raw: true
+        attributes: [[col('User.region'), 'region'], [fn('COUNT', col('User.id')), 'totalUsers']],
+        group: [col('User.region')], raw: true
       }),
       Assessment.findAll({
         where: assessmentWhere,
@@ -247,8 +262,8 @@ const analyticsService = {
       }),
       User.findAll({
         where: { ...userWhere, userType: userWhere.userType || { [Op.ne]: null } },
-        attributes: ['userType', [fn('COUNT', col('id')), 'count']],
-        group: ['userType'], raw: true
+        attributes: [[col('User.user_type'), 'userType'], [fn('COUNT', col('User.id')), 'count']],
+        group: [col('User.user_type')], raw: true
       })
     ]);
 
@@ -300,6 +315,17 @@ const analyticsService = {
   /* ── 5. Per-Institution Breakdown ───────────────────────────────────────── */
   getInstitutionBreakdown: async (query = {}) => {
     const { userWhere, institutionWhere, assessmentWhere } = buildFilters(query);
+    const catalogWhere = buildInstitutionCatalogWhere(query);
+    const catalogInstitutions = await Institution.findAll({
+      where: catalogWhere,
+      attributes: ['id', 'name', 'region', 'type'],
+      order: [['name', 'ASC']]
+    });
+    const catalogByType = catalogInstitutions.reduce((acc, institution) => {
+      const type = institution.type || 'other';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
     const institutionInclude = {
       model: Institution,
       as: 'institution',
@@ -322,6 +348,19 @@ const analyticsService = {
     });
 
     const institutionMap = {};
+    catalogInstitutions.forEach((institution) => {
+      institutionMap[institution.id] = {
+        institutionId: institution.id,
+        institutionName: institution.name,
+        region: institution.region || 'unknown',
+        type: institution.type || 'other',
+        userIds: new Set(),
+        totalAssessments: 0,
+        completedAssessments: 0,
+        codeCounts: {}
+      };
+    });
+
     assessments.forEach((assessment) => {
       const user = assessment.user || assessment.get?.('user');
       const institution = user?.institution || user?.get?.('institution');
@@ -366,7 +405,15 @@ const analyticsService = {
       })
       .sort((a, b) => b.totalAssessments - a.totalAssessments || a.institutionName.localeCompare(b.institutionName));
 
-    return { institutions: results };
+    return {
+      summary: {
+        totalInstitutions: catalogInstitutions.length,
+        byType: Object.entries(catalogByType)
+          .map(([type, count]) => ({ type, count }))
+          .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type))
+      },
+      institutions: results
+    };
   },
 
   /* ── 6. Career Knowledge Graph ──────────────────────────────────────────── */

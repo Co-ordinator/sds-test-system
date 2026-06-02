@@ -125,7 +125,7 @@ const AccessibilityPage = () => {
             Accessibility Settings
           </h1>
           <p className={`${TYPO.body} max-w-2xl mx-auto`} style={{ color: highContrast ? '#cccccc' : GOV.textMuted }}>
-            Customize your viewing experience with these accessibility options. These settings are saved locally and will apply across all pages of the SDS assessment system.
+            Customize your viewing experience with these accessibility options. These settings apply across all pages and are also synced to your user profile when signed in.
           </p>
         </div>
 
@@ -324,10 +324,10 @@ const AccessibilityPage = () => {
                 Additional Resources
               </h3>
               <ul className="space-y-2 text-sm" style={{ color: highContrast ? '#cccccc' : GOV.textMuted }}>
-                <li>• Settings are saved locally in your browser</li>
-                <li>• Changes apply immediately across all pages</li>
-                <li>• You can reset to default settings at any time</li>
-                <li>• These settings work alongside your browser's accessibility features</li>
+                <li>- Settings are saved locally in your browser</li>
+                <li>- Changes apply immediately across all pages</li>
+                <li>- You can reset to default settings at any time</li>
+                <li>- These settings work alongside your browser's accessibility features</li>
               </ul>
             </div>
           </div>

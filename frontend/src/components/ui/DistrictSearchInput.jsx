@@ -1,26 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, MapPin, X } from 'lucide-react';
 import { GOV, TYPO } from '../../theme/government';
-
-// Eswatini districts and their towns
-const DISTRICTS_DATA = {
-  hhohho: [
-    'Mbabane', 'Piggs Peak', 'Manzini (Nhlangano area)', 'Lobamba', 'Matsapha',
-    'Ezulwini', 'Malkerns', 'Motshane', 'Buhleni', 'Timphisini'
-  ],
-  manzini: [
-    'Manzini', 'Matsapha', 'Lavumisa', 'Big Bend', 'Malkerns', 'Ngwenya',
-    'Mhlambanyatsi', 'Kwaluseni', 'Sidvokodvo', 'Matsanjeni'
-  ],
-  lubombo: [
-    'Siteki', 'Big Bend', 'Lavumisa', 'Matsanjeni', 'Mhlume', 'Tshaneni',
-    'Dvokodvweni', 'Siphofaneni', 'Mpolonjeni', 'Nhlambeni'
-  ],
-  shiselweni: [
-    'Nhlangano', 'Hlatikhulu', 'Golgotha', 'Matsamo', 'Matsanjeni', 'Zombodze',
-    'Emvembili', 'Matsapha', 'Gege', 'Mavuso'
-  ]
-};
+import {
+  ESWATINI_TOWNS_BY_REGION,
+  REGION_FROM_BACKEND,
+  getTownsForRegion,
+  normalizeRegionKey,
+} from '../../data/eswatiniLocations';
 
 /**
  * DistrictSearchInput
@@ -29,6 +15,7 @@ const DISTRICTS_DATA = {
  *   value        - display string (district/town name)
  *   onChange(name) - called when selection changes
  *   placeholder  - input placeholder
+ *   region       - selected region, either display label or backend value
  *   inputClassName - extra class on the input
  *   error        - truthy to show error border
  */
@@ -36,6 +23,7 @@ export default function DistrictSearchInput({
   value = '',
   onChange,
   placeholder = 'Search for district or town...',
+  region = '',
   inputClassName = '',
   error = false,
 }) {
@@ -44,12 +32,10 @@ export default function DistrictSearchInput({
   const [results, setResults] = useState([]);
   const containerRef = useRef(null);
 
-  // Keep local query in sync when value prop changes externally (e.g. form reset)
   useEffect(() => {
     setQuery(value || '');
   }, [value]);
 
-  // Close on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
@@ -61,41 +47,55 @@ export default function DistrictSearchInput({
   }, []);
 
   const searchDistrictsAndTowns = useCallback((searchQuery) => {
-    if (!searchQuery || searchQuery.trim().length < 1) {
+    const regionKey = normalizeRegionKey(region);
+    const q = String(searchQuery || '').toLowerCase().trim();
+
+    if (!regionKey && q.length < 1) {
       setResults([]);
       return;
     }
 
-    const q = searchQuery.toLowerCase().trim();
+    const searchRegions = regionKey && ESWATINI_TOWNS_BY_REGION[regionKey]
+      ? [[regionKey, getTownsForRegion(regionKey)]]
+      : Object.entries(ESWATINI_TOWNS_BY_REGION).map(([key]) => [key, getTownsForRegion(key)]);
+
     const matches = [];
 
-    // Search districts
-    Object.keys(DISTRICTS_DATA).forEach(district => {
-      if (district.toLowerCase().includes(q)) {
-        matches.push({
-          type: 'district',
-          name: district.charAt(0).toUpperCase() + district.slice(1),
-          value: district
-        });
-      }
-    });
+    if (!regionKey) {
+      Object.keys(ESWATINI_TOWNS_BY_REGION).forEach((district) => {
+        const label = REGION_FROM_BACKEND[district] || district;
+        if (label.toLowerCase().includes(q)) {
+          matches.push({
+            type: 'district',
+            name: label,
+            value: district,
+          });
+        }
+      });
+    }
 
-    // Search towns within districts
-    Object.entries(DISTRICTS_DATA).forEach(([district, towns]) => {
-      towns.forEach(town => {
-        if (town.toLowerCase().includes(q)) {
+    searchRegions.forEach(([district, towns]) => {
+      towns.forEach((town) => {
+        if (!q || town.toLowerCase().includes(q)) {
           matches.push({
             type: 'town',
             name: town,
-            district: district.charAt(0).toUpperCase() + district.slice(1),
-            value: town
+            district: REGION_FROM_BACKEND[district] || district,
+            value: town,
           });
         }
       });
     });
 
-    // Sort by relevance (exact matches first, then alphabetical)
-    matches.sort((a, b) => {
+    const dedupedMatches = matches.filter((match, index, allMatches) => (
+      index === allMatches.findIndex((candidate) => (
+        candidate.type === match.type
+        && candidate.name.toLowerCase() === match.name.toLowerCase()
+        && candidate.district === match.district
+      ))
+    ));
+
+    dedupedMatches.sort((a, b) => {
       const aExact = a.name.toLowerCase() === q;
       const bExact = b.name.toLowerCase() === q;
       if (aExact && !bExact) return -1;
@@ -103,13 +103,13 @@ export default function DistrictSearchInput({
       return a.name.localeCompare(b.name);
     });
 
-    setResults(matches.slice(0, 10)); // Limit to 10 results
-  }, []);
+    setResults(dedupedMatches.slice(0, 10));
+  }, [region]);
 
   const handleInputChange = (e) => {
     const val = e.target.value;
     setQuery(val);
-    setOpen(val.trim().length > 0);
+    setOpen(val.trim().length > 0 || Boolean(normalizeRegionKey(region)));
     onChange(val);
     searchDistrictsAndTowns(val);
   };
@@ -140,7 +140,7 @@ export default function DistrictSearchInput({
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (query.trim()) {
+            if (query.trim() || normalizeRegionKey(region)) {
               setOpen(true);
               searchDistrictsAndTowns(query);
             }
@@ -164,15 +164,14 @@ export default function DistrictSearchInput({
         )}
       </div>
 
-      {/* Dropdown */}
       {open && (
         <ul
           className="absolute z-20 left-0 right-0 mt-0.5 py-0.5 rounded-md border overflow-auto max-h-48 bg-white shadow-sm"
           style={{ borderColor: GOV.border }}
         >
-          {query.trim().length > 0 && results.length === 0 && (
+          {results.length === 0 && (
             <li className={`px-3 py-2 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-              No district or town found. Try a different search term.
+              No town found for the selected region. Try another search term.
             </li>
           )}
           {results.map((result, index) => (
@@ -192,7 +191,7 @@ export default function DistrictSearchInput({
                     </span>
                   )}
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ backgroundColor: GOV.borderLight, color: GOV.textMuted }}>
-                    {result.type === 'district' ? 'District' : 'Town'}
+                    {result.type === 'district' ? 'Region' : 'Town'}
                   </span>
                 </span>
               </button>

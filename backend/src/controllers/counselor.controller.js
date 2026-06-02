@@ -110,6 +110,7 @@ const generateLoginCards = async (req, res, next) => {
       const x = MARGIN + col * (CARD_W + GAP_X);
       const y = MARGIN + row * (CARD_H + GAP_Y);
       const loginNumber = student.studentCode || student.username || '';
+      const loginPassword = student.get?.('loginCardPassword') || student.loginCardPassword || '';
       const studentNum = student.schoolStudent?.studentNumber || student.studentNumber || '';
       const grade = student.schoolStudent?.grade || student.gradeLevel || '';
       const className = student.schoolStudent?.className || student.className || '';
@@ -143,16 +144,18 @@ const generateLoginCards = async (req, res, next) => {
       doc.fontSize(7).fillColor('#374151').text('LOGIN DETAILS', x + 8, y + 63);
       doc.fontSize(9).fillColor('#111827').font('Helvetica-Bold')
         .text(`Login Number: ${loginNumber}`, x + 8, y + 73);
+      doc.fontSize(8).fillColor('#111827')
+        .text(`Password: ${loginPassword}`, x + 8, y + 84);
       doc.font('Helvetica').fontSize(8).fillColor('#111827')
-        .text(`Website:  careers.gov.sz`, x + 8, y + 86);
+        .text(`Website: careers.gov.sz`, x + 8, y + 94);
 
       // Instructions
       doc.fontSize(6).fillColor('#6b7280')
-        .text('1. Go to website and click Login', x + 8, y + 99)
-        .text('2. Enter your Login Number above', x + 8, y + 107)
-        .text('3. Use your printed password card', x + 8, y + 115)
-        .text('4. Complete the Career Test', x + 8, y + 123)
-        .text('5. Download your Career Report', x + 8, y + 131);
+        .text('1. Go to website and click Login', x + 8, y + 106)
+        .text('2. Enter your Login Number and Password above', x + 8, y + 114)
+        .text('3. Change password at first login', x + 8, y + 122)
+        .text('4. Complete the Career Test', x + 8, y + 130)
+        .text('5. Download your Career Report', x + 8, y + 138);
 
       // Login number barcode-style display
       doc.fontSize(6).fillColor('#9ca3af').text(`ID: ${loginNumber}`, x + 8, y + CARD_H - 14, { width: CARD_W - 16, align: 'right' });

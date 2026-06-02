@@ -43,6 +43,7 @@ router.post('/forgot-password', authLimiter, captchaRequired, validate(authValid
 // alias for any reset emails already in inboxes that point at the old URL.
 router.post('/reset-password', validate(authValidation.resetPasswordWithToken), authController.resetPassword);
 router.post('/reset-password/:token', validate(authValidation.resetPassword), authController.resetPassword);
+router.post('/reset-password-otp', authLimiter, validate(authValidation.resetPasswordWithOtp), authController.resetPasswordWithOtp);
 
 // Refresh token — rate-limited even though it requires a valid cookie, so a
 // stolen RT can't be replayed unbounded.

@@ -111,7 +111,7 @@ export default function Help() {
                       <li>Enter your 13-digit National ID number</li>
                       <li>Provide your email address and create a password</li>
                       <li>Agree to the data processing consent</li>
-                      <li>Check your email for verification link</li>
+                      <li>Check your email for verification code</li>
                       <li>Complete your profile during first login</li>
                     </ol>
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">

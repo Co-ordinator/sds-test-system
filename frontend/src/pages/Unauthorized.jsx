@@ -49,7 +49,7 @@ export default function Unauthorized() {
             </h1>
             <p className={`${TYPO.bodySmall} mb-4`} style={{ color: GOV.textMuted }}>
               {requiresVerification
-                ? 'Please verify your email address to access this page. Check your inbox for a verification link.'
+                ? 'Please verify your email address to access this page. Check your inbox for a verification code.'
                 : 'You do not have permission to view this page.'}
             </p>
             <div className="flex flex-col gap-2">
@@ -60,7 +60,7 @@ export default function Unauthorized() {
                   className={`py-2.5 px-4 rounded-md font-medium ${TYPO.bodySmall} text-white transition-opacity hover:opacity-95`}
                   style={{ backgroundColor: GOV.blue }}
                 >
-                  Resend verification email
+                  Resend verification code
                 </button>
               )}
               <button

@@ -7,6 +7,7 @@ import { analyticsService } from '../services/analyticsService';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 import FilterDialog from '../components/ui/FilterDialog';
+import { useAccessibility } from '../context/AccessibilityContext';
 import {
   RIASEC_LABELS, REGION_LABELS, INSTITUTION_TYPE_LABELS, USER_TYPE_LABELS
 } from '../features/analytics/analyticsConstants';
@@ -29,6 +30,12 @@ const EMPTY_FILTERS = {
 };
 
 const getHollandDisplayCode = (item) => item?.hollandCodeDisplay || item?.hollandCode || item?.holland_code || item?.code || '';
+const institutionMatchesFilterScope = (institution, filters) => {
+  if (!institution) return false;
+  if (filters.institutionType && institution.type !== filters.institutionType) return false;
+  if (filters.region && institution.region && ![filters.region, 'multiple'].includes(institution.region)) return false;
+  return true;
+};
 
 const QUICK_DATE_RANGES = [
   { key: '30d', label: 'Last 30 days', days: 30 },
@@ -37,6 +44,7 @@ const QUICK_DATE_RANGES = [
 ];
 
 export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) => {
+  const { announce } = useAccessibility();
   const hasDashboardOverview = typeof dashboardOverview === 'function';
   const [activeTab, setActiveTab] = useState(() => (hasDashboardOverview ? 'dashboard' : 'overview'));
   const [analytics, setAnalytics] = useState(null);
@@ -46,6 +54,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
   const [mapRegionalData, setMapRegionalData] = useState(null);
   const [kgData, setKgData] = useState(null);
   const [institutions, setInstitutions] = useState([]);
+  const [institutionBreakdown, setInstitutionBreakdown] = useState(null);
   const [loading, setLoading] = useState(true);
   const [segmentData, setSegmentData] = useState(null);
   const [pipelineData, setPipelineData] = useState(null);
@@ -70,6 +79,12 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
       : analyticsTabs;
   }, [hasDashboardOverview]);
 
+  const handleTabChange = (tab) => {
+    if (tab.key === activeTab) return;
+    setActiveTab(tab.key);
+    announce(`Switched to ${tab.label} tab`);
+  };
+
   const hasActiveFilters = useMemo(
     () => Object.values(filters).some(Boolean),
     [filters]
@@ -85,6 +100,19 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
     },
     [institutions]
   );
+
+  const filteredInstitutionOptions = useMemo(
+    () => institutions.filter((institution) => institutionMatchesFilterScope(institution, filters)),
+    [filters, institutions]
+  );
+
+  useEffect(() => {
+    if (!filters.institutionId || institutions.length === 0) return;
+    const selected = institutions.find((institution) => String(institution.id) === String(filters.institutionId));
+    if (selected && !institutionMatchesFilterScope(selected, filters)) {
+      setFilters(prev => ({ ...prev, institutionId: '' }));
+    }
+  }, [filters, institutions]);
 
   const activeFilterChips = useMemo(() => {
     const chips = [];
@@ -135,7 +163,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
         const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
         const mapFilters = { ...f };
         delete mapFilters.region;
-        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData, pipeline, kg, unfilteredRegionalData] = await Promise.all([
+        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData, pipeline, kg, institutionData, unfilteredRegionalData] = await Promise.all([
           analyticsService.getOverview(f),
           analyticsService.getHollandDistribution(f),
           analyticsService.getTrend(f),
@@ -144,6 +172,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
           analyticsService.getFundingAlignment(f),
           analyticsService.getSkillsPipeline(f),
           analyticsService.getKnowledgeGraph(f),
+          analyticsService.getInstitutionBreakdown(f),
           filters.region ? analyticsService.getRegional(mapFilters) : Promise.resolve(null),
         ]);
         setAnalytics(overviewData);
@@ -155,8 +184,9 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
         setFundingAlignmentData(fundingData);
         setPipelineData(pipeline);
         setKgData(kg);
+        setInstitutionBreakdown(institutionData);
       } catch {
-        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setMapRegionalData(null); setSegmentData(null); setFundingAlignmentData(null); setPipelineData(null); setKgData(null);
+        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setMapRegionalData(null); setSegmentData(null); setFundingAlignmentData(null); setPipelineData(null); setKgData(null); setInstitutionBreakdown(null);
       } finally { setLoading(false); }
     };
     setLoading(true); fetchAll();
@@ -230,9 +260,9 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
               <Download className="w-3.5 h-3.5" /> PDF
             </button>
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-2">
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 pb-2" role="tablist" aria-label="Analytics sections">
             {tabs.map(tab => (
-              <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)}
+              <button key={tab.key} type="button" onClick={() => handleTabChange(tab)}
                 className={`px-3 py-2 rounded-md text-xs whitespace-nowrap transition-colors border ${activeTab === tab.key ? 'font-bold' : 'font-medium'}`}
                 style={activeTab === tab.key
                   ? {
@@ -244,7 +274,11 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                     color: GOV.textMuted,
                     backgroundColor: 'transparent',
                     borderColor: 'transparent'
-                  }}>
+                  }}
+                role="tab"
+                aria-selected={activeTab === tab.key}
+                aria-label={`${tab.label} tab`}
+              >
                 {tab.label}
               </button>
             ))}
@@ -338,7 +372,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 style={{ color: GOV.text }}
               >
                 <option value="">All Institutions</option>
-                {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                {filteredInstitutionOptions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
             </div>
             <div>
@@ -414,6 +448,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
               hollandDist,
               trend,
               institutions,
+              institutionBreakdown,
               filters,
               refreshKey,
               onRegionSelect: (region) => setFilters(prev => ({ ...prev, region })),

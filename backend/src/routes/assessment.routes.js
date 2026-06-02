@@ -1,5 +1,5 @@
 const express = require('express');
-const { verifyToken, restrictTo } = require('../middleware/authentication.middleware');
+const { verifyToken, restrictTo, requireCompletedOnboarding } = require('../middleware/authentication.middleware');
 const AssessmentController = require('../controllers/assessment.controller');
 const CertificateController = require('../controllers/certificate.controller');
 
@@ -9,6 +9,7 @@ const router = express.Router();
 // This is intentional - the test-taking workflow is role-specific by design
 // Permissions are for administrative operations, not for test taker actions
 router.use(verifyToken);
+router.use(requireCompletedOnboarding);
 
 router.post('/', restrictTo('Test Taker'), AssessmentController.startAssessment);
 router.get('/', restrictTo('Test Taker'), AssessmentController.listMyAssessments);

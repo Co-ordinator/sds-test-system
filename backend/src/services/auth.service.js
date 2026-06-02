@@ -8,6 +8,17 @@ const { generateStudentCode } = require('../utils/generateStudentCode');
 const { hashValue, safeCompareHex } = require('../utils/security.util');
 const { BadRequestError, ConflictError, AuthError, NotFoundError } = require('../utils/errors/appError');
 
+const parsePositiveInt = (value, fallback) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const EMAIL_OTP_LENGTH = 6;
+const EMAIL_OTP_TTL_MS = parsePositiveInt(process.env.EMAIL_OTP_TTL_MS, 10 * 60 * 1000);
+const EMAIL_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.EMAIL_OTP_RESEND_COOLDOWN_MS, 2 * 60 * 1000);
+const PASSWORD_RESET_OTP_TTL_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_TTL_MS, EMAIL_OTP_TTL_MS);
+const PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS, EMAIL_OTP_RESEND_COOLDOWN_MS);
+
 // Grade level text → education_levels.level mapping
 const GRADE_TO_EDUCATION_LEVEL = {
   'Form 3 (Junior Secondary)': 1,
@@ -19,19 +30,29 @@ const GRADE_TO_EDUCATION_LEVEL = {
 };
 
 /** All required onboarding fields captured for Test Takers (no placeholder names — use onboarding_completed flag). */
+const hasOnboardingText = (value) => String(value ?? '').trim() !== '';
+const hasOnboardingNumber = (value) => value !== null && value !== undefined && String(value).trim() !== '';
+
 function computeTestTakerOnboardingComplete(u) {
   if (!u || u.role !== 'Test Taker') return true;
-  const fn = (u.firstName || '').trim();
-  const ln = (u.lastName || '').trim();
-  if (!fn || !ln) return false;
+  if (!hasOnboardingText(u.firstName) || !hasOnboardingText(u.lastName)) return false;
+  if (!u.gender) return false;
   if (!u.userType) return false;
   if (!u.region) return false;
-  if (!((u.district || '').trim())) return false;
+  if (!hasOnboardingText(u.district)) return false;
+  if (!hasOnboardingText(u.address)) return false;
+  if (!u.preferredLanguage) return false;
+  if (!hasOnboardingText(u.gradeLevel)) return false;
+
   if (u.userType === 'Professional') {
-    return !!(((u.workplaceName || '').trim()) || u.workplaceInstitutionId);
+    const hasWorkplace = hasOnboardingText(u.workplaceName) || !!u.workplaceInstitutionId;
+    const hasOccupation = hasOnboardingText(u.currentOccupation) || !!u.currentOccupationId;
+    return hasWorkplace && hasOccupation && hasOnboardingNumber(u.yearsExperience);
   }
   if (u.userType === 'High School Student' || u.userType === 'University Student') {
-    return !!(((u.currentInstitution || '').trim()) || u.institutionId);
+    const hasInstitution = hasOnboardingText(u.currentInstitution) || !!u.institutionId;
+    if (u.userType === 'High School Student') return hasInstitution;
+    return hasInstitution && hasOnboardingText(u.degreeProgram) && hasOnboardingNumber(u.yearOfStudy);
   }
   return true;
 }
@@ -263,6 +284,51 @@ module.exports = {
     return { user, token, refreshToken };
   },
 
+  verifyEmailOtp: async ({ email, code }) => {
+    if (!email?.trim()) {
+      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    }
+    if (!code?.trim()) {
+      throw new BadRequestError('Verification code is required', 'OTP_REQUIRED');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      throw new BadRequestError('Verification code must be 6 digits', 'INVALID_OTP_FORMAT');
+    }
+
+    const user = await User.findOne({
+      where: { email: { [Op.iLike]: cleanEmail } }
+    });
+
+    if (!user) {
+      throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
+    }
+
+    if (user.isEmailVerified) {
+      const { token, refreshToken } = await issueAuthTokens(user);
+      return { user, token, refreshToken, alreadyVerified: true };
+    }
+
+    if (!user.emailVerificationToken || !user.emailVerificationExpires || user.emailVerificationExpires <= new Date()) {
+      throw new BadRequestError('Verification code has expired. Request a new code and try again.', 'OTP_EXPIRED');
+    }
+
+    if (hashToken(cleanCode) !== user.emailVerificationToken) {
+      throw new BadRequestError('Incorrect verification code. Please check and try again.', 'INVALID_OTP');
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    user.emailVerificationSentAt = null;
+    await user.save();
+
+    const { token, refreshToken } = await issueAuthTokens(user);
+    return { user, token, refreshToken, alreadyVerified: false };
+  },
+
   /* ─── Login ───────────────────────────────────────────────────────────── */
   login: async (identifier, password) => {
     if (!identifier || !password) {
@@ -352,7 +418,10 @@ module.exports = {
     const { Permission } = require('../models');
     const user = await User.findByPk(userId, {
       attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken'] },
-      include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
+      include: [
+        { model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } },
+        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region', 'district'], required: false }
+      ]
     });
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
     return user;
@@ -496,9 +565,66 @@ module.exports = {
       return { shouldSend: false, user: null, resetToken: null };
     }
 
-    const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    user.passwordResetToken = hashToken(resetToken);
-    user.passwordResetExpires = new Date(Date.now() + 3600000);
+    const now = Date.now();
+    if (user.passwordResetSentAt) {
+      const resendAvailableAtMs = new Date(user.passwordResetSentAt).getTime() + PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS;
+      const remainingMs = resendAvailableAtMs - now;
+      if (remainingMs > 0) {
+        const cooldownError = new AuthError(
+          `Please wait ${toSeconds(remainingMs)} seconds before requesting another reset code.`,
+          'PASSWORD_RESET_OTP_RESEND_COOLDOWN',
+          429
+        );
+        cooldownError.resendAvailableInSeconds = toSeconds(remainingMs);
+        throw cooldownError;
+      }
+    }
+
+    const resetRecord = createPasswordResetRecord();
+    user.passwordResetToken = resetRecord.otpHash;
+    user.passwordResetExpires = resetRecord.expiresAt;
+    user.passwordResetSentAt = resetRecord.sentAt;
+    await user.save();
+
+    return {
+      user,
+      resetOtp: resetRecord.otpCode,
+      resendAvailableInSeconds: toSeconds(PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS),
+      otpExpiresInSeconds: toSeconds(PASSWORD_RESET_OTP_TTL_MS)
+    };
+  },
+
+  resetPasswordWithOtp: async ({ email, code, newPassword }) => {
+    if (!email?.trim()) {
+      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    }
+    if (!code?.trim()) {
+      throw new BadRequestError('Reset code is required', 'OTP_REQUIRED');
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      throw new BadRequestError('Reset code must be 6 digits', 'INVALID_OTP_FORMAT');
+    }
+
+    const user = await User.findOne({
+      where: { email: { [Op.iLike]: cleanEmail } }
+    });
+
+    if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
+    if (!user.passwordResetToken || !user.passwordResetExpires || user.passwordResetExpires <= new Date()) {
+      throw new BadRequestError('Reset code has expired. Request a new code and try again.', 'OTP_EXPIRED');
+    }
+
+    if (hashToken(cleanCode) !== user.passwordResetToken) {
+      throw new BadRequestError('Incorrect reset code. Please check and try again.', 'INVALID_OTP');
+    }
+
+    user.password = newPassword;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.passwordResetSentAt = null;
     await user.save();
 
     return { shouldSend: true, user, resetToken };

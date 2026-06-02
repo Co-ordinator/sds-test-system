@@ -23,6 +23,9 @@ export default function InstitutionSearchInput({
   inputClassName = '',
   error = false,
   allowClear = true,
+  region = '',
+  type = '',
+  userType = '',
 }) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -54,14 +57,19 @@ export default function InstitutionSearchInput({
     }
     setLoading(true);
     try {
-      const res = await api.get(`/api/v1/institutions/search?q=${encodeURIComponent(q.trim())}`);
+      const params = new URLSearchParams({ q: q.trim() });
+      if (region) params.set('region', String(region).toLowerCase());
+      if (type) params.set('type', String(type).toLowerCase());
+      if (userType) params.set('userType', String(userType).toLowerCase());
+
+      const res = await api.get(`/api/v1/institutions/search?${params.toString()}`);
       setResults(res.data?.data?.institutions || []);
     } catch {
       setResults([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [region, type, userType]);
 
   const handleInputChange = (e) => {
     const val = e.target.value;

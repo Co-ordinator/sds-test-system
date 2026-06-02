@@ -1,7 +1,20 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import OnboardingLayout from '../components/onboarding/OnboardingLayout';
-import { GOV, MINISTRY_NAME, KINGDOM } from '../theme/government';
+import {
+  ArrowRight,
+  BarChart3,
+  BookOpenCheck,
+  ClipboardList,
+  GraduationCap,
+  HelpCircle,
+  Lock,
+  Map,
+  ShieldCheck,
+  Target,
+  UserPlus,
+} from 'lucide-react';
+import { LOGO_ALT } from '../theme/government';
+import { useAccessibility } from '../context/AccessibilityContext';
 
 /**
  * Break out of OnboardingLayout `max-w-5xl` so background paints edge-to-edge.
@@ -16,32 +29,62 @@ const fullBleed = {
 };
 
 export default function Home() {
-  return (
-    <OnboardingLayout wide>
-      <div
-        className="mx-0 mt-0 w-full mb-[-1.5rem] sm:mb-[-2rem]"
-        style={{ fontFamily: 'sans-serif', color: GOV.text, background: 'transparent', padding: 0 }}
-      >
+  const { getAriaLabel } = useAccessibility();
+  const year = new Date().getFullYear();
 
-      {/* ── HERO ── */}
-      <section
-        className="mx-auto flex w-full max-w-[1100px] flex-col items-stretch gap-6 px-4 pb-0 pt-10 min-h-0 sm:gap-8 sm:px-6 sm:pt-12 lg:min-h-[min(520px,52vh)] lg:flex-row lg:justify-between lg:gap-8 lg:px-12 lg:pt-16"
-      >
-        <div className="w-full max-w-none shrink-0 self-center lg:max-w-[420px] lg:self-center">
-          <h1
-            className="mb-3 text-[1.65rem] font-extrabold leading-tight sm:text-[1.85rem] lg:text-[2.2rem]"
-            style={{ color: GOV.text }}
-          >
-            Welcome to the Self-Directed Search (SDS)
-          </h1>
-          <p className="mb-8 text-[0.9rem] leading-relaxed sm:text-[0.92rem]" style={{ color: GOV.textMuted }}>
-            The Self-Directed Search (SDS) is a structured interest inventory: it records your preferences across standard occupational themes and produces a profile used to align brief guidance with your results and to support career planning.
-          </p>
-          <Link to="/register" style={{ ...btnPrimary, display: 'inline-block', textDecoration: 'none', textAlign: 'center' }}>
-            Register an account
-          </Link>
+  return (
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-[#f4f9fc] text-[#111827]">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
+      <header className="sticky top-0 z-40 border-b border-[#d8e7f1] bg-white/96 shadow-sm backdrop-blur" role="banner">
+        <div className="mx-auto max-w-[92rem] px-3 py-3 sm:px-5 lg:px-6 lg:py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+            <div className="flex min-w-0 items-center gap-2.5 text-left sm:gap-4">
+              <div className="flex h-14 w-24 shrink-0 items-center justify-center rounded-md border border-[#d8e7f1] bg-white px-1.5 shadow-sm sm:h-[4.75rem] sm:w-[14.5rem] sm:border-0 sm:px-0 sm:shadow-none lg:w-[19rem]">
+                <img
+                  src="/letterhead.png"
+                  alt={LOGO_ALT}
+                  className="h-11 w-full object-contain sm:h-[4.25rem] lg:h-[4.75rem]"
+                />
+              </div>
+              <div className="hidden h-16 w-1.5 shrink-0 overflow-hidden rounded-full sm:block">
+                <div className="h-1/3 bg-[#3b82c4]" />
+                <div className="h-1/6 bg-[#ffeb3b]" />
+                <div className="h-1/3 bg-[#f44336]" />
+                <div className="h-1/6 bg-[#ffeb3b]" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-wide text-[#2d8bc4] sm:text-[11px]">
+                  Government of Eswatini
+                </p>
+                <h1 className="mt-0.5 text-[0.95rem] font-extrabold leading-[1.05] text-[#07183d] sm:text-2xl lg:text-[30px] xl:whitespace-nowrap xl:text-[34px]">
+                  <span className="block sm:inline">Ministry of Labor:</span>{' '}
+                  <span className="block whitespace-nowrap text-[#07183d] sm:inline">
+                    Measurement and Testing Unit
+                  </span>
+                </h1>
+                <p className="mt-1 text-[10px] font-semibold leading-snug text-[#4b5563] sm:text-sm">
+                  SDS National Career Assessment System
+                </p>
+              </div>
+            </div>
+
+            <Link
+              to="/help"
+              className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-[#d8e1ea] bg-white px-4 text-sm font-semibold text-[#2d8bc4] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#7fbeeb] hover:bg-[#f7fbff] hover:shadow-md sm:h-10 sm:w-fit lg:self-auto"
+              aria-label={getAriaLabel('Open help page', 'Home actions')}
+            >
+              <HelpCircle className="h-4 w-4" aria-hidden="true" />
+              Learn more
+            </Link>
+          </div>
         </div>
-        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-end lg:max-w-none lg:flex-[1_1_480px] lg:items-end">
+      </header>
+
+      <main id="main-content" className="flex flex-1 flex-col" role="main">
+        <section className="relative isolate overflow-hidden bg-[#07183d] lg:hidden">
           <img
             src="/hero-group.png"
             alt=""
@@ -99,69 +142,132 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS ── */}
-      <section className="mx-auto flex w-full max-w-[1100px] flex-col items-stretch gap-8 px-4 py-10 sm:gap-10 sm:px-6 sm:py-12 lg:flex-row lg:items-start lg:gap-12 lg:px-8 lg:py-16">
-        <div className="flex shrink-0 justify-center lg:basis-[320px] lg:justify-start">
+        <section className="relative isolate hidden flex-1 overflow-hidden bg-[#07183d] lg:flex">
           <img
-            src="/chair-person.png"
-            alt=""
-            className="h-auto w-full max-w-[280px] object-contain sm:max-w-[320px] lg:max-w-[320px]"
+            src="/landing-assessment-testing.jpg"
+            alt="Pencil marking an assessment answer sheet"
+            className="absolute inset-0 -z-20 h-full w-full object-cover opacity-80"
           />
-        </div>
-        <div className="min-w-0 w-full flex-1">
-          <h2 style={{ fontWeight: 800, fontSize: '1.5rem', margin: '0 0 2rem', color: GOV.text }}>How the system operates</h2>
-          {[
-            {
-              active: true,
-              title: 'Assess',
-              desc: 'Sign in and complete the Self-Directed Search assessment through your authenticated account.',
-            },
-            {
-              active: false,
-              title: 'Review',
-              desc: 'Examine your profile output and the explanatory resources supplied within the platform.',
-            },
-            {
-              active: false,
-              title: 'Proceed',
-              desc: 'Apply the information, in conjunction with institutional guidance or qualified advisers as applicable, to support career planning.',
-            },
-          ].map((item, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{
-                width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-                background: item.active ? GOV.blue : GOV.border,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginTop: '2px',
-              }}>
-                {item.active && (
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M2 7l3.5 3.5L12 4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
+          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#07183d] via-[#07183d]/86 to-[#c83232]/28" />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#07183d]/92 via-[#07183d]/18 to-[#edf6fc]/10" />
+          <div className="absolute inset-x-0 top-0 flex h-1.5">
+            <div className="flex-1 bg-[#3b82c4]" />
+            <div className="w-20 bg-[#ffeb3b]" />
+            <div className="w-28 bg-[#f44336]" />
+            <div className="w-20 bg-[#ffeb3b]" />
+            <div className="flex-1 bg-[#3b82c4]" />
+          </div>
+
+          <div className="mx-auto grid w-full max-w-[92rem] flex-1 justify-items-start gap-6 px-4 py-8 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_350px] lg:items-center lg:justify-items-stretch lg:gap-8 lg:py-12 xl:py-16 2xl:max-w-[104rem]">
+            <div className="min-w-0 max-w-[21.75rem] sm:max-w-4xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white backdrop-blur">
+                  Official portal
+                </span>
+                <span className="rounded-full border border-[#ffeb3b] bg-[#ffeb3b] px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#4b3b00]">
+                  National career assessment
+                </span>
               </div>
-              <div>
-                <p style={{ fontWeight: 700, fontSize: '0.95rem', margin: '0 0 0.3rem', color: GOV.text }}>{item.title}</p>
-                {item.desc && <p style={{ fontSize: '0.82rem', color: GOV.textMuted, margin: 0, lineHeight: 1.5 }}>{item.desc}</p>}
+
+              <h2 className="mt-5 max-w-full break-words text-[2rem] font-extrabold leading-[1.04] text-white sm:mt-6 sm:text-5xl sm:leading-[1.02] lg:max-w-4xl lg:text-[66px]">
+                <span className="block sm:inline">Self-Directed Search</span>{' '}
+                <span className="block sm:inline">(SDS)</span>
+              </h2>
+              <p className="mt-4 max-w-full text-[0.95rem] font-bold leading-6 text-[#d9efff] sm:max-w-3xl sm:text-2xl sm:leading-8">
+                Career guidance for informed education and work decisions.
+              </p>
+              <p className="mt-4 max-w-full text-[0.82rem] font-medium leading-6 text-white/90 sm:mt-5 sm:max-w-3xl sm:text-lg sm:leading-7">
+                SDS helps learners and professionals understand their interests, abilities, and preferred work activities. The assessment produces a Holland Code profile that supports practical career and education planning.
+              </p>
+
+              <div className="mt-6 flex w-full max-w-xl flex-col gap-3 sm:mt-8 sm:flex-row">
+                <Link
+                  to="/login"
+                  className="group inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md bg-[#2d8bc4] px-5 text-sm font-bold text-white shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#256b9a] hover:shadow-xl sm:h-12"
+                >
+                  <Lock className="h-4 w-4" aria-hidden="true" />
+                  Login
+                  <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
+                </Link>
+                <Link
+                  to="/register"
+                  className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-md border border-white/75 bg-white px-5 text-sm font-bold text-[#086fcf] shadow-lg shadow-black/20 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] hover:shadow-xl sm:h-12"
+                >
+                  <UserPlus className="h-4 w-4" aria-hidden="true" />
+                  Register
+                </Link>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ── FOOTER ── */}
-      <footer style={{ ...fullBleed, background: '#fff', borderTop: `1px solid ${GOV.border}` }}>
-        <div className="mx-auto max-w-[1100px] px-4 py-5 sm:px-6 lg:px-8">
-          <p style={{
-            textAlign: 'center',
-            fontSize: '0.75rem',
-            color: GOV.textHint,
-            lineHeight: 1.5,
-            margin: 0,
-          }}>
-            © {new Date().getFullYear()} {KINGDOM}. {MINISTRY_NAME}. All rights reserved.
-          </p>
-        </div>
+            <aside
+              className="w-full max-w-[21.75rem] rounded-xl border border-white/25 bg-white/[0.13] p-3 text-white shadow-2xl shadow-black/20 backdrop-blur-xl ring-1 ring-white/10 sm:max-w-none sm:p-4 lg:self-center"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-[#ffeb3b]">How it works</p>
+                  <h2 className="mt-1 text-lg font-extrabold text-white sm:text-xl">Four simple steps</h2>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-[#ffeb3b] ring-1 ring-white/20 sm:h-10 sm:w-10">
+                  <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5">
+                {steps.map(({ number, title, description, Icon }) => (
+                  <div
+                    key={number}
+                    className="group flex gap-3 rounded-md border border-white/20 bg-gradient-to-r from-[#07183d] via-[#0b214c] to-[#112f64] p-2.5 shadow-sm shadow-black/30 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#ffeb3b]/70 hover:from-[#0a1d49] hover:via-[#0e2859] hover:to-[#173a78] hover:shadow-md sm:p-3"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-[#ffeb3b] ring-1 ring-white/20 transition-colors duration-200 group-hover:bg-[#ffeb3b] group-hover:text-[#07183d]">
+                      <Icon className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-extrabold text-[#ffeb3b]">{number}</span>
+                        <h3 className="text-sm font-extrabold text-white">{title}</h3>
+                      </div>
+                      <p className="mt-0.5 text-xs leading-5 text-white/80">{description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+
+            <div className="hidden gap-3 md:grid md:grid-cols-3 lg:col-span-2">
+              {heroHighlights.map(({ title, text, Icon }) => (
+                <div
+                  key={title}
+                  className="group border border-white/20 bg-white/[0.11] p-4 text-white shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-1 hover:border-[#ffeb3b]/70 hover:bg-white/[0.16]"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-white/10 text-[#ffeb3b] ring-1 ring-white/20 transition-colors duration-200 group-hover:bg-[#ffeb3b] group-hover:text-[#07183d]">
+                      <Icon className="h-5 w-5" strokeWidth={1.9} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold">{title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-white/80">{text}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="bg-[#333b4c] px-6 py-3 text-center text-xs font-normal text-white" role="contentinfo">
+        <p>
+          &copy; {year} All rights reserved. SDS Career Assessment System{' '}
+          <span className="font-bold text-[#f44336]">|</span> Powered By:{' '}
+          <a
+            href="https://datamatics.co.sz"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-white underline-offset-4 transition-colors hover:text-[#7fbeeb] hover:underline"
+          >
+            Datamatics Eswatini
+          </a>
+        </p>
       </footer>
 
       </div>

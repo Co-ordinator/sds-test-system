@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.16.0] - 2026-05-26
+
+### Added - Branded startup loading screen
+
+- Added a clean branded startup screen with the ministry letterhead logo and rotating tricolor ring.
+- Added a static loader in `frontend/public/index.html` so users see immediate feedback before React mounts.
+- Added `StartupScreen.jsx` and wired it into `AuthContext` so the app no longer renders blank during the initial session check.
+
+### Changed - Login wording
+
+- Renamed the login panel from "Continue your career assessment" to "Access Your Account".
+- Updated the login helper copy to reflect account, dashboard, assessment, results, and profile access.
+
+### Changed - Region and town selection
+
+- Added shared Eswatini region/town data in `frontend/src/data/eswatiniLocations.js`.
+- Updated onboarding Town / City suggestions to cascade from the selected region.
+- Updated profile District / Town suggestions to use the same region-aware filtering.
+
+### Deployment Notes
+
+- No database migration or seed step is required.
+- Rebuild and redeploy the frontend to apply the startup loader and cascading location filtering.
+
+---
+
 ## [2.15.0] - 2026-04-20
 
 ### Added - New permission modules
