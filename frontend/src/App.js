@@ -7,10 +7,9 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import RegistrationSuccess from './pages/RegistrationSuccess';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import VerifyEmail from './pages/VerifyEmail';
+import VerifyOtp from './pages/VerifyOtp';
 import Questionnaire from './pages/Questionnaire';
 import QuestionnaireIntro from './pages/QuestionnaireIntro';
 import TestCompletion from './pages/TestCompletion';
@@ -54,11 +53,12 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/help" element={<Help />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/registration-success" element={<RegistrationSuccess />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/verify-email/:token" element={<VerifyEmail />} />
+          <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/verify-email" element={<Navigate to="/verify-otp" replace />} />
+          <Route path="/verify-email/:token" element={<Navigate to="/verify-otp" replace />} />
           <Route path="/onboarding" element={
             <ProtectedRoute allowedRoles={['Test Taker']}>
               <Onboarding />

@@ -88,7 +88,7 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sitek
                 value={institutionId}
                 onChange={(e) => setInstitutionId(e.target.value)}
                 className="form-control w-full text-sm"
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 <option value="">Use institution from CSV rows</option>
                 {institutions.map((institution) => (

@@ -164,7 +164,7 @@ const AdminInstitutionsPanel = () => {
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
         <input
           className="form-control-with-icon pl-7 text-xs w-40"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
           placeholder="Search…"
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -282,12 +282,12 @@ const AdminInstitutionsPanel = () => {
             <form className="flex-1 overflow-y-auto p-5 space-y-3" onSubmit={async (e) => { await handleCreate(e); setShowCreateDialog(false); }}>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Name *</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newInst.name} onChange={e => setNewInst({ ...newInst, name: e.target.value })} required />
+                <input className="form-control" style={{ color: GOV.text }} value={newInst.name} onChange={e => setNewInst({ ...newInst, name: e.target.value })} required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Type</label>
-                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newInst.type} onChange={e => setNewInst({ ...newInst, type: e.target.value })}>
+                  <select className="form-control" style={{ color: GOV.text }} value={newInst.type} onChange={e => setNewInst({ ...newInst, type: e.target.value })}>
                     <option value="school">School</option>
                     <option value="college">College</option>
                     <option value="tvet">TVET</option>
@@ -298,7 +298,7 @@ const AdminInstitutionsPanel = () => {
                 </div>
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Region</label>
-                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newInst.region} onChange={e => setNewInst({ ...newInst, region: e.target.value })}>
+                  <select className="form-control" style={{ color: GOV.text }} value={newInst.region} onChange={e => setNewInst({ ...newInst, region: e.target.value })}>
                     <option value="hhohho">Hhohho</option>
                     <option value="manzini">Manzini</option>
                     <option value="lubombo">Lubombo</option>
@@ -332,7 +332,7 @@ const AdminInstitutionsPanel = () => {
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Name</label>
               <input
                 className="form-control"
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
                 value={editingInst.name || ''}
                 onChange={e => setEditingInst({ ...editingInst, name: e.target.value })}
               />
@@ -342,7 +342,7 @@ const AdminInstitutionsPanel = () => {
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Type</label>
                 <select
                   className="form-control"
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                   value={editingInst.type}
                   onChange={e => setEditingInst({ ...editingInst, type: e.target.value })}
                 >
@@ -358,7 +358,7 @@ const AdminInstitutionsPanel = () => {
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Region</label>
                 <select
                   className="form-control"
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                   value={editingInst.region || ''}
                   onChange={e => setEditingInst({ ...editingInst, region: e.target.value })}
                 >

@@ -2,17 +2,31 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import ResendVerification from '../components/auth/ResendVerification';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
-import { GOV, TYPO } from '../theme/government';
+import { GOV } from '../theme/government';
+
+const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [serverError, setServerError] = useState('');
-  const [showResendModal, setShowResendModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
+
+  const goToVerifyOtp = (identifier) => {
+    const looksLikeEmail = typeof identifier === 'string' && EMAIL_REGEX.test(identifier.trim());
+    const email = looksLikeEmail ? identifier.trim().toLowerCase() : '';
+    if (email) {
+      try { sessionStorage.setItem('pendingVerificationEmail', email); } catch (_) {}
+    }
+    navigate('/verify-otp', {
+      state: email
+        ? { email, fromLogin: true, message: 'Your account is not verified yet. Enter the verification code we sent you — if your previous code expired, request a new one below.' }
+        : { fromLogin: true }
+    });
+  };
 
   const onSubmit = async (data) => {
     setServerError('');
@@ -21,7 +35,6 @@ const Login = () => {
       const user = result?.data?.user ?? result?.user;
 
       if (result?.status === 'success' && user) {
-        // Check if user must change password
         if (result?.mustChangePassword) {
           navigate('/change-password');
           return;
@@ -39,82 +52,131 @@ const Login = () => {
             navigate('/dashboard');
         }
       } else if (result?.requiresVerification || result?.status === 403) {
-        setShowResendModal(true);
+        goToVerifyOtp(data.email);
       } else {
-        setServerError(result?.message || 'Login failed');
+        setServerError(result?.message || 'Sign-in was unsuccessful.');
       }
     } catch (err) {
       if (err.status === 403 && err.raw?.response?.data?.requiresVerification) {
-        setShowResendModal(true);
+        goToVerifyOtp(data.email);
       } else {
-        setServerError(err.uiMessage || 'Login failed');
+        setServerError(err.uiMessage || 'Sign-in was unsuccessful.');
       }
     }
   };
 
   return (
-    <OnboardingLayout>
-      {showResendModal && (
-        <ResendVerification onClose={() => setShowResendModal(false)} />
-      )}
-      <div className="w-full max-w-[420px] mx-auto">
+    <OnboardingLayout wide>
+      <div
+        className="mx-auto flex w-full min-w-0 max-w-[860px] min-h-0 flex-col overflow-hidden bg-white lg:min-h-[560px] lg:flex-row"
+        style={{ borderRadius: '0' }}
+      >
         <div
-          className="w-full bg-white rounded-md border overflow-hidden"
-          style={{ borderColor: GOV.border }}
+          className="hidden items-center justify-center bg-white p-8 lg:flex lg:grow-0 lg:shrink-0 lg:basis-[42%]"
         >
-          <div className="px-6 pt-6 pb-1">
-            <h1 className={`${TYPO.pageTitle} text-center`} style={{ color: GOV.text }}>
-              Login to the SDS Assessment System
+          <img
+            src="/auth.png"
+            alt=""
+            style={{ width: '100%', maxWidth: '320px', height: 'auto', objectFit: 'contain' }}
+          />
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-8">
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h1
+              className="text-[1.65rem] font-bold leading-tight sm:text-[1.85rem] lg:text-[2rem]"
+              style={{
+                lineHeight: 1.15,
+                color: GOV.text,
+                margin: 0,
+              }}
+            >
+              Sign in
             </h1>
-            <p className={`${TYPO.bodySmall} text-center mt-1`} style={{ color: GOV.textMuted }}>
-              Enter your credentials to securely access your account
+            <p
+              style={{
+                fontSize: '1.1rem',
+                fontWeight: 400,
+                color: GOV.textMuted,
+                margin: '0.15rem 0 0.5rem',
+                lineHeight: 1.35,
+              }}
+            >
+              Enter your registered email address or participant code and your password to continue.
+            </p>
+            <p
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: GOV.text,
+                margin: 0,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Account credentials
             </p>
           </div>
 
-          <form className="px-6 pt-5 pb-6 space-y-5" onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div>
-              <label htmlFor="login-identifier" className={`block ${TYPO.label} mb-2`} style={{ color: GOV.text }}>Email or Code</label>
-              <input
-                id="login-identifier"
-                {...register('email', {
-                  required: 'Email or Code is required',
-                })}
-                type="text"
-                autoComplete="username"
-                placeholder="your@email.com or SDS123456"
-                className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: errors.email ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.email && (
-                <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.email.message}</p>
-              )}
+              <div style={styles.inputWrapper(!!errors.email)}>
+                <span style={styles.inputIcon}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                </span>
+                <input
+                  id="login-identifier"
+                  {...register('email', {
+                    required: 'An email address or participant code is required.',
+                  })}
+                  type="text"
+                  autoComplete="username"
+                  placeholder="Email address or participant code"
+                  style={styles.input}
+                />
+              </div>
+              {errors.email && <p style={styles.errorText}>{errors.email.message}</p>}
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="login-password" className={`block ${TYPO.label}`} style={{ color: GOV.text }}>Password</label>
-                <Link to="/forgot-password" className={`${TYPO.hint} font-semibold underline hover:no-underline transition-all`} style={{ color: GOV.blue }}>
-                  Forgot password?
+              <div style={styles.inputWrapper(!!errors.password)}>
+                <span style={styles.inputIcon}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                </span>
+                <input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  {...register('password', { required: 'Password is required.' })}
+                  autoComplete="current-password"
+                  placeholder="Password"
+                  style={styles.input}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={styles.eyeBtn}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword
+                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                  }
+                </button>
+              </div>
+              {errors.password && <p style={styles.errorText}>{errors.password.message}</p>}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
+                <Link
+                  to="/forgot-password"
+                  style={{ fontSize: '0.7rem', color: GOV.blue, fontWeight: 600, textDecoration: 'none' }}
+                >
+                  Forgot your password?
                 </Link>
               </div>
-              <input
-                id="login-password"
-                type="password"
-                {...register('password', { required: 'Password is required' })}
-                autoComplete="current-password"
-                className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: errors.password ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.password && (
-                <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.password.message}</p>
-              )}
             </div>
 
             {serverError && (
-              <div
-                className={`rounded-md px-3 py-2 ${TYPO.hint}`}
-                style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}
-              >
+              <div style={{ background: GOV.errorBg, border: `1px solid ${GOV.errorBorder}`, borderRadius: '6px', padding: '8px 12px', fontSize: '0.75rem', color: GOV.error }}>
                 {serverError}
               </div>
             )}
@@ -122,25 +184,79 @@ const Login = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-              style={{ backgroundColor: GOV.blue }}
+              className="transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:hover:opacity-100"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: GOV.blue,
+                color: GOV.ministryBarText,
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                marginTop: '0.25rem',
+                letterSpacing: '0.02em',
+                outlineColor: GOV.blue,
+              }}
             >
-              {isSubmitting ? 'Logging in…' : 'Login'}
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
             </button>
-          </form>
 
-          <div className="px-6 pb-6 pt-0 text-center border-t" style={{ borderColor: GOV.borderLight }}>
-            <p className={TYPO.hint} style={{ color: GOV.textMuted }}>
-              Don&apos;t have an account?{' '}
-              <Link to="/register" className="font-medium hover:underline" style={{ color: GOV.blue }}>
-                Register
+            <p style={{ textAlign: 'center', fontSize: '0.75rem', color: GOV.textMuted, margin: '0.25rem 0 0' }}>
+              Not yet registered?{' '}
+              <Link to="/register" style={{ color: GOV.blue, fontWeight: 600, textDecoration: 'none' }}>
+                Create an account
               </Link>
             </p>
-          </div>
+          </form>
         </div>
       </div>
     </OnboardingLayout>
   );
+};
+
+const styles = {
+  inputWrapper: (hasError) => ({
+    display: 'flex',
+    alignItems: 'center',
+    background: GOV.borderLight,
+    border: `1px solid ${hasError ? GOV.error : GOV.border}`,
+    borderRadius: '6px',
+    padding: '0 10px',
+    height: '40px',
+  }),
+  inputIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    color: GOV.textHint,
+    marginRight: '8px',
+    flexShrink: 0,
+  },
+  input: {
+    flex: 1,
+    border: 'none',
+    background: 'transparent',
+    fontSize: '0.82rem',
+    color: GOV.text,
+    outline: 'none',
+    height: '100%',
+  },
+  eyeBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: GOV.textHint,
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 0 0 6px',
+  },
+  errorText: {
+    fontSize: '0.7rem',
+    color: GOV.error,
+    margin: '3px 0 0',
+  },
 };
 
 export default Login;

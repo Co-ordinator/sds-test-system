@@ -128,7 +128,7 @@ const Notifications = () => {
           </div>
           {actionTypes.length > 0 && (
             <select
-              className="border rounded-md px-3 py-1.5 text-xs bg-white" style={{ borderColor: GOV.border, color: GOV.text }}
+              className="border rounded-md px-3 py-1.5 text-xs bg-white" style={{ color: GOV.text }}
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value)}
             >

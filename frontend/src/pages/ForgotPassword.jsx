@@ -60,7 +60,8 @@ export default function ForgotPassword() {
                   {...register('identifier', { required: 'Required' })}
                   placeholder="your@email.com or SDS123456"
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: errors.identifier ? GOV.error : GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
+                  aria-invalid={errors.identifier ? 'true' : 'false'}
                 />
                 {errors.identifier && (
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.identifier.message}</p>

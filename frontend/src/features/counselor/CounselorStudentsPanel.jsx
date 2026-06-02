@@ -134,30 +134,30 @@ const CounselorStudentsPanel = ({ students, isAdmin, loading, error, onRefresh, 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>First Name</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingStudent.firstName || ''} onChange={e => setEditingStudent({ ...editingStudent, firstName: e.target.value })} />
+                <input className="form-control" style={{ color: GOV.text }} value={editingStudent.firstName || ''} onChange={e => setEditingStudent({ ...editingStudent, firstName: e.target.value })} />
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Last Name</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingStudent.lastName || ''} onChange={e => setEditingStudent({ ...editingStudent, lastName: e.target.value })} />
+                <input className="form-control" style={{ color: GOV.text }} value={editingStudent.lastName || ''} onChange={e => setEditingStudent({ ...editingStudent, lastName: e.target.value })} />
               </div>
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email</label>
-              <input type="email" className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingStudent.email || ''} onChange={e => setEditingStudent({ ...editingStudent, email: e.target.value })} />
+              <input type="email" className="form-control" style={{ color: GOV.text }} value={editingStudent.email || ''} onChange={e => setEditingStudent({ ...editingStudent, email: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Grade / Level</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingStudent.gradeLevel || ''} onChange={e => setEditingStudent({ ...editingStudent, gradeLevel: e.target.value })} placeholder="e.g. 11" />
+                <input className="form-control" style={{ color: GOV.text }} value={editingStudent.gradeLevel || ''} onChange={e => setEditingStudent({ ...editingStudent, gradeLevel: e.target.value })} placeholder="e.g. 11" />
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Class</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingStudent.className || ''} onChange={e => setEditingStudent({ ...editingStudent, className: e.target.value })} placeholder="e.g. A" />
+                <input className="form-control" style={{ color: GOV.text }} value={editingStudent.className || ''} onChange={e => setEditingStudent({ ...editingStudent, className: e.target.value })} placeholder="e.g. A" />
               </div>
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Student Number</label>
-              <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingStudent.studentNumber || ''} onChange={e => setEditingStudent({ ...editingStudent, studentNumber: e.target.value })} />
+              <input className="form-control" style={{ color: GOV.text }} value={editingStudent.studentNumber || ''} onChange={e => setEditingStudent({ ...editingStudent, studentNumber: e.target.value })} />
             </div>
             <div className="flex gap-2 pt-2">
               <button type="button" onClick={() => setEditingStudent(null)} className="flex-1 border rounded-md py-2 text-sm" style={{ borderColor: GOV.border, color: GOV.textMuted }}>Cancel</button>

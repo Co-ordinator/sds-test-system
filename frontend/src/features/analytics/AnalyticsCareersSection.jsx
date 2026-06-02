@@ -170,7 +170,7 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
         <input
           type="search"
           className="w-full rounded-md border pl-7 pr-2 py-1.5 text-xs"
-          style={{ borderColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
           placeholder="Search career or category…"
           value={careerSearch}
           onChange={(e) => setCareerSearch(e.target.value)}

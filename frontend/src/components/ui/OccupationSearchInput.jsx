@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Briefcase, X } from 'lucide-react';
 import api from '../../services/api';
 import { GOV, TYPO } from '../../theme/government';
@@ -97,8 +97,6 @@ export default function OccupationSearchInput({
     onChange('', null);
   };
 
-  const borderColor = error ? GOV.error : GOV.border;
-
   return (
     <div className="relative" ref={containerRef}>
       <div className="relative">
@@ -120,7 +118,8 @@ export default function OccupationSearchInput({
           placeholder={placeholder}
           autoComplete="off"
           className={`form-control-with-icon pl-8 pr-8 ${inputClassName}`}
-          style={{ borderBottomColor: borderColor, color: GOV.text }}
+          style={{ color: GOV.text, ...(error && { borderColor: GOV.error }) }}
+          aria-invalid={error ? 'true' : 'false'}
         />
         {query && (
           <button

@@ -60,8 +60,9 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
               <input
                 type="email"
                 {...register('email', { required: 'Email is required' })}
-                className={`w-full px-3 py-2 border rounded-md ${TYPO.body} focus:outline-none focus:ring-2 focus:ring-offset-0`}
-                style={{ borderColor: errors.email ? GOV.error : GOV.border, color: GOV.text }}
+                className={`form-control ${TYPO.body}`}
+                style={{ color: GOV.text }}
+                aria-invalid={errors.email ? 'true' : 'false'}
               />
               {errors.email && <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.email.message}</p>}
             </div>
@@ -77,7 +78,7 @@ export default function ResendVerification({ onClose, defaultEmail = '' }) {
                 type="button"
                 onClick={onClose}
                 className="px-4 py-2 border rounded-md text-sm font-semibold bg-white"
-                style={{ borderColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 Cancel
               </button>

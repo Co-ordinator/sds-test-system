@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Users, Activity, FileCheck, BarChart2, CreditCard, Upload, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
@@ -75,7 +75,7 @@ const TestAdministratorDashboard = () => {
             <div className="w-full sm:max-w-sm lg:max-w-md xl:max-w-lg shrink-0">
               <select
                 className="form-control text-sm"
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
                 value={instFilter}
                 onChange={e => setInstFilter(e.target.value)}
               >

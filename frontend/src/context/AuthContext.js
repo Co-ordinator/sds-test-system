@@ -56,15 +56,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Explicit user-initiated sign-out drops them back on the public landing
+    // page (involuntary session expiry still routes to /login — see the
+    // auth:session-expired handler above).
     try {
       await api.post('/api/v1/auth/logout');
-      setUser(null);
-      setIsAuthenticated(false);
-      navigate('/login');
     } catch (_) {
+      // Network/API error is non-fatal — clear local session anyway so the
+      // user isn't trapped on an authenticated screen.
+    } finally {
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/login');
+      navigate('/', { replace: true });
     }
   }, [navigate]);
 
@@ -107,7 +110,8 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // Require email verification only for self-registered accounts.
   const needsEmailVerification = user?.email && !user?.isEmailVerified && !user?.createdByTestAdministrator;
-  const isOnVerifyPage = window.location.pathname.includes('/verify-email');
+  const isOnVerifyPage = /\/verify-otp(\/|$)/.test(window.location.pathname)
+    || /\/verify-email(\/|$)/.test(window.location.pathname);
   
   const roleDashboard = (role) => {
     if (role === 'System Administrator') return '/admin';

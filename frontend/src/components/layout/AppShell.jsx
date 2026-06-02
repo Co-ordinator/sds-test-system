@@ -7,8 +7,18 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
-import { GOV } from '../../theme/government';
+import { GOV, LOGO_ALT } from '../../theme/government';
 import { useNotificationCount } from '../../hooks/useNotificationCount';
+
+/** Match OnboardingLayout wide header — text links, no icons. */
+const widePublicNavClass =
+  'text-sm font-medium transition-colors hover:opacity-90';
+
+const TEST_TAKER_PUBLIC_LINKS = [
+  { to: '/', label: 'Home' },
+  { to: '/#about', label: 'About' },
+  { to: '/help', label: 'FAQ' },
+];
 
 // All possible admin nav links with required permissions
 const ADMIN_NAV_LINKS = [
@@ -95,9 +105,6 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
 
   const breadcrumbs = customBreadcrumbs || BREADCRUMB_MAP[location.pathname] || [];
 
-  // Close mobile nav on route change
-  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
-
   const isActive = useCallback((to) => {
     if (to === '/test-administrator') {
       return location.pathname.startsWith('/test-administrator') || location.pathname.startsWith('/counselor');
@@ -114,177 +121,324 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
     return location.pathname === to;
   }, [location.pathname]);
 
-  return (
-    <div className={`min-h-screen flex flex-col ${isTestTaker ? 'bg-[#fbfdff]' : 'bg-white'}`}>
-      <div
-        className={isTestTaker ? 'hidden' : 'flex-shrink-0 py-0.5 border-b'}
-        style={{ backgroundColor: GOV.ministryBarBg, borderColor: GOV.border }}
-      >
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-[11px] font-medium tracking-normal" style={{ color: GOV.ministryBarText }}>
-            Ministry of Labour &amp; Social Security · Kingdom of Eswatini
-          </p>
-        </div>
-      </div>
+  // Close mobile nav on route change
+  useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
 
-      {/* ── Primary nav bar ── */}
-      <header
-        className="sticky top-0 z-20 border-b h-14"
-        style={{ borderColor: GOV.border, backgroundColor: '#ffffff' }}
+  useEffect(() => {
+    if (!isTestTaker || !mobileNavOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [isTestTaker, mobileNavOpen]);
+
+  const closeMobileNav = () => setMobileNavOpen(false);
+
+  const userMenuButton = (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        className={isTestTaker ? 'flex max-w-[180px] items-center gap-2 rounded-md px-2.5 py-1.5 transition-colors hover:bg-gray-50' : 'flex max-w-[170px] items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors'}
+        onClick={() => setUserMenuOpen((o) => !o)}
       >
-        <div className={`relative h-full ${isTestTaker ? 'px-3 sm:px-6' : 'px-4 lg:px-6'}`}>
-          <div className={`absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:gap-3 ${isTestTaker ? 'left-3 sm:left-6' : 'left-3 sm:left-4 lg:left-6'}`}>
-            <button
-              type="button"
-              className="lg:hidden p-1.5 rounded-md hover:bg-gray-100"
-              onClick={() => setMobileNavOpen(o => !o)}
-            >
-              {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
-            </button>
+        <div
+          className={isTestTaker ? 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full' : 'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0'}
+          style={{ backgroundColor: GOV.blueLightAlt }}
+        >
+          <User className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} style={{ color: GOV.blue }} />
+        </div>
+        <div className="hidden sm:block min-w-0 text-left">
+          <p className="truncate text-xs font-semibold leading-none" style={{ color: GOV.text }}>{displayName}</p>
+          <p className="truncate text-[10px] mt-0.5 leading-none" style={{ color: GOV.textMuted }}>{roleLabel}</p>
+        </div>
+        <ChevronDown className="h-3.5 w-3.5" style={{ color: GOV.textMuted }} />
+      </button>
+
+      {userMenuOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+          <div
+            className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border rounded-md shadow-lg py-1"
+            style={{ borderColor: GOV.border }}
+          >
+            <div className="px-3 py-2 border-b" style={{ borderColor: GOV.borderLight }}>
+              <p className="text-xs font-semibold" style={{ color: GOV.text }}>{displayName}</p>
+              <span
+                className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                style={{ backgroundColor: roleColor.bg, color: roleColor.text }}
+              >
+                {roleLabel}
+              </span>
+              {user?.institution?.name && (
+                <p className="text-[10px] mt-1" style={{ color: GOV.textMuted }}>{user.institution.name}</p>
+              )}
+            </div>
 
             <Link
-              to={dashboardPath}
-              className="flex w-[150px] min-w-0 items-center sm:w-[180px] lg:w-[205px]"
-              aria-label="Go to dashboard"
+              to="/profile"
+              className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
+              style={{ color: GOV.text }}
+              onClick={() => setUserMenuOpen(false)}
             >
-              <img
-                src="/letterhead.png"
-                alt="Government of Eswatini"
-                className="h-10 w-full object-contain object-left sm:h-11"
-              />
+              <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
             </Link>
-          </div>
 
-          <div className={isTestTaker ? 'mx-auto hidden h-full max-w-7xl items-center lg:flex lg:pl-[190px] lg:pr-[190px]' : 'max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center'}>
-            <nav className={isTestTaker ? 'hidden h-full w-full min-w-0 items-center gap-5 overflow-x-auto lg:flex custom-scrollbar' : 'hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar'}>
-              {navLinks.map(({ to, label, Icon, badge }) => {
-                const active = isActive(to);
-                return (
-                  <Link
-                    key={`${to}-${label}`}
-                    to={to}
-                    className={isTestTaker ? 'relative flex h-full shrink-0 items-center gap-2 border-b-2 px-2 text-sm font-semibold transition-colors whitespace-nowrap' : 'relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap'}
-                    style={
-                      active
-                        ? { color: GOV.blue, fontWeight: 700, borderColor: isTestTaker ? GOV.blue : undefined }
-                        : { color: GOV.textMuted, fontWeight: isTestTaker ? 600 : 500, borderColor: isTestTaker ? 'transparent' : undefined }
-                    }
-                  >
-                    <Icon className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} />
-                    {label}
-                    {badge && notificationCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
-                        {notificationCount > 99 ? '99+' : notificationCount}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          <div className={`absolute top-1/2 z-10 -translate-y-1/2 ${isTestTaker ? 'right-3 sm:right-6' : 'right-3 sm:right-4 lg:right-6'}`}>
-            <div className="relative">
-              <button
-                type="button"
-                className={isTestTaker ? 'flex max-w-[180px] items-center gap-2 rounded-md px-2.5 py-1.5 transition-colors hover:bg-gray-50' : 'flex max-w-[170px] items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-gray-50 transition-colors'}
-                onClick={() => setUserMenuOpen(o => !o)}
+            {isAdminLike && (
+              <Link
+                to={dashboardPath}
+                className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
+                style={{ color: GOV.text }}
+                onClick={() => setUserMenuOpen(false)}
               >
-                <div
-                  className={isTestTaker ? 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full' : 'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0'}
-                  style={{ backgroundColor: GOV.blueLightAlt }}
-                >
-                  <User className={isTestTaker ? 'h-4 w-4' : 'w-4 h-4'} style={{ color: GOV.blue }} />
-                </div>
-                <div className="hidden sm:block min-w-0 text-left">
-                  <p className={isTestTaker ? 'truncate text-xs font-semibold leading-none' : 'truncate text-xs font-semibold leading-none'} style={{ color: GOV.text }}>{displayName}</p>
-                  <p className={isTestTaker ? 'truncate text-[10px] mt-0.5 leading-none' : 'truncate text-[10px] mt-0.5 leading-none'} style={{ color: GOV.textMuted }}>{roleLabel}</p>
-                </div>
-                <ChevronDown className={isTestTaker ? 'h-3.5 w-3.5' : 'w-3.5 h-3.5'} style={{ color: GOV.textMuted }} />
-              </button>
+                <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Dashboard
+              </Link>
+            )}
 
-              {userMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                  <div
-                    className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border rounded-md shadow-lg py-1"
-                    style={{ borderColor: GOV.border }}
+            <div className="border-t my-1" style={{ borderColor: GOV.borderLight }} />
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-red-50 text-left"
+              style={{ color: '#dc2626' }}
+              onClick={() => { setUserMenuOpen(false); logout(); }}
+            >
+              <LogOut className="w-3.5 h-3.5" /> Sign Out
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen flex flex-col bg-white">
+      {/* Ministry strip — OnboardingLayout (wide): thin bar; admin: bar + caption */}
+      <div
+        className="flex-shrink-0 border-b py-1.5"
+        style={{ borderColor: GOV.border, backgroundColor: GOV.ministryBarBg }}
+        aria-hidden={isTestTaker ? 'true' : undefined}
+      >
+        {!isTestTaker && (
+          <div className="max-w-7xl mx-auto px-6 text-center">
+            <p className="text-[11px] font-medium tracking-normal" style={{ color: GOV.ministryBarText }}>
+              Ministry of Labour &amp; Social Security · Kingdom of Eswatini
+            </p>
+          </div>
+        )}
+      </div>
+
+      {isTestTaker ? (
+        <>
+          <header className="relative z-30 flex-shrink-0 border-b bg-white" style={{ borderColor: GOV.border }}>
+            <div className="max-w-5xl relative mx-auto">
+              <div className="relative z-50 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-3 bg-white px-3 py-4 sm:px-4 sm:py-5">
+                <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border lg:hidden"
+                    style={{ borderColor: GOV.border, backgroundColor: '#fff' }}
+                    aria-expanded={mobileNavOpen}
+                    aria-controls="test-taker-wide-nav-mobile"
+                    aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+                    onClick={() => setMobileNavOpen((o) => !o)}
                   >
-                    <div className="px-3 py-2 border-b" style={{ borderColor: GOV.borderLight }}>
-                      <p className="text-xs font-semibold" style={{ color: GOV.text }}>{displayName}</p>
-                      <span
-                        className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                        style={{ backgroundColor: roleColor.bg, color: roleColor.text }}
-                      >
-                        {roleLabel}
-                      </span>
-                      {user?.institution?.name && (
-                        <p className="text-[10px] mt-1" style={{ color: GOV.textMuted }}>{user.institution.name}</p>
-                      )}
-                    </div>
-
-                    <Link
-                      to="/profile"
-                      className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
-                      style={{ color: GOV.text }}
-                      onClick={() => setUserMenuOpen(false)}
-                    >
-                      <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
-                    </Link>
-
-                    {isAdminLike && (
-                      <Link
-                        to={dashboardPath}
-                        className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
-                        style={{ color: GOV.text }}
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        <Settings className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Dashboard
-                      </Link>
+                    {mobileNavOpen ? (
+                      <X className="w-5 h-5" style={{ color: GOV.text }} />
+                    ) : (
+                      <Menu className="w-5 h-5" style={{ color: GOV.text }} />
                     )}
+                  </button>
+                  <Link to="/" className="min-w-0 shrink" aria-label="Home">
+                    <img
+                      src="/letterhead.png"
+                      alt={LOGO_ALT}
+                      className="h-14 w-auto max-w-[16rem] object-contain sm:h-16 sm:max-w-[18rem] md:h-[4.5rem] md:max-w-[21rem]"
+                    />
+                  </Link>
+                </div>
 
-                    <div className="border-t my-1" style={{ borderColor: GOV.borderLight }} />
-                    <button
-                      type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-red-50 text-left"
-                      style={{ color: '#dc2626' }}
-                      onClick={() => { setUserMenuOpen(false); logout(); }}
+                <nav className="hidden min-w-0 shrink-0 items-center justify-end gap-3 sm:gap-4 md:gap-5 lg:flex" aria-label="Primary">
+                  {TEST_TAKER_PUBLIC_LINKS.map(({ to, label }) => (
+                    <Link
+                      key={to + label}
+                      to={to}
+                      className={widePublicNavClass}
+                      style={{ color: GOV.textMuted }}
+                      onClick={closeMobileNav}
                     >
-                      <LogOut className="w-3.5 h-3.5" /> Sign Out
-                    </button>
+                      {label}
+                    </Link>
+                  ))}
+                  {navLinks.map(({ to, label, badge }) => {
+                    const active = isActive(to);
+                    return (
+                      <Link
+                        key={`${to}-${label}`}
+                        to={to}
+                        className={`relative ${widePublicNavClass}`}
+                        style={{ color: active ? GOV.blue : GOV.textMuted, fontWeight: active ? 700 : 500 }}
+                        onClick={closeMobileNav}
+                      >
+                        {label}
+                        {badge && notificationCount > 0 && (
+                          <span className="absolute -top-1.5 -right-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                            {notificationCount > 99 ? '99+' : notificationCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </nav>
+
+                {userMenuButton}
+              </div>
+
+              {mobileNavOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40 bg-black/30 lg:hidden"
+                    role="presentation"
+                    aria-hidden="true"
+                    onClick={closeMobileNav}
+                  />
+                  <div
+                    id="test-taker-wide-nav-mobile"
+                    className="absolute left-0 right-0 top-full z-50 border-b px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:px-6 lg:hidden"
+                    style={{ borderColor: GOV.border, backgroundColor: '#fff' }}
+                  >
+                    <nav className="flex flex-col gap-4" aria-label="Primary mobile">
+                      {TEST_TAKER_PUBLIC_LINKS.map(({ to, label }) => (
+                        <Link
+                          key={`m-pub-${to}`}
+                          to={to}
+                          className="text-base font-medium py-1 transition-colors hover:opacity-90"
+                          style={{ color: GOV.textMuted }}
+                          onClick={closeMobileNav}
+                        >
+                          {label}
+                        </Link>
+                      ))}
+                      {navLinks.map(({ to, label, Icon, badge }) => {
+                        const active = isActive(to);
+                        return (
+                          <Link
+                            key={`m-${to}-${label}`}
+                            to={to}
+                            className="flex items-center gap-2 py-1 text-base font-medium transition-colors"
+                            style={{ color: active ? GOV.blue : GOV.textMuted, fontWeight: active ? 700 : 500 }}
+                            onClick={closeMobileNav}
+                          >
+                            <Icon className="h-4 w-4 shrink-0" />
+                            {label}
+                            {badge && notificationCount > 0 && (
+                              <span className="ml-auto flex h-4 min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                {notificationCount > 99 ? '99+' : notificationCount}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </nav>
                   </div>
                 </>
               )}
             </div>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Mobile nav drawer ── */}
-      {mobileNavOpen && (
-        <div className="lg:hidden border-b bg-white" style={{ borderColor: GOV.border }}>
-          <div className="max-w-7xl mx-auto px-6 py-2 space-y-1">
-            {navLinks.map(({ to, label, Icon, badge }) => {
-              const active = isActive(to);
-              return (
-                <Link
-                  key={`m-${to}-${label}`}
-                  to={to}
-                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
-                  style={active ? { backgroundColor: GOV.blueLightAlt, color: GOV.blue } : { color: GOV.textMuted }}
+          </header>
+        </>
+      ) : (
+        <>
+          <header
+            className="sticky top-0 z-20 border-b h-14"
+            style={{ borderColor: GOV.border, backgroundColor: '#ffffff' }}
+          >
+            <div className="relative h-full px-4 lg:px-6">
+              <div className="absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:gap-3 left-3 sm:left-4 lg:left-6">
+                <button
+                  type="button"
+                  className="lg:hidden p-1.5 rounded-md hover:bg-gray-100"
+                  onClick={() => setMobileNavOpen((o) => !o)}
                 >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                  {badge && notificationCount > 0 && (
-                    <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
-                      {notificationCount > 99 ? '99+' : notificationCount}
-                    </span>
-                  )}
+                  {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
+                </button>
+
+                <Link
+                  to={dashboardPath}
+                  className="flex w-[150px] min-w-0 items-center sm:w-[180px] lg:w-[205px]"
+                  aria-label="Go to dashboard"
+                >
+                  <img
+                    src="/letterhead.png"
+                    alt="Government of Eswatini"
+                    className="h-10 w-full object-contain object-left sm:h-11"
+                  />
                 </Link>
-              );
-            })}
-          </div>
-        </div>
+              </div>
+
+              <div className="max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center">
+                <nav className="hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar">
+                  {navLinks.map(({ to, label, Icon, badge }) => {
+                    const active = isActive(to);
+                    return (
+                      <Link
+                        key={`${to}-${label}`}
+                        to={to}
+                        className="relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap"
+                        style={
+                          active
+                            ? { color: GOV.blue, fontWeight: 700 }
+                            : { color: GOV.textMuted, fontWeight: 500 }
+                        }
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                        {badge && notificationCount > 0 && (
+                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
+                            {notificationCount > 99 ? '99+' : notificationCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              <div className="absolute top-1/2 z-10 -translate-y-1/2 right-3 sm:right-4 lg:right-6">
+                {userMenuButton}
+              </div>
+            </div>
+          </header>
+
+          {mobileNavOpen && (
+            <div className="lg:hidden border-b bg-white" style={{ borderColor: GOV.border }}>
+              <div className="max-w-7xl mx-auto px-6 py-2 space-y-1">
+                {navLinks.map(({ to, label, Icon, badge }) => {
+                  const active = isActive(to);
+                  return (
+                    <Link
+                      key={`m-${to}-${label}`}
+                      to={to}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
+                      style={active ? { backgroundColor: GOV.blueLightAlt, color: GOV.blue } : { color: GOV.textMuted }}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                      {badge && notificationCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
+                          {notificationCount > 99 ? '99+' : notificationCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* ── Breadcrumbs ── */}

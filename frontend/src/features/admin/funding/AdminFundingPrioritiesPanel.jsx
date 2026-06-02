@@ -181,7 +181,7 @@ const AdminFundingPrioritiesPanel = () => {
               </div>
               <select
                 className="px-2 py-1.5 border rounded-md text-xs"
-                style={{ borderColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
                 value={priorityFilter}
                 onChange={e => setPriorityFilter(e.target.value)}
                 aria-label="Filter by funding priority"

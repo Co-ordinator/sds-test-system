@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
-import { GOV, TYPO } from '../theme/government';
+import { GOV, MINISTRY_NAME } from '../theme/government';
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
@@ -18,23 +17,27 @@ export default function Register() {
   const onSubmit = async (data) => {
     setServerError('');
     const payload = {
+      firstName: (data.firstName || '').trim(),
+      lastName: (data.lastName || '').trim(),
       nationalId: data.nationalId.trim(),
       email: data.email.trim(),
       password: data.password,
-      consent: true
+      consent: Boolean(data.consent)
     };
     try {
       const response = await api.post('/api/v1/auth/register', payload);
       const verificationEmailSent = response?.data?.verificationEmailSent !== false;
-      navigate('/registration-success', {
+      const verifiedEmail = response?.data?.data?.email || payload.email;
+      try { sessionStorage.setItem('pendingVerificationEmail', verifiedEmail); } catch (_) {}
+      navigate('/verify-otp', {
         state: {
-          email: payload.email,
+          email: verifiedEmail,
           verificationEmailSent,
           message: response?.data?.message || ''
         }
       });
     } catch (err) {
-      const uiMessage = err?.uiMessage || err?.response?.data?.message || 'Registration failed. Please try again.';
+      const uiMessage = err?.uiMessage || err?.response?.data?.message || 'Registration was unsuccessful. Please try again.';
       const details = Array.isArray(err?.details) ? err.details : [];
 
       let hasFieldError = false;
@@ -42,7 +45,7 @@ export default function Register() {
         const field = detail?.field;
         const message = detail?.message;
         if (!field || !message) continue;
-        if (!['nationalId', 'email', 'password', 'consent'].includes(field)) continue;
+        if (!['firstName', 'lastName', 'nationalId', 'email', 'password', 'consent'].includes(field)) continue;
         setError(field, { type: 'server', message });
         hasFieldError = true;
       }
@@ -51,138 +54,237 @@ export default function Register() {
         setError('nationalId', { type: 'server', message: uiMessage });
         hasFieldError = true;
       }
-
       if (err?.code === 'EMAIL_EXISTS') {
         setError('email', { type: 'server', message: uiMessage });
         hasFieldError = true;
       }
-
       if (!hasFieldError) setServerError(uiMessage);
     }
   };
 
-  const inputClass = (hasError) =>
-    `form-control ${hasError ? '' : ''}`;
-
   return (
-    <OnboardingLayout>
-      <div className="w-full max-w-[440px] mx-auto">
-        <div className="w-full bg-white rounded-md border overflow-hidden" style={{ borderColor: GOV.border }}>
-          <form className="p-6 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="mb-2">
-              <h1 className={`${TYPO.pageTitle} text-center mb-1`} style={{ color: GOV.text }}>Create your account</h1>
-              <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
-                Verify your email after registration to continue.
-              </p>
+    <OnboardingLayout wide>
+      {/* Outer card — centered, white, rounded, with shadow */}
+      <div
+        className="mx-auto flex w-full min-w-0 max-w-[860px] min-h-0 flex-col overflow-hidden bg-white lg:min-h-[560px] lg:flex-row"
+        style={{ borderRadius: '0' }}
+      >
+        {/* Left — illustration panel */}
+        <div
+          className="hidden items-center justify-center bg-white p-8 lg:flex lg:grow-0 lg:shrink-0 lg:basis-[42%]"
+        >
+          <img
+            src="/auth.png"
+            alt=""
+            style={{ width: '100%', maxWidth: '320px', height: 'auto', objectFit: 'contain' }}
+          />
+        </div>
+
+        {/* Right — form panel */}
+        <div className="flex min-h-0 flex-1 flex-col justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-8">
+          {/* Heading block */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h1
+              className="text-[1.65rem] font-bold leading-tight sm:text-[1.85rem] lg:text-[2rem]"
+              style={{
+                lineHeight: 1.15,
+                color: GOV.text,
+                margin: 0,
+              }}
+            >
+              Register
+            </h1>
+            <p
+              style={{
+                fontSize: '1.1rem',
+                fontWeight: 400,
+                color: GOV.textMuted,
+                margin: '0.15rem 0 0.5rem',
+                lineHeight: 1.35,
+              }}
+            >
+              Register to access the secure assessment workspace administered by the {MINISTRY_NAME}.
+            </p>
+            <p
+              style={{
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: GOV.text,
+                margin: 0,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Required information
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+
+            {/* Given name + surname — two columns. Captured at registration so
+                the onboarding wizard can focus on programme/work details. */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <div style={styles.inputWrapper(!!errors.firstName)}>
+                  <span style={styles.inputIcon}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </span>
+                  <input
+                    {...register('firstName', {
+                      required: 'Given name is required.',
+                      maxLength: { value: 255, message: 'Given name is too long.' }
+                    })}
+                    type="text"
+                    autoComplete="given-name"
+                    placeholder="Given name"
+                    style={styles.input}
+                  />
+                </div>
+                {errors.firstName && <p style={styles.errorText}>{errors.firstName.message}</p>}
+              </div>
+              <div>
+                <div style={styles.inputWrapper(!!errors.lastName)}>
+                  <span style={styles.inputIcon}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </span>
+                  <input
+                    {...register('lastName', {
+                      required: 'Surname is required.',
+                      maxLength: { value: 255, message: 'Surname is too long.' }
+                    })}
+                    type="text"
+                    autoComplete="family-name"
+                    placeholder="Surname"
+                    style={styles.input}
+                  />
+                </div>
+                {errors.lastName && <p style={styles.errorText}>{errors.lastName.message}</p>}
+              </div>
             </div>
 
-            {/* National ID */}
+            {/* National ID — required for SDS registration */}
             <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>National ID *</label>
-              <input
-                {...register('nationalId', {
-                  required: 'National ID is required',
-                  pattern: {
-                    value: /^\d{13}$/,
-                    message: 'National ID must be exactly 13 digits'
-                  }
-                })}
-                type="text"
-                inputMode="numeric"
-                maxLength={13}
-                placeholder="13-digit ID number"
-                className={inputClass(!!errors.nationalId)}
-                style={{ borderBottomColor: errors.nationalId ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.nationalId && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.nationalId.message}</p>}
-              {!errors.nationalId && (
-                <p className="mt-1 text-xs" style={{ color: GOV.textHint }}>
-                  Used to prevent duplicate accounts and link your profile across life stages.
-                </p>
-              )}
+              <div style={styles.inputWrapper(!!errors.nationalId)}>
+                <span style={styles.inputIcon}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 6h6M9 10h6M9 14h4"/></svg>
+                </span>
+                <input
+                  {...register('nationalId', {
+                    required: 'National ID is required.',
+                    pattern: { value: /^\d{13}$/, message: 'National ID must be exactly 13 digits.' }
+                  })}
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={13}
+                  placeholder="National ID (13 digits)"
+                  style={styles.input}
+                />
+              </div>
+              {errors.nationalId && <p style={styles.errorText}>{errors.nationalId.message}</p>}
             </div>
 
-            {/* Email */}
+            {/* Email Address */}
             <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email *</label>
-              <input
-                {...register('email', {
-                  required: 'Email is required',
-                  pattern: {
-                    value: EMAIL_REGEX,
-                    message: 'Enter a valid email address'
-                  }
-                })}
-                type="email"
-                autoComplete="username"
-                placeholder="you@example.com"
-                className={inputClass(!!errors.email)}
-                style={{ borderBottomColor: errors.email ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {errors.email && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.email.message}</p>}
+              <div style={styles.inputWrapper(!!errors.email)}>
+                <span style={styles.inputIcon}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                </span>
+                <input
+                  {...register('email', {
+                    required: 'Email address is required.',
+                    pattern: { value: EMAIL_REGEX, message: 'Please enter a valid email address.' }
+                  })}
+                  type="email"
+                  autoComplete="username"
+                  placeholder="Email address"
+                  style={styles.input}
+                />
+              </div>
+              {errors.email && <p style={styles.errorText}>{errors.email.message}</p>}
             </div>
 
             {/* Password */}
             <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Password *</label>
-              <div className="relative">
+              <div style={styles.inputWrapper(!!errors.password)}>
+                <span style={styles.inputIcon}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </span>
                 <input
-                  type={showPassword ? 'text' : 'password'}
                   {...register('password', {
-                    required: 'Password is required',
-                    minLength: { value: 8, message: 'At least 8 characters' },
-                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/, message: 'Use letters and numbers' }
+                    required: 'Password is required.',
+                    minLength: { value: 12, message: 'Password must be at least 12 characters.' },
+                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/, message: 'Password must be at least 12 characters and contain both letters and numbers.' }
                   })}
+                  type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
-                  className={inputClass(!!errors.password)}
-                  style={{ borderBottomColor: errors.password ? GOV.error : GOV.border, color: GOV.text, paddingRight: '2.5rem' }}
+                  placeholder="Password (at least 12 characters)"
+                  style={styles.input}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
-                  style={{ color: GOV.textMuted }}
+                  style={styles.eyeBtn}
+                  tabIndex={-1}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword
+                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  }
                 </button>
               </div>
-              {errors.password && <p className="mt-1 text-xs" style={{ color: GOV.error }}>{errors.password.message}</p>}
+              {errors.password && <p style={styles.errorText}>{errors.password.message}</p>}
             </div>
 
             {/* Consent */}
-            <div className="flex items-start gap-2.5 pt-2">
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
               <input
                 id="reg-consent"
                 type="checkbox"
-                {...register('consent', { required: 'You must accept the terms' })}
-                className="h-4 w-4 mt-0.5 rounded shrink-0"
-                style={{ accentColor: GOV.blue }}
+                {...register('consent', { required: 'You must accept the terms to register.' })}
+                style={{ marginTop: '2px', accentColor: GOV.blue, flexShrink: 0 }}
               />
-              <label htmlFor="reg-consent" className="text-xs" style={{ color: GOV.text }}>
-                I consent to the processing of my data under the Eswatini Data Protection Act 2022
+              <label htmlFor="reg-consent" style={{ fontSize: '0.7rem', color: GOV.textMuted, lineHeight: 1.4 }}>
+                I consent to the processing of my personal data in accordance with the Eswatini Data Protection Act, 2022.
               </label>
             </div>
-            {errors.consent && <p className="text-xs" style={{ color: GOV.error }}>{errors.consent.message}</p>}
+            {errors.consent && <p style={styles.errorText}>{errors.consent.message}</p>}
 
             {serverError && (
-              <div className="rounded-md px-3 py-2 text-xs" style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}>
+              <div style={{ background: GOV.errorBg, border: `1px solid ${GOV.errorBorder}`, borderRadius: '6px', padding: '8px 12px', fontSize: '0.75rem', color: GOV.error }}>
                 {serverError}
               </div>
             )}
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-              style={{ backgroundColor: GOV.blue }}
+              className="transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:hover:opacity-100"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: GOV.blue,
+                color: GOV.ministryBarText,
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '1rem',
+                fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                marginTop: '0.25rem',
+                letterSpacing: '0.02em',
+                outlineColor: GOV.blue,
+              }}
             >
-              {isSubmitting ? 'Creating account...' : 'Create account'}
+              {isSubmitting ? 'Creating your account…' : 'Create account'}
             </button>
 
-            <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium hover:underline" style={{ color: GOV.blue }}>Login</Link>
+            {/* Already have account */}
+            <p style={{ textAlign: 'center', fontSize: '0.75rem', color: GOV.textMuted, margin: '0.25rem 0 0' }}>
+              Already registered?{' '}
+              <Link to="/login" style={{ color: GOV.blue, fontWeight: 600, textDecoration: 'none' }}>Sign in</Link>
             </p>
+
           </form>
         </div>
       </div>
@@ -190,3 +292,44 @@ export default function Register() {
   );
 }
 
+const styles = {
+  inputWrapper: (hasError) => ({
+    display: 'flex',
+    alignItems: 'center',
+    background: GOV.borderLight,
+    border: `1px solid ${hasError ? GOV.error : GOV.border}`,
+    borderRadius: '6px',
+    padding: '0 10px',
+    height: '40px',
+  }),
+  inputIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    color: GOV.textHint,
+    marginRight: '8px',
+    flexShrink: 0,
+  },
+  input: {
+    flex: 1,
+    border: 'none',
+    background: 'transparent',
+    fontSize: '0.82rem',
+    color: GOV.text,
+    outline: 'none',
+    height: '100%',
+  },
+  eyeBtn: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: GOV.textHint,
+    display: 'flex',
+    alignItems: 'center',
+    padding: '0 0 0 6px',
+  },
+  errorText: {
+    fontSize: '0.7rem',
+    color: GOV.error,
+    margin: '3px 0 0',
+  },
+};

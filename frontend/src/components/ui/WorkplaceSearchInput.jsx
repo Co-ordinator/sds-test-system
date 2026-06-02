@@ -85,8 +85,6 @@ export default function WorkplaceSearchInput({
     onChange('', null);
   };
 
-  const borderColor = error ? GOV.error : GOV.border;
-
   return (
     <div className="relative" ref={containerRef}>
       <div className="relative">
@@ -108,7 +106,8 @@ export default function WorkplaceSearchInput({
           placeholder={placeholder}
           autoComplete="off"
           className={`form-control-with-icon pl-8 pr-8 ${inputClassName}`}
-          style={{ borderBottomColor: borderColor, color: GOV.text }}
+          style={{ color: GOV.text, ...(error && { borderColor: GOV.error }) }}
+          aria-invalid={error ? 'true' : 'false'}
         />
         {query && (
           <button

@@ -192,7 +192,7 @@ Nomcebo,Mkhonza,nomcebo.mkhonza@example.org,Ministry of Education and Training`;
     <>
       <div className="flex items-center gap-2 py-1.5">
         <Search className="w-4 h-4" style={{ color: GOV.textMuted }} />
-        <input className="form-control text-sm" style={{ borderBottomColor: GOV.border, color: GOV.text }} placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="form-control text-sm" style={{ color: GOV.text }} placeholder="Search name or email…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <button type="button" onClick={() => setShowFilterDialog(true)} className={`flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs bg-white ${roleFilter ? 'border-blue-300 bg-blue-50' : ''}`} style={{ borderColor: roleFilter ? GOV.blue : GOV.border, color: roleFilter ? GOV.blue : GOV.textMuted }}>
         <Filter className="w-3 h-3" /> {roleFilter || 'Filter'}
@@ -215,7 +215,7 @@ Nomcebo,Mkhonza,nomcebo.mkhonza@example.org,Ministry of Education and Training`;
         >
           <Download className="w-3 h-3" /> Admin CSV Template
         </button>
-        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border cursor-pointer" style={{ borderColor: GOV.border, color: GOV.text }}>
+        <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border cursor-pointer" style={{ color: GOV.text }}>
           <Upload className="w-3.5 h-3.5" /> {isImportingAdmins ? 'Importing…' : 'Import System Admins'}
           <input
             type="file"
@@ -325,21 +325,21 @@ Nomcebo,Mkhonza,nomcebo.mkhonza@example.org,Ministry of Education and Training`;
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>First Name *</label>
-                  <input required className="form-control w-full text-sm" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={createForm.firstName} onChange={e => setCreateForm({ ...createForm, firstName: e.target.value })} />
+                  <input required className="form-control w-full text-sm" style={{ color: GOV.text }} value={createForm.firstName} onChange={e => setCreateForm({ ...createForm, firstName: e.target.value })} />
                 </div>
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Last Name *</label>
-                  <input required className="form-control w-full text-sm" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={createForm.lastName} onChange={e => setCreateForm({ ...createForm, lastName: e.target.value })} />
+                  <input required className="form-control w-full text-sm" style={{ color: GOV.text }} value={createForm.lastName} onChange={e => setCreateForm({ ...createForm, lastName: e.target.value })} />
                 </div>
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Email *</label>
-                <input type="email" required className="form-control w-full text-sm" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
+                <input type="email" required className="form-control w-full text-sm" style={{ color: GOV.text }} value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} />
                 <p className="text-[10px] mt-1 flex items-center gap-1" style={{ color: GOV.textHint }}><Mail className="w-3 h-3" /> Credentials will be emailed</p>
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Role *</label>
-                <select required className="form-control w-full text-sm" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })}>
+                <select required className="form-control w-full text-sm" style={{ color: GOV.text }} value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })}>
                   <option value="Test Taker">Test Taker</option>
                   <option value="Test Administrator">Test Administrator</option>
                   <option value="System Administrator">System Administrator</option>
@@ -358,7 +358,7 @@ Nomcebo,Mkhonza,nomcebo.mkhonza@example.org,Ministry of Education and Training`;
               {createForm.role === 'Test Administrator' && (
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Organization</label>
-                  <input className="form-control w-full text-sm" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={createForm.organization} onChange={e => setCreateForm({ ...createForm, organization: e.target.value })} placeholder="e.g., Ministry of Education" />
+                  <input className="form-control w-full text-sm" style={{ color: GOV.text }} value={createForm.organization} onChange={e => setCreateForm({ ...createForm, organization: e.target.value })} placeholder="e.g., Ministry of Education" />
                 </div>
               )}
               {(createForm.role === 'Test Administrator' || createForm.role === 'System Administrator') && allPermissions.length > 0 && (
@@ -457,7 +457,7 @@ Nomcebo,Mkhonza,nomcebo.mkhonza@example.org,Ministry of Education and Training`;
             <p className="text-sm font-medium" style={{ color: GOV.text }}>{adminUserDisplayName(editingUser)}</p>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Role</label>
-              <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}>
+              <select className="form-control" style={{ color: GOV.text }} value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}>
                 <option value="Test Taker">Test Taker</option>
                 <option value="Test Administrator">Test Administrator</option>
                 <option value="System Administrator">System Administrator</option>
@@ -465,7 +465,7 @@ Nomcebo,Mkhonza,nomcebo.mkhonza@example.org,Ministry of Education and Training`;
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Institution</label>
-              <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingUser.institutionId || ''} onChange={e => setEditingUser({ ...editingUser, institutionId: e.target.value || null })}>
+              <select className="form-control" style={{ color: GOV.text }} value={editingUser.institutionId || ''} onChange={e => setEditingUser({ ...editingUser, institutionId: e.target.value || null })}>
                 <option value="">— None —</option>
                 {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>

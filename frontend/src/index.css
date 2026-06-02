@@ -20,11 +20,40 @@
   }
 
   .form-control {
-    @apply w-full px-0 py-2 border-0 border-b rounded-none bg-transparent text-sm focus:outline-none focus:ring-0;
+    @apply w-full rounded-md border border-gray-200 bg-gray-100 px-3 py-2 text-sm transition-colors;
+    @apply focus:!border-[#2D8BC4] focus:!bg-white focus:!outline-none focus:!ring-2 focus:!ring-[#2D8BC4]/25;
   }
 
   .form-control-with-icon {
-    @apply w-full pr-0 py-2 border-0 border-b rounded-none bg-transparent text-sm focus:outline-none focus:ring-0;
+    @apply w-full rounded-md border border-gray-200 bg-gray-100 py-2 pr-3 text-sm transition-colors;
+    @apply focus:!border-[#2D8BC4] focus:!bg-white focus:!outline-none focus:!ring-2 focus:!ring-[#2D8BC4]/25;
+  }
+
+  .form-control[aria-invalid='true'],
+  .form-control-with-icon[aria-invalid='true'] {
+    @apply !border-red-700;
+  }
+
+  .form-control[aria-invalid='true']:focus,
+  .form-control-with-icon[aria-invalid='true']:focus {
+    @apply !border-red-700 !ring-red-600/25;
+  }
+
+  /* Auth marketing panel: soft corners, no default border ring */
+  .form-control.form-control--panel {
+    @apply rounded-lg !border-0 py-2.5 shadow-none;
+  }
+
+  .form-control.form-control--panel:focus {
+    @apply !bg-white outline-none ring-2 ring-[#2D8BC4]/35 ring-offset-0;
+  }
+
+  .form-control.form-control--panel[aria-invalid='true'] {
+    @apply ring-1 ring-red-400/70;
+  }
+
+  .form-control.form-control--panel[aria-invalid='true']:focus {
+    @apply ring-2 ring-red-500/35;
   }
 }
 

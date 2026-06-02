@@ -936,7 +936,7 @@ export default function Profile() {
               type="button"
               onClick={handleExportData}
               className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 bg-white"
-              style={{ borderColor: GOV.border, color: GOV.text }}
+              style={{ color: GOV.text }}
             >
               <Download size={14} /> Export my data
             </button>
@@ -947,7 +947,7 @@ export default function Profile() {
                 value={deleteConfirm}
                 onChange={(e) => setDeleteConfirm(e.target.value)}
                 className="form-control w-48"
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               />
               <button
                 type="button"

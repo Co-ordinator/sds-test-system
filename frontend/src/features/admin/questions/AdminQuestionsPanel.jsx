@@ -137,7 +137,7 @@ const AdminQuestionsPanel = () => {
     <>
       <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
-        <input className="pl-7 text-xs border rounded-md px-2 py-1.5 w-44 outline-none" style={{ borderColor: GOV.border, color: GOV.text }} placeholder="Search questions…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="pl-7 text-xs border rounded-md px-2 py-1.5 w-44 outline-none" style={{ color: GOV.text }} placeholder="Search questions…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: sectionFilter ? GOV.blue : GOV.textMuted }} value={sectionFilter} onChange={e => setSectionFilter(e.target.value)}>
         <option value="">All Sections</option>
@@ -206,12 +206,12 @@ const AdminQuestionsPanel = () => {
             <form className="flex-1 overflow-y-auto p-5 space-y-3" onSubmit={async (e) => { await handleCreate(e); setShowCreateDialog(false); }}>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Question Text *</label>
-                <textarea className="form-control resize-none" rows={3} style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.text} onChange={e => setNewQuestion({ ...newQuestion, text: e.target.value })} required />
+                <textarea className="form-control resize-none" rows={3} style={{ color: GOV.text }} value={newQuestion.text} onChange={e => setNewQuestion({ ...newQuestion, text: e.target.value })} required />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Section</label>
-                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.section} onChange={e => setNewQuestion({ ...newQuestion, section: e.target.value })}>
+                  <select className="form-control" style={{ color: GOV.text }} value={newQuestion.section} onChange={e => setNewQuestion({ ...newQuestion, section: e.target.value })}>
                     <option value="activities">Activities</option>
                     <option value="competencies">Competencies</option>
                     <option value="occupations">Occupations</option>
@@ -220,14 +220,14 @@ const AdminQuestionsPanel = () => {
                 </div>
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>RIASEC Type</label>
-                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.riasecType} onChange={e => setNewQuestion({ ...newQuestion, riasecType: e.target.value })}>
+                  <select className="form-control" style={{ color: GOV.text }} value={newQuestion.riasecType} onChange={e => setNewQuestion({ ...newQuestion, riasecType: e.target.value })}>
                     {['R', 'I', 'A', 'S', 'E', 'C'].map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Order (optional)</label>
-                <input type="number" className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newQuestion.order} onChange={e => setNewQuestion({ ...newQuestion, order: e.target.value })} placeholder="e.g. 42" />
+                <input type="number" className="form-control" style={{ color: GOV.text }} value={newQuestion.order} onChange={e => setNewQuestion({ ...newQuestion, order: e.target.value })} placeholder="e.g. 42" />
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={() => { setShowCreateDialog(false); setNewQuestion(EMPTY_Q); }} className="flex-1 border rounded-md py-2 text-xs" style={{ borderColor: GOV.border, color: GOV.textMuted }}>Cancel</button>
@@ -250,12 +250,12 @@ const AdminQuestionsPanel = () => {
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Question Text *</label>
-              <textarea className="form-control resize-none" rows={3} style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingQuestion.text} onChange={e => setEditingQuestion({ ...editingQuestion, text: e.target.value })} />
+              <textarea className="form-control resize-none" rows={3} style={{ color: GOV.text }} value={editingQuestion.text} onChange={e => setEditingQuestion({ ...editingQuestion, text: e.target.value })} />
             </div>
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Section</label>
-                <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingQuestion.section} onChange={e => setEditingQuestion({ ...editingQuestion, section: e.target.value })}>
+                <select className="form-control" style={{ color: GOV.text }} value={editingQuestion.section} onChange={e => setEditingQuestion({ ...editingQuestion, section: e.target.value })}>
                   <option value="activities">Activities</option>
                   <option value="competencies">Competencies</option>
                   <option value="occupations">Occupations</option>
@@ -264,13 +264,13 @@ const AdminQuestionsPanel = () => {
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>RIASEC</label>
-                <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingQuestion.riasecType} onChange={e => setEditingQuestion({ ...editingQuestion, riasecType: e.target.value })}>
+                <select className="form-control" style={{ color: GOV.text }} value={editingQuestion.riasecType} onChange={e => setEditingQuestion({ ...editingQuestion, riasecType: e.target.value })}>
                   {['R', 'I', 'A', 'S', 'E', 'C'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Order</label>
-                <input type="number" className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingQuestion.order || ''} onChange={e => setEditingQuestion({ ...editingQuestion, order: e.target.value })} />
+                <input type="number" className="form-control" style={{ color: GOV.text }} value={editingQuestion.order || ''} onChange={e => setEditingQuestion({ ...editingQuestion, order: e.target.value })} />
               </div>
             </div>
             <div className="flex gap-2 pt-2">

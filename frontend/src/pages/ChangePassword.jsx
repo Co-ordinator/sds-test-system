@@ -73,7 +73,8 @@ const ChangePassword = () => {
                   {...register('currentPassword', { required: 'Current password is required' })}
                   autoComplete="current-password"
                   className={`form-control ${TYPO.body} pr-10`}
-                  style={{ borderBottomColor: errors.currentPassword ? GOV.error : GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
+                  aria-invalid={errors.currentPassword ? 'true' : 'false'}
                 />
                 <button
                   type="button"
@@ -99,15 +100,16 @@ const ChangePassword = () => {
                   type={showNew ? 'text' : 'password'}
                   {...register('newPassword', {
                     required: 'New password is required',
-                    minLength: { value: 8, message: 'Password must be at least 8 characters' },
+                    minLength: { value: 12, message: 'Password must be at least 12 characters' },
                     pattern: {
-                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/,
-                      message: 'Password must contain both letters and numbers'
+                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/,
+                      message: 'Password must be at least 12 characters and contain both letters and numbers'
                     }
                   })}
                   autoComplete="new-password"
                   className={`form-control ${TYPO.body} pr-10`}
-                  style={{ borderBottomColor: errors.newPassword ? GOV.error : GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
+                  aria-invalid={errors.newPassword ? 'true' : 'false'}
                 />
                 <button
                   type="button"
@@ -122,7 +124,7 @@ const ChangePassword = () => {
                 <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.newPassword.message}</p>
               )}
               <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textMuted }}>
-                At least 8 characters with both letters and numbers
+                At least 12 characters with both letters and numbers
               </p>
             </div>
 
@@ -140,7 +142,8 @@ const ChangePassword = () => {
                   })}
                   autoComplete="new-password"
                   className={`form-control ${TYPO.body} pr-10`}
-                  style={{ borderBottomColor: errors.confirmPassword ? GOV.error : GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
+                  aria-invalid={errors.confirmPassword ? 'true' : 'false'}
                 />
                 <button
                   type="button"

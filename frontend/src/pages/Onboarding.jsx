@@ -96,7 +96,6 @@ export default function Onboarding() {
   const [submitError, setSubmitError] = useState('');
 
   const [form, setForm] = useState({
-    fullName: '',
     gender: '',
     region: 'Hhohho',
     townCity: '',
@@ -113,8 +112,6 @@ export default function Onboarding() {
     currentOccupationId: null,
     yearsExperience: '',
   });
-
-  const [step1Errors, setStep1Errors] = useState({});
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -144,21 +141,15 @@ export default function Onboarding() {
   };
 
   const buildProfilePayload = () => {
-    const fullName = (form.fullName || '').trim();
-    const parts = fullName.split(/\s+/).filter(Boolean);
-    const firstName = parts[0] || '';
-    const lastName = parts.slice(1).join(' ') || '';
-    
-    // Map userType to backend enum values
+    // First name + surname are captured at registration; onboarding doesn't
+    // re-collect them. If they need to change, the Profile page handles it.
     const userTypeMap = {
       'school_student': 'High School Student',
       'university_student': 'University Student',
       'professional': 'Professional'
     };
-    
+
     return {
-      firstName: firstName || null,
-      lastName: lastName || null,
       gender: form.gender === 'Male' ? 'male' : form.gender === 'Female' ? 'female' : null,
       region: REGION_TO_BACKEND[form.region] || (form.region ? form.region.toLowerCase() : null),
       district: (form.townCity || '').trim() || null,
@@ -277,33 +268,11 @@ export default function Onboarding() {
                   Personal Information
                 </h1>
                 <p className="text-xs text-center" style={{ color: GOV.textMuted }}>
-                  Please provide your personal details as they appear on your national ID.
+                  Tell us a little more about yourself so we can tailor your career recommendations.
                 </p>
               </div>
 
           <div className="space-y-6">
-            <div>
-              <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>
-                Full Legal Name *
-              </label>
-              <input
-                type="text"
-                value={form.fullName}
-                onChange={(e) => { update('fullName', e.target.value); setStep1Errors(p => ({ ...p, fullName: '' })); }}
-                placeholder="e.g. Thabo Dlamini"
-                className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: step1Errors.fullName ? GOV.error : GOV.border, color: GOV.text }}
-              />
-              {step1Errors.fullName
-                ? <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{step1Errors.fullName}</p>
-                : <p className={`mt-1 flex items-center gap-1.5 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                    <span className="w-3 h-3 rounded-full border flex items-center justify-center text-[9px] font-bold flex-shrink-0" style={{ borderColor: GOV.textHint, color: GOV.textHint }}>i</span>
-                    Use the name exactly as it appears on your national ID.
-                  </p>
-              }
-            </div>
-
-
             <div>
               <label className={`block ${TYPO.label} mb-1.5`} style={{ color: GOV.text }}>
                 Gender Identity
@@ -337,7 +306,7 @@ export default function Onboarding() {
                   type="button"
                   onClick={handleBack}
                   className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
-                  style={{ borderColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   Back
                 </button>
@@ -377,7 +346,7 @@ export default function Onboarding() {
                   value={form.region}
                   onChange={(e) => update('region', e.target.value)}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   {ESWATINI_REGIONS.map((r) => (
                     <option key={r} value={r}>{r}</option>
@@ -401,7 +370,7 @@ export default function Onboarding() {
                     }}
                     placeholder="Search or select town..."
                     className={`form-control-with-icon pl-8 ${TYPO.body}`}
-                    style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                    style={{ color: GOV.text }}
                     autoComplete="off"
                   />
                 </div>
@@ -443,7 +412,7 @@ export default function Onboarding() {
                   onChange={(e) => update('areaNeighborhood', e.target.value)}
                   placeholder="e.g. Msunduza, Fonteyn"
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 />
               </div>
               {userType === 'professional' ? (
@@ -496,7 +465,7 @@ export default function Onboarding() {
                   type="button"
                   onClick={handleBack}
                   className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
-                  style={{ borderColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   Back
                 </button>
@@ -537,7 +506,7 @@ export default function Onboarding() {
                 value={form.preferredLanguage}
                 onChange={(e) => update('preferredLanguage', e.target.value)}
                 className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 {LANGUAGES.map((l) => (
                   <option key={l} value={l}>{l}</option>
@@ -551,7 +520,7 @@ export default function Onboarding() {
                 value={form.highestGrade}
                 onChange={(e) => update('highestGrade', e.target.value)}
                 className={`form-control ${TYPO.body}`}
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 {GRADES.map((g) => (
                   <option key={g} value={g}>{g}</option>
@@ -575,7 +544,7 @@ export default function Onboarding() {
                   onChange={(e) => update('degreeProgram', e.target.value)}
                   placeholder="e.g. Bachelor of Commerce in Accounting"
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 />
               </div>
               <div>
@@ -584,7 +553,7 @@ export default function Onboarding() {
                   value={form.yearOfStudy}
                   onChange={(e) => update('yearOfStudy', e.target.value)}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   <option value="">— Select —</option>
                   {[1,2,3,4,5,6].map(y => <option key={y} value={y}>Year {y}</option>)}
@@ -618,7 +587,7 @@ export default function Onboarding() {
                   value={form.yearsExperience}
                   onChange={(e) => update('yearsExperience', e.target.value)}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   <option value="">— Select —</option>
                   {[1,2,3,4,5,6,7,8,9,10,15,20].map(y => <option key={y} value={y}>{y}{y === 20 ? '+' : ''} year{y !== 1 ? 's' : ''}</option>)}
@@ -636,7 +605,7 @@ export default function Onboarding() {
                   type="button"
                   onClick={handleBack}
                   className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2`}
-                  style={{ borderColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   Back
                 </button>
@@ -680,7 +649,9 @@ export default function Onboarding() {
                 <tbody>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall} w-1/3`} style={{ color: GOV.textHint }}>Full name</td>
-                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>{form.fullName || '—'}</td>
+                    <td className={`px-4 py-2 ${TYPO.bodySmall} font-medium`} style={{ color: GOV.text }}>
+                      {[user?.firstName, user?.lastName].filter(Boolean).join(' ') || '—'}
+                    </td>
                   </tr>
                   <tr className="border-b" style={{ borderColor: GOV.border }}>
                     <td className={`px-4 py-2 ${TYPO.bodySmall}`} style={{ color: GOV.textHint }}>Gender</td>
@@ -763,7 +734,7 @@ export default function Onboarding() {
                   onClick={handleBack}
                   disabled={submitting}
                   className={`px-4 py-2.5 rounded-md font-medium ${TYPO.bodySmall} border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-                  style={{ borderColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   Back
                 </button>

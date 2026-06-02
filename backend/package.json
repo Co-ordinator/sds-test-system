@@ -11,6 +11,8 @@
     "test:error-contract": "jest --runInBand tests/error.middleware.test.js tests/validation.middleware.test.js",
     "check:no-console": "node scripts/check-no-console.js",
     "ensure:user-schema": "node scripts/ensure-user-schema.js",
+    "cleanup:unverified": "node scripts/cleanup-unverified-users.js",
+    "cleanup:unverified:dry": "node scripts/cleanup-unverified-users.js --dry-run",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "seed": "sequelize-cli db:seed:all",

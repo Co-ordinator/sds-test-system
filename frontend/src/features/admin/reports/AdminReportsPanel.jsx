@@ -34,7 +34,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
           value={filters.region}
           onChange={e => setFilters(p => ({ ...p, region: e.target.value }))}
           className="form-control w-full"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
         >
           <option value="">All Regions</option>
           {REGIONS.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
@@ -46,7 +46,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
           value={filters.gender}
           onChange={e => setFilters(p => ({ ...p, gender: e.target.value }))}
           className="form-control w-full"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
         >
           <option value="">All Genders</option>
           {GENDERS.map(g => <option key={g} value={g}>{GENDER_LABELS[g]}</option>)}
@@ -58,7 +58,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
           value={filters.userType}
           onChange={e => setFilters(p => ({ ...p, userType: e.target.value }))}
           className="form-control w-full"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
         >
           <option value="">All User Types</option>
           {USER_TYPES.map(u => <option key={u} value={u}>{u}</option>)}
@@ -70,7 +70,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
           value={filters.institutionId}
           onChange={e => setFilters(p => ({ ...p, institutionId: e.target.value }))}
           className="form-control w-full"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
         >
           <option value="">All Institutions</option>
           {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
@@ -83,7 +83,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
           value={filters.startDate}
           onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))}
           className="form-control w-full"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
         />
       </div>
       <div>
@@ -93,7 +93,7 @@ const FilterSection = ({ filters, setFilters, institutions }) => (
           value={filters.endDate}
           onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))}
           className="form-control w-full"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
         />
       </div>
     </div>

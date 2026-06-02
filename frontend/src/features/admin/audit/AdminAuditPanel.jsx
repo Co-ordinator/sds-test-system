@@ -98,7 +98,7 @@ const AdminAuditPanel = () => {
                   </div>
                   <div>
                     <p className="text-sm font-semibold mb-2" style={{ color: GOV.text }}>Description</p>
-                    <div className="border rounded-md p-4 text-sm" style={{ borderColor: GOV.border, color: GOV.text }}>
+                    <div className="border rounded-md p-4 text-sm" style={{ color: GOV.text }}>
                       {selectedLog.description || 'No description available.'}
                     </div>
                   </div>
@@ -195,16 +195,16 @@ const AdminAuditPanel = () => {
                   value={filters.search}
                   onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(0); }} />
               </div>
-              <select className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+              <select className="px-2 py-1.5 border rounded-md text-xs" style={{ color: GOV.text }}
                 value={filters.actionType}
                 onChange={e => { setFilters(f => ({ ...f, actionType: e.target.value })); setPage(0); }}>
                 <option value="">All actions</option>
                 {ACTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <input type="date" className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+              <input type="date" className="px-2 py-1.5 border rounded-md text-xs" style={{ color: GOV.text }}
                 value={filters.startDate}
                 onChange={e => { setFilters(f => ({ ...f, startDate: e.target.value })); setPage(0); }} />
-              <input type="date" className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+              <input type="date" className="px-2 py-1.5 border rounded-md text-xs" style={{ color: GOV.text }}
                 value={filters.endDate}
                 onChange={e => { setFilters(f => ({ ...f, endDate: e.target.value })); setPage(0); }} />
               <div className="ml-auto flex items-center gap-2">

@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { User, EducationLevel, Occupation, Institution } = require('../models');
 const { Op } = require('sequelize');
 const { generateStudentCode } = require('../utils/generateStudentCode');
-const { hashValue } = require('../utils/security.util');
+const { hashValue, safeCompareHex } = require('../utils/security.util');
 const { BadRequestError, ConflictError, AuthError, NotFoundError } = require('../utils/errors/appError');
 
 // Grade level text → education_levels.level mapping
@@ -68,17 +68,54 @@ const hashToken = (tokenValue) => {
   return crypto.createHash('sha256').update(tokenValue).digest('hex');
 };
 
+const OTP_LENGTH = 6;
+const OTP_TTL_MS = 15 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+// Resend throttling (per-account, server-enforced — the 30s client cooldown is UX only).
+const RESEND_MIN_INTERVAL_MS = 30 * 1000;
+const RESEND_DAILY_CAP = 5;
+const RESEND_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+// Login throttling
+const LOGIN_MAX_FAILED_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
+
+// Refresh-token rotation
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+// Grace window during which a just-rotated RT is still recognised — required so
+// concurrent in-flight refreshes from the same browser don't accidentally trip
+// the reuse-detection guard.
+const REFRESH_TOKEN_REUSE_GRACE_MS = 60 * 1000;
+
+const generateEmailOtp = () => {
+  const max = 10 ** OTP_LENGTH;
+  const value = crypto.randomInt(0, max);
+  return String(value).padStart(OTP_LENGTH, '0');
+};
+
+const PII_FIELDS_TO_SCRUB = [
+  'firstName', 'lastName', 'email', 'username', 'nationalId',
+  'phoneNumber', 'address', 'studentCode', 'studentNumber',
+  'workplaceName', 'currentInstitution', 'currentOccupation', 'organization',
+  'testAdministratorCode', 'dateOfBirth'
+];
+
 module.exports = {
   signToken,
   signRefreshToken,
 
   /* ─── Register ────────────────────────────────────────────────────────── */
-  register: async ({ nationalId, email, password, consent }) => {
+  register: async ({ firstName, lastName, nationalId, email, password, consent }) => {
     if (!consent) throw new BadRequestError('You must accept the data processing terms to register.', 'NO_CONSENT');
+    if (!firstName?.trim()) throw new BadRequestError('Given name is required', 'FIRST_NAME_REQUIRED');
+    if (!lastName?.trim()) throw new BadRequestError('Surname is required', 'LAST_NAME_REQUIRED');
     if (!nationalId?.trim()) throw new BadRequestError('National ID is required', 'NATIONAL_ID_REQUIRED');
     if (!email?.trim()) throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
     if (!password) throw new BadRequestError('Password is required', 'PASSWORD_REQUIRED');
 
+    const cleanFirstName = String(firstName).trim();
+    const cleanLastName = String(lastName).trim();
     const cleanNationalId = String(nationalId).trim();
     const cleanEmail = String(email).trim().toLowerCase();
     if (!/^\d{13}$/.test(cleanNationalId)) {
@@ -87,18 +124,24 @@ module.exports = {
 
     const existingUser = await User.findOne({ where: { nationalIdHash: hashValue(cleanNationalId) } });
     if (existingUser) {
-      throw new ConflictError('An account with this National ID already exists. Please login instead.', 'NATIONAL_ID_EXISTS');
+      throw new ConflictError(
+        'An account with this National ID already exists. If you didn\'t complete registration, request a new verification code or sign in.',
+        'NATIONAL_ID_EXISTS'
+      );
     }
 
     const existingEmailUser = await User.findOne({
       where: { email: { [Op.iLike]: cleanEmail } }
     });
     if (existingEmailUser) {
-      throw new ConflictError('An account with this email already exists. Please login instead.', 'EMAIL_EXISTS');
+      throw new ConflictError(
+        'An account with this email already exists. If you didn\'t complete registration, request a new verification code or sign in.',
+        'EMAIL_EXISTS'
+      );
     }
 
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    const emailTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const emailOtp = generateEmailOtp();
+    const emailOtpExpires = new Date(Date.now() + OTP_TTL_MS);
     const studentCode = await generateStudentCode();
     const { dateOfBirth, gender } = parseNationalId(cleanNationalId);
 
@@ -108,8 +151,8 @@ module.exports = {
         nationalId: cleanNationalId,
         email: cleanEmail,
         password,
-        firstName: null,
-        lastName: null,
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
         onboardingCompleted: false,
         dateOfBirth,
         gender,
@@ -117,17 +160,27 @@ module.exports = {
         studentCode,
         isConsentGiven: true,
         consentDate: new Date(),
-        emailVerificationToken: hashToken(emailToken),
-        emailVerificationExpires: emailTokenExpires
+        emailVerificationToken: hashToken(emailOtp),
+        emailVerificationExpires: emailOtpExpires,
+        emailVerificationAttempts: 0,
+        emailVerificationLastSentAt: new Date(),
+        emailVerificationResendCount: 0,
+        emailVerificationResendWindowStartedAt: new Date()
       });
     } catch (error) {
       if (error?.name === 'SequelizeUniqueConstraintError') {
         const fields = (error?.errors || []).map((entry) => entry.path);
         if (fields.includes('email')) {
-          throw new ConflictError('An account with this email already exists. Please login instead.', 'EMAIL_EXISTS');
+          throw new ConflictError(
+            'An account with this email already exists. If you didn\'t complete registration, request a new verification code or sign in.',
+            'EMAIL_EXISTS'
+          );
         }
         if (fields.includes('national_id_hash') || fields.includes('nationalIdHash')) {
-          throw new ConflictError('An account with this National ID already exists. Please login instead.', 'NATIONAL_ID_EXISTS');
+          throw new ConflictError(
+            'An account with this National ID already exists. If you didn\'t complete registration, request a new verification code or sign in.',
+            'NATIONAL_ID_EXISTS'
+          );
         }
         throw new ConflictError('An account with these details already exists. Please login instead.', 'USER_EXISTS');
       }
@@ -137,45 +190,62 @@ module.exports = {
       throw error;
     }
 
-    return { user, emailToken };
+    return { user, emailOtp };
   },
 
-  /* ─── Verify Email ────────────────────────────────────────────────────── */
-  verifyEmail: async (tokenParam) => {
-    let user = await User.findOne({
-      where: { emailVerificationToken: hashToken(tokenParam), emailVerificationExpires: { [Op.gt]: new Date() } }
-    });
+  /* ─── Verify Email (OTP) ──────────────────────────────────────────────── */
+  verifyEmail: async ({ email, otp }) => {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanOtp = String(otp || '').trim();
 
-    if (!user) {
-      // Check if this token belongs to an already verified user by checking recent tokens
-      // We need to find the user by checking if they have isEmailVerified=true and recently had this token
-      const recentlyVerifiedUser = await User.findOne({
-        where: { 
-          isEmailVerified: true,
-          // Check if user was verified in the last hour (to handle race conditions)
-          updatedAt: { [Op.gt]: new Date(Date.now() - 60 * 60 * 1000) }
-        },
-        order: [['updatedAt', 'DESC']]
-      });
-      
-      if (recentlyVerifiedUser) {
-        let token = null;
-        let refreshToken = null;
-        try {
-          token = signToken(recentlyVerifiedUser.id, recentlyVerifiedUser.role);
-          refreshToken = signRefreshToken(recentlyVerifiedUser.id, recentlyVerifiedUser.role);
-          recentlyVerifiedUser.refreshToken = hashToken(refreshToken);
-          recentlyVerifiedUser.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-          await recentlyVerifiedUser.save();
-        } catch (_) {}
-        return { user: recentlyVerifiedUser, token, refreshToken, alreadyVerified: true };
+    // Uniform failure response — never reveal *which* check failed:
+    // - email format invalid
+    // - email not registered
+    // - account already verified (don't confirm account existence)
+    // - OTP wrong, expired, or already consumed
+    const invalidOtp = () => new BadRequestError(
+      'Verification code is invalid or has expired',
+      'INVALID_OTP'
+    );
+
+    if (!cleanEmail || !/^\d{6}$/.test(cleanOtp)) {
+      throw invalidOtp();
+    }
+
+    const user = await User.findOne({ where: { email: { [Op.iLike]: cleanEmail } } });
+    if (!user) throw invalidOtp();
+
+    // SECURITY: even if the account is already verified, do NOT issue tokens
+    // without an OTP match. Otherwise any actor that knows the email could
+    // hijack the session by sending an arbitrary 6-digit guess.
+    if (user.isEmailVerified) throw invalidOtp();
+
+    const storedHash = user.emailVerificationToken;
+    const expiresAt = user.emailVerificationExpires;
+    if (!storedHash || !expiresAt || new Date(expiresAt).getTime() < Date.now()) {
+      throw invalidOtp();
+    }
+
+    if (!safeCompareHex(storedHash, hashToken(cleanOtp))) {
+      // Per-account brute-force cap: count this wrong attempt and, once we've
+      // hit the limit, invalidate the OTP so the attacker must wait for a new
+      // one to be issued via resend (which also clears the counter).
+      const nextAttempts = (user.emailVerificationAttempts || 0) + 1;
+      const updates = { emailVerificationAttempts: nextAttempts };
+      if (nextAttempts >= OTP_MAX_ATTEMPTS) {
+        updates.emailVerificationToken = null;
+        updates.emailVerificationExpires = null;
       }
-      throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
+      await user.update(updates).catch(() => {});
+      throw invalidOtp();
     }
 
     user.isEmailVerified = true;
     user.emailVerificationToken = null;
     user.emailVerificationExpires = null;
+    user.emailVerificationAttempts = 0;
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = null;
     await user.save();
 
     let token = null;
@@ -184,7 +254,9 @@ module.exports = {
       token = signToken(user.id, user.role);
       refreshToken = signRefreshToken(user.id, user.role);
       user.refreshToken = hashToken(refreshToken);
-      user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+      user.previousRefreshToken = null;
+      user.previousRefreshTokenExpires = null;
       await user.save();
     } catch (_) {}
 
@@ -197,33 +269,78 @@ module.exports = {
       throw new BadRequestError('Please provide your email or username and password', 'LOGIN_FIELDS_REQUIRED');
     }
 
+    const cleanIdentifier = String(identifier).trim();
+
+    // Case-insensitive email match — registration always lowercases, but legacy
+    // rows or admin-created accounts may be mixed case.
     const user = await User.findOne({
-      where: { [Op.or]: [{ studentCode: identifier }, { email: identifier }, { username: identifier }, { studentNumber: identifier }] }
+      where: {
+        [Op.or]: [
+          { studentCode: cleanIdentifier },
+          { email: { [Op.iLike]: cleanIdentifier } },
+          { username: cleanIdentifier },
+          { studentNumber: cleanIdentifier }
+        ]
+      }
     });
 
-    if (!user || !(await user.comparePassword(password))) {
-      throw new AuthError('Incorrect email/username or password', 'INVALID_CREDENTIALS', 401);
+    const invalidCreds = () => new AuthError('Incorrect email/username or password', 'INVALID_CREDENTIALS', 401);
+
+    if (!user) throw invalidCreds();
+
+    // Per-account lockout (NIST SP 800-63B §5.2.2 / OWASP ASVS V2.2.1). We
+    // surface the lockout to the legitimate user (UX) at the cost of confirming
+    // account existence — acceptable given the attacker has already racked up
+    // 5+ failures by this point.
+    const now = new Date();
+    if (user.lockoutUntil && new Date(user.lockoutUntil).getTime() > now.getTime()) {
+      const retryAfterSec = Math.ceil((new Date(user.lockoutUntil).getTime() - now.getTime()) / 1000);
+      const error = new AuthError(
+        'This account is temporarily locked because of too many failed sign-in attempts. Try again later or reset your password.',
+        'ACCOUNT_LOCKED',
+        423
+      );
+      error.retryAfterSec = retryAfterSec;
+      throw error;
+    }
+
+    if (!(await user.comparePassword(password))) {
+      // Increment failure counter. We trip the lockout once we cross the
+      // threshold and re-arm the counter so the next attempt after lockout
+      // expiry doesn't immediately re-lock the account.
+      const nextFailed = (user.failedLoginAttempts || 0) + 1;
+      const updates = { failedLoginAttempts: nextFailed };
+      if (nextFailed >= LOGIN_MAX_FAILED_ATTEMPTS) {
+        updates.lockoutUntil = new Date(Date.now() + LOGIN_LOCKOUT_MS);
+        updates.failedLoginAttempts = 0;
+      }
+      await user.update(updates).catch(() => {});
+      throw invalidCreds();
     }
 
     const requiresVerification = user.email && !user.isEmailVerified && !user.createdByTestAdministrator;
     if (requiresVerification) {
-      const error = new AuthError('Your email address is not verified. Please check your inbox for the verification link.', 'EMAIL_NOT_VERIFIED', 403);
+      const error = new AuthError('Your email address is not verified. Please enter the verification code we sent to your inbox.', 'EMAIL_NOT_VERIFIED', 403);
       error.requiresVerification = true;
       throw error;
     }
 
     user.lastLogin = new Date();
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = null;
     await user.save();
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);
     user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    user.previousRefreshToken = null;
+    user.previousRefreshTokenExpires = null;
     await user.save();
 
     const { Permission } = require('../models');
     const userWithPerms = await User.findByPk(user.id, {
-      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken', 'refreshTokenExpires'] },
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken', 'refreshTokenExpires', 'previousRefreshToken', 'previousRefreshTokenExpires'] },
       include: [{ model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } }]
     });
 
@@ -252,8 +369,11 @@ module.exports = {
       throw error;
     }
 
+    // SECURITY: nationalId and email are deliberately NOT in this list. They
+    // are the identity anchors for the account and must only be changed via
+    // an administrator-mediated flow (audited identity change).
     const allowed = [
-      'firstName', 'lastName', 'gender', 'nationalId', 'phoneNumber', 'region', 'district', 'address',
+      'firstName', 'lastName', 'gender', 'phoneNumber', 'region', 'district', 'address',
       'currentInstitution', 'gradeLevel', 'employmentStatus', 'currentOccupation',
       'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds',
       'workplaceInstitutionId', 'workplaceName', 'degreeProgram', 'yearOfStudy',
@@ -349,63 +469,195 @@ module.exports = {
   },
 
   /* ─── Forgot Password ─────────────────────────────────────────────────── */
+  /**
+   * Non-enumerable: returns `{ shouldSend, user, resetToken }`. The caller
+   * MUST always respond to the client with the same generic message — never
+   * confirm whether the identifier actually maps to a real account.
+   */
   forgotPassword: async (identifier) => {
-    if (!identifier) throw new BadRequestError('Login number, email, username, or student number is required', 'IDENTIFIER_REQUIRED');
+    if (!identifier) {
+      throw new BadRequestError('Login number, email, username, or student number is required', 'IDENTIFIER_REQUIRED');
+    }
+
+    const cleanIdentifier = String(identifier).trim();
 
     const user = await User.findOne({
-      where: { [Op.or]: [{ studentCode: identifier }, { email: identifier }, { username: identifier }, { studentNumber: identifier }] }
+      where: {
+        [Op.or]: [
+          { studentCode: cleanIdentifier },
+          { email: { [Op.iLike]: cleanIdentifier } },
+          { username: cleanIdentifier },
+          { studentNumber: cleanIdentifier }
+        ]
+      }
     });
-    if (!user) throw new NotFoundError('No user found with that login number, email, username, or student number', 'USER_NOT_FOUND');
-    if (!user.email) throw new BadRequestError('Cannot send reset link: no email on file', 'EMAIL_MISSING');
+
+    if (!user || !user.email) {
+      return { shouldSend: false, user: null, resetToken: null };
+    }
 
     const resetToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     user.passwordResetToken = hashToken(resetToken);
     user.passwordResetExpires = new Date(Date.now() + 3600000);
     await user.save();
 
-    return { user, resetToken };
+    return { shouldSend: true, user, resetToken };
   },
 
   /* ─── Reset Password ──────────────────────────────────────────────────── */
+  /**
+   * Atomic reset:
+   *  - constant-time hash comparison
+   *  - issues a brand-new refresh-token family
+   *  - nukes any existing session (OWASP ASVS V3.5.4 / NIST 800-63B §7.1)
+   *  - marks the email verified, since clicking the reset link proves email
+   *    control (Auth0 / AWS Cognito convention)
+   */
   resetPassword: async (tokenParam, newPassword) => {
-    const decoded = jwt.verify(tokenParam, process.env.JWT_SECRET);
-    const user = await User.findOne({
-      where: { id: decoded.id, passwordResetToken: hashToken(tokenParam), passwordResetExpires: { [Op.gt]: new Date() } }
-    });
-    if (!user) throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
+    const decoded = (() => {
+      try { return jwt.verify(tokenParam, process.env.JWT_SECRET); }
+      catch (_) { throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN'); }
+    })();
+
+    const candidate = await User.findOne({ where: { id: decoded.id } });
+    if (!candidate || !candidate.passwordResetToken || !candidate.passwordResetExpires) {
+      throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
+    }
+    if (new Date(candidate.passwordResetExpires).getTime() < Date.now()) {
+      throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
+    }
+    if (!safeCompareHex(candidate.passwordResetToken, hashToken(tokenParam))) {
+      throw new BadRequestError('Token is invalid or has expired', 'INVALID_TOKEN');
+    }
+    const user = candidate;
 
     user.password = newPassword;
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
+
+    // C-3: invalidate every other session by rotating the family.
+    user.refreshToken = null;
+    user.refreshTokenExpires = null;
+    user.previousRefreshToken = null;
+    user.previousRefreshTokenExpires = null;
+
+    // C-4: clicking the reset link proves email ownership.
+    if (!user.isEmailVerified) {
+      user.isEmailVerified = true;
+      user.emailVerificationToken = null;
+      user.emailVerificationExpires = null;
+      user.emailVerificationAttempts = 0;
+    }
+
+    // Clear any lockout, force-change flag, and abandoned-OTP throttle state.
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = null;
+    user.mustChangePassword = false;
+
     await user.save();
 
     const token = signToken(user.id, user.role);
     const refreshToken = signRefreshToken(user.id, user.role);
     user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
     await user.save();
     return { user, token, refreshToken };
   },
 
-  /* ─── Refresh Token ───────────────────────────────────────────────────── */
+  /* ─── Refresh Token (rotation + reuse detection) ──────────────────────── */
+  /**
+   * Issues a new (access, refresh) pair and rotates the refresh-token family.
+   * The previously-current RT is parked in `previousRefreshToken` for a short
+   * grace window so concurrent in-flight refreshes from the same browser don't
+   * trip reuse detection. Any RT that matches the *previous* slot but not the
+   * current one is treated as a replay attack and burns the entire session.
+   *
+   * Returns `{ newAccessToken, newRefreshToken }` on success.
+   */
   refreshAccessToken: async (refreshTokenValue) => {
     if (!refreshTokenValue) throw new AuthError('No refresh token provided', 'REFRESH_TOKEN_MISSING', 401);
-    const decoded = jwt.verify(refreshTokenValue, process.env.JWT_REFRESH_SECRET);
-    const user = await User.findOne({
-      where: { id: decoded.id, refreshToken: hashToken(refreshTokenValue), refreshTokenExpires: { [Op.gt]: new Date() } }
-    });
-    if (!user) throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
-    const newAccessToken = signToken(user.id, user.role);
-    return { newAccessToken };
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshTokenValue, process.env.JWT_REFRESH_SECRET);
+    } catch (_) {
+      throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
+    }
+
+    const presentedHash = hashToken(refreshTokenValue);
+    const user = await User.findOne({ where: { id: decoded.id } });
+    if (!user) {
+      throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
+    }
+
+    const now = Date.now();
+    const currentValid = user.refreshToken
+      && user.refreshTokenExpires
+      && new Date(user.refreshTokenExpires).getTime() > now
+      && safeCompareHex(user.refreshToken, presentedHash);
+
+    if (currentValid) {
+      const newRefreshToken = signRefreshToken(user.id, user.role);
+      // Park the *just-rotated* hash in `previousRefreshToken` so concurrent
+      // in-flight refreshes don't get bounced as replays.
+      user.previousRefreshToken = user.refreshToken;
+      user.previousRefreshTokenExpires = new Date(now + REFRESH_TOKEN_REUSE_GRACE_MS);
+      user.refreshToken = hashToken(newRefreshToken);
+      user.refreshTokenExpires = new Date(now + REFRESH_TOKEN_TTL_MS);
+      await user.save();
+
+      const newAccessToken = signToken(user.id, user.role);
+      return { newAccessToken, newRefreshToken, reuseDetected: false };
+    }
+
+    // If we get here and the *previous* RT slot matches, it could be either a
+    // race (acceptable inside the grace window) or a replay (outside it). We
+    // only treat outside-grace replays as compromise.
+    if (user.previousRefreshToken && safeCompareHex(user.previousRefreshToken, presentedHash)) {
+      const previousValid = user.previousRefreshTokenExpires
+        && new Date(user.previousRefreshTokenExpires).getTime() > now;
+      if (previousValid) {
+        // Grace-window race — issue a new access token without further
+        // rotation, but don't hand out a fresh RT (the latest one is already
+        // out there in the legitimate client).
+        const newAccessToken = signToken(user.id, user.role);
+        return { newAccessToken, newRefreshToken: null, reuseDetected: false };
+      }
+
+      // Outside grace window → token reuse → revoke the entire family.
+      user.refreshToken = null;
+      user.refreshTokenExpires = null;
+      user.previousRefreshToken = null;
+      user.previousRefreshTokenExpires = null;
+      await user.save();
+
+      const error = new AuthError('Refresh token was reused — session revoked. Please sign in again.', 'REFRESH_TOKEN_REUSED', 401);
+      error.reuseDetected = true;
+      throw error;
+    }
+
+    throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
   },
 
   /* ─── Logout ──────────────────────────────────────────────────────────── */
   logout: async (refreshTokenValue) => {
     if (refreshTokenValue) {
-      const user = await User.findOne({ where: { refreshToken: hashToken(refreshTokenValue) } });
+      const hashed = hashToken(refreshTokenValue);
+      // Match either slot — current OR the just-rotated one. We don't trip
+      // reuse-detection on logout; the user is explicitly revoking.
+      const user = await User.findOne({
+        where: {
+          [Op.or]: [
+            { refreshToken: hashed },
+            { previousRefreshToken: hashed }
+          ]
+        }
+      });
       if (user) {
         user.refreshToken = null;
         user.refreshTokenExpires = null;
+        user.previousRefreshToken = null;
+        user.previousRefreshTokenExpires = null;
         await user.save();
       }
     }
@@ -420,33 +672,123 @@ module.exports = {
     return user;
   },
 
-  /* ─── Delete Account ──────────────────────────────────────────────────── */
+  /* ─── Delete Account (soft, with PII scrub) ───────────────────────────── */
+  /**
+   * Soft-deletes the user and scrubs PII fields so the row no longer
+   * reveals identity. Foreign-key references (assessments, audit logs) are
+   * preserved for regulatory reporting, but every relatable identifier is
+   * either nulled (releasing UNIQUE slots so the email/National-ID can be
+   * reused by a new account) or replaced with a benign placeholder.
+   *
+   * `User.paranoid = true` causes `destroy()` to set `deleted_at`, which is
+   * automatically filtered out by subsequent queries.
+   */
   deleteUserAccount: async (userId) => {
     const user = await User.findByPk(userId);
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
-    await user.destroy();
-    return user;
+
+    // Capture before scrub so the caller can audit-log the original email.
+    const snapshot = {
+      id: user.id,
+      email: user.email,
+      role: user.role
+    };
+
+    for (const field of PII_FIELDS_TO_SCRUB) {
+      // The `nationalId` setter cascades to `nationalIdHash`, so setting null
+      // here also clears the hash and frees the UNIQUE slot.
+      user.set(field, null);
+    }
+    user.isActive = false;
+    user.refreshToken = null;
+    user.refreshTokenExpires = null;
+    user.previousRefreshToken = null;
+    user.previousRefreshTokenExpires = null;
+    user.passwordResetToken = null;
+    user.passwordResetExpires = null;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    user.lockoutUntil = null;
+    user.failedLoginAttempts = 0;
+    user.piiScrubbedAt = new Date();
+
+    await user.save();
+    await user.destroy(); // paranoid: sets deletedAt
+
+    return { user, snapshot };
   },
 
   /* ─── Resend Verification ─────────────────────────────────────────────── */
+  /**
+   * Non-enumerable: returns the same shape regardless of whether the email is
+   * registered or already verified. `shouldSend` tells the caller whether a
+   * fresh OTP was actually generated (and therefore needs to be emailed).
+   * Throttled per-account with two layers:
+   *   - minimum 30 s between OTP issuances (`RESEND_MIN_INTERVAL_MS`)
+   *   - hard cap of N issuances inside a rolling 24 h window (`RESEND_DAILY_CAP`)
+   * Throttle responses still look like a successful send to the client.
+   */
   resendVerificationEmail: async (email) => {
-    const user = await User.findOne({ where: { email } });
-    if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
-    if (user.isEmailVerified) throw new BadRequestError('Email is already verified', 'EMAIL_ALREADY_VERIFIED');
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail) {
+      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
+    }
+
+    const user = await User.findOne({ where: { email: { [Op.iLike]: cleanEmail } } });
+    if (!user || user.isEmailVerified) {
+      return { shouldSend: false, user: null, emailOtp: null, previousVerification: null, throttled: false };
+    }
+
+    const now = Date.now();
+
+    // Min-interval throttle (per-account flood control).
+    if (user.emailVerificationLastSentAt) {
+      const since = now - new Date(user.emailVerificationLastSentAt).getTime();
+      if (since < RESEND_MIN_INTERVAL_MS) {
+        return { shouldSend: false, user, emailOtp: null, previousVerification: null, throttled: true };
+      }
+    }
+
+    // Rolling 24h cap.
+    let windowStart = user.emailVerificationResendWindowStartedAt
+      ? new Date(user.emailVerificationResendWindowStartedAt).getTime()
+      : 0;
+    let windowCount = user.emailVerificationResendCount || 0;
+    if (!windowStart || now - windowStart > RESEND_WINDOW_MS) {
+      windowStart = now;
+      windowCount = 0;
+    }
+    if (windowCount >= RESEND_DAILY_CAP) {
+      return { shouldSend: false, user, emailOtp: null, previousVerification: null, throttled: true };
+    }
 
     const previousVerification = {
       token: user.emailVerificationToken,
-      expires: user.emailVerificationExpires
+      expires: user.emailVerificationExpires,
+      attempts: user.emailVerificationAttempts || 0,
+      lastSentAt: user.emailVerificationLastSentAt,
+      resendCount: user.emailVerificationResendCount || 0,
+      resendWindowStartedAt: user.emailVerificationResendWindowStartedAt
     };
-    const emailToken = crypto.randomBytes(32).toString('hex');
-    user.emailVerificationToken = hashToken(emailToken);
-    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const emailOtp = generateEmailOtp();
+    user.emailVerificationToken = hashToken(emailOtp);
+    user.emailVerificationExpires = new Date(now + OTP_TTL_MS);
+    user.emailVerificationAttempts = 0;
+    user.emailVerificationLastSentAt = new Date(now);
+    user.emailVerificationResendCount = windowCount + 1;
+    user.emailVerificationResendWindowStartedAt = new Date(windowStart);
     await user.save();
 
-    return { user, emailToken, previousVerification };
+    return { shouldSend: true, user, emailOtp, previousVerification, throttled: false };
   },
 
   /* ─── Change Password ─────────────────────────────────────────────────── */
+  /**
+   * Verifies the current password, sets a new one, and invalidates all other
+   * sessions (OWASP ASVS V3.5.4). The caller must re-issue cookies for the
+   * just-authenticated request and clear them on every other device the next
+   * time those clients call /refresh-token.
+   */
   changePassword: async (userId, currentPassword, newPassword) => {
     if (!currentPassword || !newPassword) {
       throw new BadRequestError('Current password and new password are required', 'PASSWORD_FIELDS_REQUIRED');
@@ -459,8 +801,25 @@ module.exports = {
 
     user.password = newPassword;
     user.mustChangePassword = false;
+
+    // Invalidate every active session (NIST 800-63B §7.1).
+    user.refreshToken = null;
+    user.refreshTokenExpires = null;
+    user.previousRefreshToken = null;
+    user.previousRefreshTokenExpires = null;
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = null;
     await user.save();
-    return user;
+
+    // Re-issue tokens for the just-authenticated session so the user's
+    // current device keeps working.
+    const accessToken = signToken(user.id, user.role);
+    const refreshToken = signRefreshToken(user.id, user.role);
+    user.refreshToken = hashToken(refreshToken);
+    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    await user.save();
+
+    return { user, accessToken, refreshToken };
   },
 
   /** Recompute onboarding completion after profile updates (Test Takers only). */

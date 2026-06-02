@@ -36,7 +36,7 @@ const SubjectForm = ({ value, onChange, onSubmit, submitLabel, saving }) => (
   <form className="space-y-3" onSubmit={onSubmit}>
     <div>
       <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Name *</label>
-      <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }}
+      <input className="form-control" style={{ color: GOV.text }}
         value={value.name} onChange={e => onChange({ ...value, name: e.target.value })}
         required placeholder="e.g. Mathematics" />
     </div>
@@ -48,14 +48,14 @@ const SubjectForm = ({ value, onChange, onSubmit, submitLabel, saving }) => (
     <div className="grid grid-cols-2 gap-2">
       <div>
         <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Level</label>
-        <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }}
+        <select className="form-control" style={{ color: GOV.text }}
           value={value.level} onChange={e => onChange({ ...value, level: e.target.value })}>
           {LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
         </select>
       </div>
       <div>
         <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Display Order</label>
-        <input type="number" className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }}
+        <input type="number" className="form-control" style={{ color: GOV.text }}
           value={value.displayOrder} onChange={e => onChange({ ...value, displayOrder: Number(e.target.value) })}
           min={0} />
       </div>
@@ -63,7 +63,7 @@ const SubjectForm = ({ value, onChange, onSubmit, submitLabel, saving }) => (
     <div>
       <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Description</label>
       <textarea className="form-control resize-none" rows={2}
-        style={{ borderBottomColor: GOV.border, color: GOV.text }}
+        style={{ color: GOV.text }}
         value={value.description} onChange={e => onChange({ ...value, description: e.target.value })}
         placeholder="Optional description…" />
     </div>
@@ -213,7 +213,7 @@ const AdminSubjectsPanel = () => {
       <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
         <input className="form-control-with-icon pl-7 text-xs w-44"
-          style={{ borderBottomColor: GOV.border, color: GOV.text }}
+          style={{ color: GOV.text }}
           placeholder="Search subjects…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <span className="text-xs" style={{ color: GOV.textMuted }}>{subjects.length} total</span>

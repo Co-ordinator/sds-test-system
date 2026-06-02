@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Download, BookOpen, Building2, Award, ChevronDown, ChevronUp,
@@ -597,7 +597,7 @@ const TestResults = () => {
           <p className="text-sm mb-4" style={{ color: GOV.text }}>{error}</p>
           <div className="flex gap-3 justify-center">
             <button type="button" onClick={() => navigate(getDashboardPath())}
-              className="px-4 py-2 rounded-md text-sm font-semibold border bg-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ borderColor: GOV.border, color: GOV.text }}>
+              className="px-4 py-2 rounded-md text-sm font-semibold border bg-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text }}>
               Dashboard
             </button>
             <button type="button" onClick={() => navigate('/test')}
@@ -1005,7 +1005,7 @@ const TestResults = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-md border transition-colors hover:bg-gray-50"
-                  style={{ borderColor: GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Application Form

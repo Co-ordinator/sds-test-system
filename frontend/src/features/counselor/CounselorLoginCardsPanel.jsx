@@ -38,7 +38,7 @@ const CounselorLoginCardsPanel = ({ isAdmin, institutions = [], userInstitutionI
           {isAdmin && (
             <div className="mb-4">
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Institution *</label>
-              <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={cardInstitutionId} onChange={e => setCardInstitutionId(e.target.value)}>
+              <select className="form-control" style={{ color: GOV.text }} value={cardInstitutionId} onChange={e => setCardInstitutionId(e.target.value)}>
                 <option value="">— Select institution —</option>
                 {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
@@ -53,7 +53,7 @@ const CounselorLoginCardsPanel = ({ isAdmin, institutions = [], userInstitutionI
               type="text"
               placeholder="e.g. Form5 or 11A"
               className="form-control"
-              style={{ borderBottomColor: GOV.border, color: GOV.text }}
+              style={{ color: GOV.text }}
               value={cardGrade}
               onChange={e => setCardGrade(e.target.value)}
             />

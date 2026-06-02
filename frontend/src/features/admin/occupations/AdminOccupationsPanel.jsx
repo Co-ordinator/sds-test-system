@@ -153,7 +153,7 @@ const AdminOccupationsPanel = () => {
     <>
       <div className="relative">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3" style={{ color: GOV.textMuted }} />
-        <input className="form-control-with-icon pl-7 text-xs w-40" style={{ borderBottomColor: GOV.border, color: GOV.text }} placeholder="Search occupations…" value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="form-control-with-icon pl-7 text-xs w-40" style={{ color: GOV.text }} placeholder="Search occupations…" value={search} onChange={e => setSearch(e.target.value)} />
       </div>
       <select className="text-xs border rounded-md px-2 py-1.5" style={{ borderColor: GOV.border, color: riasecFilter ? GOV.blue : GOV.textMuted }} value={riasecFilter} onChange={e => setRiasecFilter(e.target.value)}>
         <option value="">All RIASEC</option>
@@ -233,22 +233,22 @@ const AdminOccupationsPanel = () => {
             <form className="flex-1 overflow-y-auto p-5 space-y-3" onSubmit={async (e) => { await handleCreate(e); setShowCreateDialog(false); }}>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Name *</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newOcc.name} onChange={e => setNewOcc({ ...newOcc, name: e.target.value })} required placeholder="e.g. Software Engineer" />
+                <input className="form-control" style={{ color: GOV.text }} value={newOcc.name} onChange={e => setNewOcc({ ...newOcc, name: e.target.value })} required placeholder="e.g. Software Engineer" />
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Category</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newOcc.category} onChange={e => setNewOcc({ ...newOcc, category: e.target.value })} placeholder="e.g. Technology" />
+                <input className="form-control" style={{ color: GOV.text }} value={newOcc.category} onChange={e => setNewOcc({ ...newOcc, category: e.target.value })} placeholder="e.g. Technology" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Primary RIASEC</label>
-                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newOcc.primaryRiasec} onChange={e => setNewOcc({ ...newOcc, primaryRiasec: e.target.value })}>
+                  <select className="form-control" style={{ color: GOV.text }} value={newOcc.primaryRiasec} onChange={e => setNewOcc({ ...newOcc, primaryRiasec: e.target.value })}>
                     {['R', 'I', 'A', 'S', 'E', 'C'].map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Demand Level</label>
-                  <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newOcc.demandLevel} onChange={e => setNewOcc({ ...newOcc, demandLevel: e.target.value })}>
+                  <select className="form-control" style={{ color: GOV.text }} value={newOcc.demandLevel} onChange={e => setNewOcc({ ...newOcc, demandLevel: e.target.value })}>
                     <option value="high">High</option>
                     <option value="medium">Medium</option>
                     <option value="low">Low</option>
@@ -257,7 +257,7 @@ const AdminOccupationsPanel = () => {
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Description</label>
-                <textarea className="form-control resize-none" rows={2} style={{ borderBottomColor: GOV.border, color: GOV.text }} value={newOcc.description} onChange={e => setNewOcc({ ...newOcc, description: e.target.value })} placeholder="Brief description…" />
+                <textarea className="form-control resize-none" rows={2} style={{ color: GOV.text }} value={newOcc.description} onChange={e => setNewOcc({ ...newOcc, description: e.target.value })} placeholder="Brief description…" />
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={() => { setShowCreateDialog(false); setNewOcc(EMPTY_OCC); }} className="flex-1 border rounded-md py-2 text-xs" style={{ borderColor: GOV.border, color: GOV.textMuted }}>Cancel</button>
@@ -280,29 +280,29 @@ const AdminOccupationsPanel = () => {
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Name *</label>
-              <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingOcc.name || ''} onChange={e => setEditingOcc({ ...editingOcc, name: e.target.value })} />
+              <input className="form-control" style={{ color: GOV.text }} value={editingOcc.name || ''} onChange={e => setEditingOcc({ ...editingOcc, name: e.target.value })} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Category</label>
-                <input className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingOcc.category || ''} onChange={e => setEditingOcc({ ...editingOcc, category: e.target.value })} />
+                <input className="form-control" style={{ color: GOV.text }} value={editingOcc.category || ''} onChange={e => setEditingOcc({ ...editingOcc, category: e.target.value })} />
               </div>
               <div>
                 <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Primary RIASEC</label>
-                <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingOcc.primaryRiasec || 'R'} onChange={e => setEditingOcc({ ...editingOcc, primaryRiasec: e.target.value })}>
+                <select className="form-control" style={{ color: GOV.text }} value={editingOcc.primaryRiasec || 'R'} onChange={e => setEditingOcc({ ...editingOcc, primaryRiasec: e.target.value })}>
                   {['R', 'I', 'A', 'S', 'E', 'C'].map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Demand Level</label>
-              <select className="form-control" style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingOcc.demandLevel || 'medium'} onChange={e => setEditingOcc({ ...editingOcc, demandLevel: e.target.value })}>
+              <select className="form-control" style={{ color: GOV.text }} value={editingOcc.demandLevel || 'medium'} onChange={e => setEditingOcc({ ...editingOcc, demandLevel: e.target.value })}>
                 <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
               </select>
             </div>
             <div>
               <label className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Description</label>
-              <textarea className="form-control resize-none" rows={2} style={{ borderBottomColor: GOV.border, color: GOV.text }} value={editingOcc.description || ''} onChange={e => setEditingOcc({ ...editingOcc, description: e.target.value })} />
+              <textarea className="form-control resize-none" rows={2} style={{ color: GOV.text }} value={editingOcc.description || ''} onChange={e => setEditingOcc({ ...editingOcc, description: e.target.value })} />
             </div>
             <div className="flex gap-2 pt-2">
               <button type="button" onClick={() => setEditingOcc(null)} className="flex-1 border rounded-md py-2 text-sm" style={{ borderColor: GOV.border, color: GOV.textMuted }}>Cancel</button>

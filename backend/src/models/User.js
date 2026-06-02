@@ -228,6 +228,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'email_verification_expires'
     },
+    emailVerificationAttempts: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'email_verification_attempts'
+    },
     
     // Preferences
     preferredLanguage: {
@@ -274,6 +280,54 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: true,
       field: 'refresh_token_expires'
+    },
+    previousRefreshToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      field: 'previous_refresh_token'
+    },
+    previousRefreshTokenExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'previous_refresh_token_expires'
+    },
+
+    // Login throttling (NIST 800-63B §5.2.2 / OWASP ASVS V2.2.1)
+    failedLoginAttempts: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'failed_login_attempts'
+    },
+    lockoutUntil: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'lockout_until'
+    },
+
+    // Per-account verification resend throttling
+    emailVerificationLastSentAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'email_verification_last_sent_at'
+    },
+    emailVerificationResendCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'email_verification_resend_count'
+    },
+    emailVerificationResendWindowStartedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'email_verification_resend_window_started_at'
+    },
+
+    // Soft delete metadata (paranoid model)
+    piiScrubbedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'pii_scrubbed_at'
     },
     
     // Extended user journey fields
@@ -357,6 +411,8 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'users',
     timestamps: true,
+    paranoid: true,
+    deletedAt: 'deletedAt',
     underscored: true,
     indexes: [
       { fields: ['username'], unique: true },
@@ -419,6 +475,16 @@ module.exports = (sequelize, DataTypes) => {
     delete values.emailVerificationToken;
     delete values.refreshToken;
     delete values.refreshTokenExpires;
+    delete values.previousRefreshToken;
+    delete values.previousRefreshTokenExpires;
+    delete values.failedLoginAttempts;
+    delete values.lockoutUntil;
+    delete values.emailVerificationLastSentAt;
+    delete values.emailVerificationResendCount;
+    delete values.emailVerificationResendWindowStartedAt;
+    delete values.piiScrubbedAt;
+    delete values.deletedAt;
+    delete values.deleted_at;
     delete values.nationalIdHash;
     return values;
   };

@@ -15,11 +15,17 @@ export default function ResetPassword() {
   const password = watch('password');
 
   const onSubmit = async (data) => {
+    if (!token) {
+      setError('Reset link is missing the security token. Please request a new password reset email.');
+      return;
+    }
     try {
-      await api.post(`/api/v1/auth/reset-password/${token}`, {
+      // POST the token in the request body — keeps it out of NGINX access
+      // logs, browser DevTools network history, and Referer headers.
+      await api.post('/api/v1/auth/reset-password', {
+        token,
         newPassword: data.password,
-        confirmPassword: data.confirmPassword,
-        password: data.password
+        confirmPassword: data.confirmPassword
       });
       setSuccess(true);
       setError('');
@@ -66,16 +72,18 @@ export default function ResetPassword() {
                 <input
                   id="reset-password"
                   type="password"
+                  autoComplete="new-password"
                   {...register('password', {
                     required: 'Required',
-                    minLength: { value: 8, message: 'At least 8 characters' },
+                    minLength: { value: 12, message: 'At least 12 characters' },
                     pattern: {
-                      value: /^(?=.*[a-zA-Z])(?=.*[0-9])/,
-                      message: 'Use letters and numbers'
+                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/,
+                      message: 'At least 12 characters with both letters and numbers'
                     }
                   })}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: errors.password ? GOV.error : GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
+                  aria-invalid={errors.password ? 'true' : 'false'}
                 />
                 {errors.password && (
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.password.message}</p>
@@ -92,7 +100,8 @@ export default function ResetPassword() {
                     validate: (value) => value === password || 'Passwords must match'
                   })}
                   className={`form-control ${TYPO.body}`}
-                  style={{ borderBottomColor: errors.confirmPassword ? GOV.error : GOV.border, color: GOV.text }}
+                  style={{ color: GOV.text }}
+                  aria-invalid={errors.confirmPassword ? 'true' : 'false'}
                 />
                 {errors.confirmPassword && (
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.confirmPassword.message}</p>

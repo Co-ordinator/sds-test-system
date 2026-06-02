@@ -606,7 +606,7 @@ const AdminCoursesPanel = () => {
                   placeholder="Search courses…" value={search}
                   onChange={e => setSearch(e.target.value)} />
               </div>
-              <select className="px-2 py-1.5 border rounded-md text-xs" style={{ borderColor: GOV.border, color: GOV.text }}
+              <select className="px-2 py-1.5 border rounded-md text-xs" style={{ color: GOV.text }}
                 value={qualFilter} onChange={e => setQualFilter(e.target.value)}>
                 <option value="">All types</option>
                 {QUAL_TYPES.map(q => <option key={q.value} value={q.value}>{q.label}</option>)}

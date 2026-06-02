@@ -219,7 +219,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
               type="button"
               onClick={() => setRefreshKey(prev => prev + 1)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-semibold bg-white"
-              style={{ borderColor: GOV.border, color: GOV.text }}
+              style={{ color: GOV.text }}
             >
               <RefreshCw className="w-3.5 h-3.5" /> Refresh
             </button>
@@ -335,7 +335,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 value={filters.institutionId} 
                 onChange={e => setFilters(p => ({ ...p, institutionId: e.target.value }))} 
                 className="form-control w-full" 
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 <option value="">All Institutions</option>
                 {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
@@ -347,7 +347,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 value={filters.institutionType} 
                 onChange={e => setFilters(p => ({ ...p, institutionType: e.target.value }))} 
                 className="form-control w-full" 
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 <option value="">All Types</option>
                 {Object.entries(INSTITUTION_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -359,7 +359,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 value={filters.region} 
                 onChange={e => setFilters(p => ({ ...p, region: e.target.value }))} 
                 className="form-control w-full" 
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 <option value="">All Regions</option>
                 {Object.entries(REGION_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -371,7 +371,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 value={filters.userType} 
                 onChange={e => setFilters(p => ({ ...p, userType: e.target.value }))} 
                 className="form-control w-full" 
-                style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               >
                 <option value="">All User Types</option>
                 {Object.entries(USER_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -384,7 +384,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 value={filters.startDate} 
                 onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))} 
                 className="form-control w-full" 
-                style={{ borderBottomColor: GOV.border, color: GOV.text }} 
+                style={{ color: GOV.text }} 
               />
             </div>
             <div>
@@ -394,7 +394,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 value={filters.endDate} 
                 onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))} 
                 className="form-control w-full" 
-                style={{ borderBottomColor: GOV.border, color: GOV.text }} 
+                style={{ color: GOV.text }} 
               />
             </div>
           </div>

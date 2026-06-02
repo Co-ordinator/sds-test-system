@@ -137,7 +137,7 @@ const GlossaryPage = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
-                style={{ borderColor: GOV.border, color: GOV.text }}
+                style={{ color: GOV.text }}
               />
             </div>
 
