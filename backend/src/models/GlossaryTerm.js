@@ -14,7 +14,16 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     section: {
-      type: DataTypes.ENUM('activities', 'competencies', 'occupations', 'self_estimates', 'general'),
+      type: DataTypes.ENUM(
+        'riasec',
+        'structure',
+        'actions',
+        'occupations',
+        'activities',
+        'competencies',
+        'self_estimates',
+        'general'
+      ),
       allowNull: false,
       defaultValue: 'general',
     },

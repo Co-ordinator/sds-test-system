@@ -4,9 +4,10 @@ export const glossaryService = {
   listTerms: async (section = null, search = null) => {
     const params = new URLSearchParams();
     if (section && section !== 'all') params.append('section', section);
-    if (search) params.append('search', search);
+    if (search && search.trim()) params.append('search', search.trim());
     
-    const response = await api.get(`/api/v1/glossary?${params}`);
+    const query = params.toString();
+    const response = await api.get(`/api/v1/glossary${query ? `?${query}` : ''}`);
     return response.data?.data?.terms || [];
   },
 

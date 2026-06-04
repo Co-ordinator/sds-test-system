@@ -4,26 +4,35 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 
-const LETTERHEAD_PATHS = [
-  process.env.PDF_LETTERHEAD_PATH ? path.resolve(process.env.PDF_LETTERHEAD_PATH) : null,
-  process.env.LETTERHEAD_PATH ? path.resolve(process.env.LETTERHEAD_PATH) : null,
-  path.resolve(__dirname, '../../../docs/letterhead.png'),
-  path.resolve(__dirname, '../../assets/letterhead.png'),
-  path.resolve(process.cwd(), '../docs/letterhead.png'),
-  path.resolve(process.cwd(), 'docs/letterhead.png'),
-  path.resolve(process.cwd(), 'backend/assets/letterhead.png')
+const assetPath = (fileName, envNames = []) => [
+  ...envNames.map((name) => (process.env[name] ? path.resolve(process.env[name]) : null)),
+  path.resolve(__dirname, '../../assets', fileName),
+  path.resolve(process.cwd(), 'assets', fileName),
+  path.resolve(process.cwd(), 'backend/assets', fileName),
+  path.resolve(__dirname, '../../../frontend/public', fileName),
+  path.resolve(__dirname, '../../../../frontend/public', fileName),
+  path.resolve(__dirname, '../../../docs', fileName),
+  path.resolve(__dirname, '../../../../docs', fileName),
+  path.resolve(process.cwd(), '../frontend/public', fileName),
+  path.resolve(process.cwd(), '../docs', fileName),
+  path.resolve(process.cwd(), 'frontend/public', fileName),
+  path.resolve(process.cwd(), 'docs', fileName)
 ].filter(Boolean);
 
-const imageBoundsCache = new Map();
-
-const resolveLetterheadPath = () => {
+const resolveAssetPath = (fileName, envNames = []) => {
   const seen = new Set();
-  return LETTERHEAD_PATHS.find((candidate) => {
+  return assetPath(fileName, envNames).find((candidate) => {
     if (seen.has(candidate)) return false;
     seen.add(candidate);
     return fs.existsSync(candidate);
   });
 };
+
+const LETTERHEAD_PATHS = assetPath('letterhead.png', ['PDF_LETTERHEAD_PATH', 'LETTERHEAD_PATH']);
+
+const imageBoundsCache = new Map();
+
+const resolveLetterheadPath = () => resolveAssetPath('letterhead.png', ['PDF_LETTERHEAD_PATH', 'LETTERHEAD_PATH']);
 
 const paethPredictor = (left, up, upLeft) => {
   const estimate = left + up - upLeft;
@@ -165,6 +174,7 @@ const drawLetterheadImage = (doc, options = {}) => {
 
 module.exports = {
   LETTERHEAD_PATHS,
+  resolveAssetPath,
   drawLetterheadImage,
   resolveLetterheadPath
 };

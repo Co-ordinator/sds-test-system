@@ -338,7 +338,10 @@ module.exports = {
       include: [{
         model: User, as: 'user', required: Object.keys(userWhere).length > 0,
         where: userWhere,
-        attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'region'],
+        attributes: [
+          'id', 'firstName', 'lastName', 'email', 'userType', 'institutionId',
+          'currentInstitution', 'workplaceInstitutionId', 'workplaceName', 'region'
+        ],
         include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'region', 'type'] }]
       }],
       order: [['createdAt', 'DESC']],
@@ -363,7 +366,10 @@ module.exports = {
       include: [{
         model: User, as: 'user', required: false,
         where: institutionId ? { institutionId } : {},
-        attributes: ['firstName', 'lastName', 'email', 'institutionId'],
+        attributes: [
+          'firstName', 'lastName', 'email', 'userType', 'institutionId',
+          'currentInstitution', 'workplaceInstitutionId', 'workplaceName'
+        ],
         include: [{ model: Institution, as: 'institution', attributes: ['name'] }]
       }],
       order: [['createdAt', 'DESC']],
@@ -376,7 +382,7 @@ module.exports = {
       firstName: a.user?.firstName || '',
       lastName: a.user?.lastName || '',
       email: a.user?.email || '',
-      institution: a.user?.institution?.name || '',
+      institution: a.user?.institution?.name || a.user?.currentInstitution || a.user?.workplaceName || '',
       status: a.status,
       hollandCode: getAssessmentDisplayCode(a) || a.hollandCode || '',
       scoreR: a.scoreR,

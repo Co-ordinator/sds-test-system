@@ -242,17 +242,24 @@ export default function ForgotPassword() {
               <div className="relative">
                 <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
                 <input
-                  id="forgot-identifier"
-                  {...register('identifier', { required: 'Required' })}
-                  placeholder="your@email.com or SDS123456"
-                  className={`form-control ${TYPO.body}`}
-                  style={{ color: GOV.text }}
-                  aria-invalid={errors.identifier ? 'true' : 'false'}
+                  id="forgot-new-password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  placeholder="New password"
+                  className={`${inputClass(!!formError)} pl-9 pr-10`}
                 />
-                {errors.identifier && (
-                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.identifier.message}</p>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((previous) => !previous)}
+                  className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+                  aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
+            </div>
 
             <div>
               <label htmlFor="forgot-confirm-password" className="mb-1.5 block text-xs font-bold text-[#374151]">

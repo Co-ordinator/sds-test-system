@@ -154,15 +154,16 @@ export const useGlossary = () => {
 
   // Get user's glossary statistics
   const getStats = useCallback(() => {
-    const totalTerms = glossaryTerms.length;
-    const learnedCount = learnedTerms.size;
+    const activeTermKeys = new Set(glossaryTerms.map(term => term.term.toLowerCase()));
+    const totalTerms = activeTermKeys.size;
+    const learnedCount = Array.from(learnedTerms).filter(termKey => activeTermKeys.has(termKey)).length;
     const interactionCount = Object.keys(termInteractions).length;
     
     return {
       totalTerms,
       learnedCount,
       interactionCount,
-      progressPercentage: totalTerms > 0 ? Math.round((learnedCount / totalTerms) * 100) : 0
+      progressPercentage: totalTerms > 0 ? Math.min(100, Math.round((learnedCount / totalTerms) * 100)) : 0
     };
   }, [learnedTerms, termInteractions, glossaryTerms]);
 

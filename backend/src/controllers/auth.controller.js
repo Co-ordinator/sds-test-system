@@ -483,7 +483,6 @@ const resendVerificationEmail = async (req, res, next) => {
         emailVerificationResendWindowStartedAt: previousVerification.resendWindowStartedAt
       }).catch(() => {});
       throw new AppError('We could not send the verification code right now. Please wait a moment and try again.', {
-      throw new AppError('We could not send the verification code right now. Please wait a moment and try again.', {
         status: 503,
         code: 'EMAIL_DELIVERY_FAILED',
         expose: true

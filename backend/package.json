@@ -20,6 +20,7 @@
     "db:bootstrap": "sequelize-cli db:migrate && sequelize-cli db:seed:all",
     "db:reset": "sequelize-cli db:migrate:undo:all && sequelize-cli db:migrate && sequelize-cli db:seed:all",
     "db:verify": "node scripts/validate-seed-integrity.js",
+    "audit:onboarding": "node scripts/audit-onboarding-completeness.js",
     "db:smoke": "npm run db:reset && npm run db:verify"
   },
   "keywords": [],

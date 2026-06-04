@@ -1,5 +1,13 @@
 # SDS Test System Changelog
 
+## 2026-06-04
+
+### Backend PDF Assets
+- Added the required PDF/certificate images under `backend/assets` so hosted backend deployments include the letterhead, Siyinqaba crest, and watermark without manual copying.
+- Updated backend PDF asset resolution to check backend assets, built `dist/assets`, frontend public assets, docs assets, and optional environment overrides.
+- Updated the backend build script so `letterhead.png`, `siyinqaba.png`, and `watermark.png` are copied into `backend/dist/assets`.
+- Documented the deployment rule that PDF/certificate images are backend runtime assets, not only frontend static files.
+
 ## 2026-05-26
 
 ### Startup Loading Experience

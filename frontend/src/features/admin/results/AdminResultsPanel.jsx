@@ -10,6 +10,11 @@ import { usePermissions } from '../../../context/PermissionContext';
 
 const getHollandDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '–';
 
+const getInstitutionLabel = (assessment) => {
+  const user = assessment?.user || {};
+  return user.institution?.name || user.currentInstitution || user.workplaceName || '';
+};
+
 const AdminResultsPanel = () => {
   const navigate = useNavigate();
   const [assessments, setAssessments] = useState([]);
@@ -59,7 +64,7 @@ const AdminResultsPanel = () => {
     if (!search) return assessments;
     const q = search.toLowerCase();
     return assessments.filter(a =>
-      `${a.user?.firstName} ${a.user?.lastName} ${a.user?.email} ${getHollandDisplayCode(a)} ${a.user?.institution?.name || ''}`
+      `${a.user?.firstName} ${a.user?.lastName} ${a.user?.email} ${getHollandDisplayCode(a)} ${getInstitutionLabel(a)}`
         .toLowerCase().includes(q)
     );
   }, [assessments, search]);
@@ -78,8 +83,16 @@ const AdminResultsPanel = () => {
     },
     {
       key: 'institution',
-      header: 'Institution',
-      render: (a) => <span className="text-xs" style={{ color: GOV.textMuted }}>{a.user?.institution?.name || '–'}</span>,
+      header: 'Institution / Workplace',
+      render: (a) => {
+        const label = getInstitutionLabel(a);
+        const isWorkplace = !a.user?.institution?.name && !a.user?.currentInstitution && Boolean(a.user?.workplaceName);
+        return (
+          <span className="text-xs" style={{ color: label ? GOV.textMuted : GOV.textHint }}>
+            {label || 'Not specified'}{isWorkplace ? ' (workplace)' : ''}
+          </span>
+        );
+      },
     },
     {
       key: 'status',

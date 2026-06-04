@@ -59,9 +59,11 @@ function computeTestTakerOnboardingComplete(u) {
 
 async function maybeSetOnboardingCompleted(userId) {
   const u = await User.findByPk(userId);
-  if (!u || u.role !== 'Test Taker' || u.onboardingCompleted) return;
-  if (!computeTestTakerOnboardingComplete(u)) return;
-  await u.update({ onboardingCompleted: true });
+  if (!u || u.role !== 'Test Taker') return;
+  const isComplete = computeTestTakerOnboardingComplete(u);
+  if (u.onboardingCompleted !== isComplete) {
+    await u.update({ onboardingCompleted: isComplete });
+  }
 }
 
 const parseNationalId = (nationalId) => {
@@ -420,7 +422,10 @@ module.exports = {
       attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken'] },
       include: [
         { model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } },
-        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region', 'district'], required: false }
+        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region', 'district'], required: false },
+        { model: Institution, as: 'workplace', attributes: ['id', 'name', 'type', 'region', 'district'], required: false },
+        { model: EducationLevel, as: 'education', attributes: ['id', 'level', 'description'], required: false },
+        { model: Occupation, as: 'occupation', attributes: ['id', 'name', 'category'], required: false }
       ]
     });
     if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
@@ -441,13 +446,19 @@ module.exports = {
     // SECURITY: nationalId and email are deliberately NOT in this list. They
     // are the identity anchors for the account and must only be changed via
     // an administrator-mediated flow (audited identity change).
-    const allowed = [
-      'firstName', 'lastName', 'gender', 'phoneNumber', 'region', 'district', 'address',
-      'currentInstitution', 'gradeLevel', 'employmentStatus', 'currentOccupation',
-      'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds',
-      'workplaceInstitutionId', 'workplaceName', 'degreeProgram', 'yearOfStudy',
-      'yearsExperience', 'userType', 'institutionId', 'currentOccupationId'
+    const commonAllowed = [
+      'phoneNumber', 'region', 'district', 'address',
+      'preferredLanguage', 'requiresAccessibility', 'accessibilityNeeds'
     ];
+    const testTakerAllowed = [
+      'firstName', 'lastName', 'gender',
+      'currentInstitution', 'gradeLevel', 'employmentStatus', 'currentOccupation',
+      'workplaceInstitutionId', 'workplaceName', 'degreeProgram', 'yearOfStudy',
+      'yearsExperience', 'userType', 'institutionId', 'currentOccupationId', 'educationLevel'
+    ];
+    const allowed = user.role === 'Test Taker'
+      ? [...commonAllowed, ...testTakerAllowed]
+      : commonAllowed;
     const updates = {};
     for (const key of allowed) {
       if (body[key] !== undefined) {
@@ -531,8 +542,16 @@ module.exports = {
     await user.update(updates);
     await maybeSetOnboardingCompleted(user.id);
 
+    const { Permission } = require('../models');
     const updated = await User.findByPk(user.id, {
-      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken'] }
+      attributes: { exclude: ['password', 'passwordResetToken', 'passwordResetExpires', 'emailVerificationToken', 'refreshToken'] },
+      include: [
+        { model: Permission, as: 'permissions', attributes: ['id', 'code', 'name', 'module'], through: { attributes: [] } },
+        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region', 'district'], required: false },
+        { model: Institution, as: 'workplace', attributes: ['id', 'name', 'type', 'region', 'district'], required: false },
+        { model: EducationLevel, as: 'education', attributes: ['id', 'level', 'description'], required: false },
+        { model: Occupation, as: 'occupation', attributes: ['id', 'name', 'category'], required: false }
+      ]
     });
     return { updated, updates };
   },

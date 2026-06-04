@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Clock,
   FileText,
+  Hand,
   Info,
   Loader2,
   Play,
@@ -309,15 +310,22 @@ const TestTakerDashboard = () => {
         style={{ fontFamily: 'sans-serif', color: GOV.text, background: 'transparent', padding: 0 }}
       >
         <section className="mx-auto w-full max-w-[1100px] px-4 pt-8 pb-2 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12">
-          <h1
-            className="mb-2 text-[1.65rem] font-extrabold leading-tight sm:text-[1.85rem] lg:text-[2.05rem]"
-            style={{ color: GOV.text }}
-          >
-            Welcome back, {displayName}
-          </h1>
-          <p className="m-0 max-w-[640px] text-[0.9rem] leading-relaxed sm:text-[0.92rem]" style={{ color: GOV.textMuted }}>
-            Continue your Self-Directed Search, review results, and download certificates from this page.
-          </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#edf6ff]">
+              <Hand className="sds-dashboard-hand-shake h-7 w-7 text-[#f2b632]" strokeWidth={1.8} aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <h1
+                className="mb-2 text-[1.65rem] font-extrabold leading-tight sm:text-[1.85rem] lg:text-[2.05rem]"
+                style={{ color: GOV.text }}
+              >
+                Welcome back, {displayName}
+              </h1>
+              <p className="m-0 max-w-[640px] text-[0.9rem] leading-relaxed sm:text-[0.92rem]" style={{ color: GOV.textMuted }}>
+                Continue your Self-Directed Search, review results, and download certificates from this page.
+              </p>
+            </div>
+          </div>
         </section>
 
         <div className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:pb-12">

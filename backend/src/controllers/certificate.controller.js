@@ -1,20 +1,12 @@
 'use strict';
 
 const PDFDocument = require('pdfkit');
-const path = require('path');
-const fs = require('fs');
 const { AuditLog, sequelize } = require('../models');
 const certificateService = require('../services/certificate.service');
 const logger = require('../utils/logger');
-const { drawLetterheadImage } = require('../utils/pdfAssets');
+const { drawLetterheadImage, resolveAssetPath } = require('../utils/pdfAssets');
 
-const WATERMARK_PATHS = [
-  path.join(__dirname, '../../../frontend/public/watermark.png'),
-  path.join(__dirname, '../../../docs/watermark.png'),
-  path.join(__dirname, '../../assets/watermark.png'),
-];
-
-const resolveWatermarkPath = () => WATERMARK_PATHS.find((imagePath) => fs.existsSync(imagePath));
+const resolveWatermarkPath = () => resolveAssetPath('watermark.png', ['PDF_WATERMARK_PATH', 'WATERMARK_PATH']);
 
 const drawWatermark = (doc, pageW, pageH) => {
   const watermarkPath = resolveWatermarkPath();

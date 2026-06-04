@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import Joi from 'joi';
 import { joiResolver } from '@hookform/resolvers/joi';
 import { useNavigate } from 'react-router-dom';
-import { Save, Download, Trash2, User, GraduationCap, Briefcase, Settings, Shield, Clock, Mail, Key, Eye, EyeOff, Upload, FileText, X, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Save, Download, Trash2, User, GraduationCap, Briefcase, Settings, Shield, Clock, Mail, Key, Eye, EyeOff, Upload, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
@@ -30,9 +30,28 @@ const ROLE_COLORS = {
   'Test Taker': { bg: '#f0fdf4', text: '#15803d', label: 'Test Taker' },
 };
 
+const STAFF_ROLES = new Set(['System Administrator', 'Test Administrator']);
+const TERTIARY_INSTITUTION_TYPES = 'university,college,tvet,vocational';
+const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
+const GRADE_LEVEL_OPTIONS = [
+  'Form 3 (Junior Secondary)',
+  'Form 5 / O-Level (Senior Secondary)',
+  'A-Level',
+  'Certificate / Diploma',
+  'Bachelor\'s degree',
+  'Postgraduate',
+];
+
+const USER_TYPE_LABELS = {
+  'High School Student': 'High School Student',
+  'University Student': 'Tertiary Student',
+  Professional: 'Professional',
+};
+
 export default function Profile() {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth();
+  const { user: authUser, setSession } = useAuth();
   const [userData, setUserData] = useState(null);
   const [saveStatus, setSaveStatus] = useState(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -66,18 +85,32 @@ export default function Profile() {
     // Keep this flexible to avoid blocking profile saves for legacy UUID-based values.
     educationLevel: Joi.string().optional().allow('', null).label('Education Level'),
     currentInstitution: Joi.string().optional().allow('', null).label('Current Institution'),
+    gradeLevel: Joi.string().optional().allow('', null).label('Current or Highest Grade'),
+    degreeProgram: Joi.string().optional().allow('', null).label('Degree Programme'),
+    yearOfStudy: Joi.number().integer().min(0).max(20).optional().allow('', null).label('Year of Study'),
     employmentStatus: Joi.string().valid(
       'student', 'employed', 'unemployed', 'self_employed', 'other'
     ).optional().allow('', null).label('Employment Status'),
     currentOccupation: Joi.string().optional().allow('', null).label('Current Occupation'),
-    preferredLanguage: Joi.string().valid('en', 'ss').optional().allow('', null).label('Preferred Language'),
-    requiresAccessibility: Joi.boolean().optional().allow(null).label('Requires Accessibility')
+    yearsExperience: Joi.number().integer().min(0).max(80).optional().allow('', null).label('Years of Experience'),
+    preferredLanguage: Joi.string().valid('en', 'ss').optional().allow('', null).label('Preferred Language')
   });
 
   const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
     resolver: joiResolver(schema)
   });
   const selectedRegion = watch('region');
+  const role = authUser?.role || userData?.role || 'Test Taker';
+  const userType = userData?.userType || authUser?.userType || '';
+  const isTestTaker = role === 'Test Taker';
+  const isStaff = STAFF_ROLES.has(role);
+  const isHighSchoolTaker = isTestTaker && userType === 'High School Student';
+  const isUniversityTaker = isTestTaker && userType === 'University Student';
+  const isProfessionalTaker = isTestTaker && userType === 'Professional';
+  const institutionTypeFilter = isHighSchoolTaker ? 'school' : isUniversityTaker ? TERTIARY_INSTITUTION_TYPES : '';
+  const institutionUserTypeFilter = isHighSchoolTaker ? 'school_student' : isUniversityTaker ? 'university_student' : '';
+  const canEditInstitution = isTestTaker && !isProfessionalTaker;
+  const canDeleteAccount = isTestTaker;
 
   const handlePhoneNumberChange = (e) => {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
@@ -101,10 +134,13 @@ export default function Profile() {
             address: user.address || '',
             educationLevel: user.educationLevel || '',
             currentInstitution: user.currentInstitution || '',
+            gradeLevel: user.gradeLevel || '',
+            degreeProgram: user.degreeProgram || '',
+            yearOfStudy: user.yearOfStudy ?? '',
             employmentStatus: user.employmentStatus || '',
             currentOccupation: user.currentOccupation || '',
+            yearsExperience: user.yearsExperience ?? '',
             preferredLanguage: user.preferredLanguage || 'en',
-            requiresAccessibility: Boolean(user.requiresAccessibility),
           });
           const rawPhone = (user.phoneNumber || '').toString();
           const parsedPhoneDigits = rawPhone.startsWith('+268')
@@ -229,10 +265,6 @@ export default function Profile() {
   const onSubmit = async (data) => {
     setIsSavingProfile(true);
     setSaveStatus(null);
-    const isProfessional = (userData?.userType === 'Professional') ||
-      (authUser?.userType === 'Professional') ||
-      (userData?.userType === 'professional');
-    const normalizedOccupation = (data.currentOccupation || '').trim();
     const normalizedPhone = phoneDigitsRef.current ? `+268${phoneDigitsRef.current}` : null;
     const normalizeText = (value) => {
       if (value === null || value === undefined) return null;
@@ -246,29 +278,66 @@ export default function Profile() {
       return;
     }
     const payload = {
+      phoneNumber: normalizedPhone,
       region: data.region || null,
       district: normalizeText(district),
       address: normalizeText(data.address),
-      educationLevel: data.educationLevel || null,
-      currentInstitution: normalizeText(institution.name),
-      institutionId: institution.institutionId || null,
-      employmentStatus: data.employmentStatus || null,
-      currentOccupation: normalizeText(occupation.name),
-      currentOccupationId: occupation.occupationId || null,
       preferredLanguage: data.preferredLanguage || 'en',
-      requiresAccessibility: Boolean(data.requiresAccessibility),
-      phoneNumber: normalizedPhone,
-      ...(isProfessional ? {
-        workplaceName: normalizeText(workplace.name),
-        workplaceInstitutionId: workplace.institutionId || null,
-      } : {}),
     };
+
+    if (isTestTaker) {
+      Object.assign(payload, {
+        educationLevel: data.educationLevel || null,
+        gradeLevel: normalizeText(data.gradeLevel),
+        employmentStatus: data.employmentStatus || null,
+      });
+
+      if (canEditInstitution) {
+        Object.assign(payload, {
+          currentInstitution: normalizeText(institution.name),
+          institutionId: institution.institutionId || null,
+        });
+      }
+
+      if (isUniversityTaker) {
+        Object.assign(payload, {
+          degreeProgram: normalizeText(data.degreeProgram),
+          yearOfStudy: data.yearOfStudy === '' || data.yearOfStudy === null || data.yearOfStudy === undefined
+            ? null
+            : Number(data.yearOfStudy),
+        });
+      }
+
+      if (isProfessionalTaker) {
+        Object.assign(payload, {
+          currentOccupation: normalizeText(occupation.name),
+          currentOccupationId: occupation.occupationId || null,
+          yearsExperience: data.yearsExperience === '' || data.yearsExperience === null || data.yearsExperience === undefined
+            ? null
+            : Number(data.yearsExperience),
+          workplaceName: normalizeText(workplace.name),
+          workplaceInstitutionId: workplace.institutionId || null,
+        });
+      }
+    }
     try {
-      await api.patch('/api/v1/auth/me', payload);
-      setUserData((prev) => ({ ...prev, ...payload }));
+      const res = await api.patch('/api/v1/auth/me', payload);
+      const updatedUser = res.data?.data?.user || res.data?.user || null;
+      if (updatedUser) {
+        setUserData(updatedUser);
+        if (setSession) setSession(null, updatedUser);
+      } else {
+        setUserData((prev) => ({ ...prev, ...payload }));
+      }
       const savedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setSaveStatus({ type: 'success', message: `Profile saved successfully at ${savedAt}.` });
       setTimeout(() => setSaveStatus(null), 4000);
+      if (isTestTaker && updatedUser?.onboardingCompleted === false) {
+        navigate('/onboarding', {
+          replace: true,
+          state: { message: 'Complete the missing profile fields before continuing.' }
+        });
+      }
     } catch (err) {
       setSaveStatus({
         type: 'error',
@@ -323,12 +392,19 @@ export default function Profile() {
     if (newPw.length < 8) {
       setPwStatus({ type: 'error', msg: 'New password must be at least 8 characters.' }); return;
     }
+    if (!PASSWORD_PATTERN.test(newPw)) {
+      setPwStatus({ type: 'error', msg: 'New password must include letters and numbers. Symbols are allowed.' }); return;
+    }
     if (newPw !== confirmPw) {
       setPwStatus({ type: 'error', msg: 'New passwords do not match.' }); return;
     }
     setPwSaving(true); setPwStatus(null);
     try {
-      await api.post('/api/v1/auth/change-password', { currentPassword: currentPw, newPassword: newPw });
+      await api.post('/api/v1/auth/change-password', {
+        currentPassword: currentPw,
+        newPassword: newPw,
+        confirmPassword: confirmPw
+      });
       setPwStatus({ type: 'success', msg: 'Password changed successfully.' });
       if (pwRefs.current.current) pwRefs.current.current.value = '';
       if (pwRefs.current.newPw) pwRefs.current.newPw.value = '';
@@ -384,9 +460,11 @@ export default function Profile() {
     error ? <p className="mt-1" style={{ color: GOV.error, fontSize: '0.75rem' }}>{error.message}</p> : null;
 
   const regionField = register('region');
-  const role = authUser?.role || userData?.role || 'Test Taker';
   const rc = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
   const backTo = role === 'System Administrator' || role === 'Test Administrator' ? '/admin/dashboard' : '/dashboard';
+  const displayUserType = USER_TYPE_LABELS[userType] || userType;
+  const assignedInstitutionName = userData?.institution?.name || userData?.currentInstitution || '';
+  const workplaceDisplayName = userData?.workplace?.name || userData?.workplaceName || '';
 
   if (!userData) {
     return (
@@ -470,6 +548,9 @@ export default function Profile() {
                   onChange={(e) => {
                     regionField.onChange(e);
                     setDistrict('');
+                    if (isHighSchoolTaker) {
+                      setInstitution({ name: '', institutionId: null });
+                    }
                   }}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.region ? errorInputStyle : {}) }}
@@ -507,75 +588,135 @@ export default function Profile() {
             </div>
           </SectionCard>
 
-          {/* Education Section */}
-          <SectionCard icon={GraduationCap} title="Education">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <FieldLabel>Education Level</FieldLabel>
-                <select
-                  {...register('educationLevel')}
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.educationLevel ? errorInputStyle : {}) }}
-                  disabled={educationLevelsLoading}
-                >
-                  <option value="">Select Education Level</option>
-                  {educationLevels.map((level) => (
-                    <option key={level.id} value={level.id}>
-                      {level.description}
-                    </option>
-                  ))}
-                </select>
-                <FieldError error={errors.educationLevel} />
-              </div>
+          {isTestTaker && (
+            <SectionCard icon={GraduationCap} title={isProfessionalTaker ? 'Education & Qualifications' : 'Education'}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <FieldLabel>Education Level</FieldLabel>
+                  <select
+                    {...register('educationLevel')}
+                    className={inputFocusClass}
+                    style={{ ...inputStyle, ...(errors.educationLevel ? errorInputStyle : {}) }}
+                    disabled={educationLevelsLoading}
+                  >
+                    <option value="">Select Education Level</option>
+                    {educationLevels.map((level) => (
+                      <option key={level.id} value={level.id}>
+                        {level.description}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldError error={errors.educationLevel} />
+                </div>
 
-              <div>
-                <FieldLabel>Current Institution</FieldLabel>
-                <InstitutionSearchInput
-                  value={institution.name}
-                  institutionId={institution.institutionId}
-                  onChange={(name, id) => setInstitution({ name, institutionId: id })}
-                  placeholder="Search for your institution..."
-                  error={!!errors.currentInstitution}
-                />
-                <FieldError error={errors.currentInstitution} />
-              </div>
-            </div>
-          </SectionCard>
+                <div>
+                  <FieldLabel>Current or Highest Grade</FieldLabel>
+                  <select
+                    {...register('gradeLevel')}
+                    className={inputFocusClass}
+                    style={{ ...inputStyle, ...(errors.gradeLevel ? errorInputStyle : {}) }}
+                  >
+                    <option value="">Select grade or qualification</option>
+                    {GRADE_LEVEL_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                  <FieldError error={errors.gradeLevel} />
+                </div>
 
-          {/* Employment Section */}
-          <SectionCard icon={Briefcase} title="Employment">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div>
-                <FieldLabel>Employment Status</FieldLabel>
-                <select
-                  {...register('employmentStatus')}
-                  className={inputFocusClass}
-                  style={{ ...inputStyle, ...(errors.employmentStatus ? errorInputStyle : {}) }}
-                >
-                  <option value="">Select Employment Status</option>
-                  <option value="student">Student</option>
-                  <option value="employed">Employed</option>
-                  <option value="unemployed">Unemployed</option>
-                  <option value="self_employed">Self-Employed</option>
-                  <option value="other">Other</option>
-                </select>
-                <FieldError error={errors.employmentStatus} />
-              </div>
+                {canEditInstitution && (
+                  <div className="md:col-span-2">
+                    <FieldLabel>{isHighSchoolTaker ? 'Current School' : 'Current Institution'}</FieldLabel>
+                    <InstitutionSearchInput
+                      value={institution.name}
+                      institutionId={institution.institutionId}
+                      onChange={(name, id) => setInstitution({ name, institutionId: id })}
+                      placeholder={isHighSchoolTaker ? 'Search for your high school...' : 'Search for your tertiary institution...'}
+                      region={isHighSchoolTaker ? selectedRegion : ''}
+                      type={institutionTypeFilter}
+                      userType={institutionUserTypeFilter}
+                      error={!!errors.currentInstitution}
+                    />
+                    <FieldError error={errors.currentInstitution} />
+                  </div>
+                )}
 
-              <div>
-                <FieldLabel>Current Occupation</FieldLabel>
-                <OccupationSearchInput
-                  value={occupation.name}
-                  occupationId={occupation.occupationId}
-                  onChange={(name, id) => setOccupation({ name, occupationId: id })}
-                  placeholder="Search for your occupation..."
-                  error={!!errors.currentOccupation}
-                />
-                <FieldError error={errors.currentOccupation} />
+                {isUniversityTaker && (
+                  <>
+                    <div>
+                      <FieldLabel>Degree / Programme</FieldLabel>
+                      <input
+                        {...register('degreeProgram')}
+                        className={inputFocusClass}
+                        style={{ ...inputStyle, ...(errors.degreeProgram ? errorInputStyle : {}) }}
+                        placeholder="e.g. BSc Computer Science"
+                      />
+                      <FieldError error={errors.degreeProgram} />
+                    </div>
+                    <div>
+                      <FieldLabel>Year of Study</FieldLabel>
+                      <input
+                        type="number"
+                        min="0"
+                        max="20"
+                        {...register('yearOfStudy')}
+                        className={inputFocusClass}
+                        style={{ ...inputStyle, ...(errors.yearOfStudy ? errorInputStyle : {}) }}
+                      />
+                      <FieldError error={errors.yearOfStudy} />
+                    </div>
+                  </>
+                )}
               </div>
+            </SectionCard>
+          )}
 
-              {((userData?.userType === 'Professional') || (authUser?.userType === 'Professional') || (userData?.userType === 'professional')) && (
-                <div className="md:col-span-2">
+          {isProfessionalTaker && (
+            <SectionCard icon={Briefcase} title="Career Background">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <FieldLabel>Employment Status</FieldLabel>
+                  <select
+                    {...register('employmentStatus')}
+                    className={inputFocusClass}
+                    style={{ ...inputStyle, ...(errors.employmentStatus ? errorInputStyle : {}) }}
+                  >
+                    <option value="">Select Employment Status</option>
+                    <option value="student">Student</option>
+                    <option value="employed">Employed</option>
+                    <option value="unemployed">Unemployed</option>
+                    <option value="self_employed">Self-Employed</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <FieldError error={errors.employmentStatus} />
+                </div>
+
+                <div>
+                  <FieldLabel>Years of Experience</FieldLabel>
+                  <input
+                    type="number"
+                    min="0"
+                    max="80"
+                    {...register('yearsExperience')}
+                    className={inputFocusClass}
+                    style={{ ...inputStyle, ...(errors.yearsExperience ? errorInputStyle : {}) }}
+                  />
+                  <FieldError error={errors.yearsExperience} />
+                </div>
+
+                <div>
+                  <FieldLabel>Current Occupation</FieldLabel>
+                  <OccupationSearchInput
+                    value={occupation.name}
+                    occupationId={occupation.occupationId}
+                    onChange={(name, id) => setOccupation({ name, occupationId: id })}
+                    placeholder="Search for your occupation..."
+                    error={!!errors.currentOccupation}
+                  />
+                  <FieldError error={errors.currentOccupation} />
+                </div>
+
+                <div>
                   <FieldLabel>Workplace / Employer</FieldLabel>
                   <WorkplaceSearchInput
                     value={workplace.name}
@@ -587,9 +728,25 @@ export default function Profile() {
                     Type to search registered organisations, or enter your workplace name.
                   </p>
                 </div>
-              )}
-            </div>
-          </SectionCard>
+              </div>
+            </SectionCard>
+          )}
+
+          {isStaff && role === 'Test Administrator' && (
+            <SectionCard icon={GraduationCap} title="Assigned Institution">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Institution</p>
+                  <p className="text-sm font-semibold" style={{ color: GOV.text }}>
+                    {assignedInstitutionName || 'Not assigned'}
+                  </p>
+                  <p className={TYPO.hint} style={{ color: GOV.textHint }}>
+                    This assignment controls student imports, login cards, and counselor reporting scope.
+                  </p>
+                </div>
+              </div>
+            </SectionCard>
+          )}
 
           {/* Preferences Section */}
           <SectionCard icon={Settings} title="Preferences">
@@ -605,19 +762,6 @@ export default function Profile() {
                   <option value="ss">SiSwati</option>
                 </select>
                 <FieldError error={errors.preferredLanguage} />
-              </div>
-
-              <div className="flex items-center pt-5">
-                <input
-                  type="checkbox"
-                  id="requiresAccessibility"
-                  {...register('requiresAccessibility')}
-                  className="h-4 w-4 rounded"
-                  style={{ accentColor: GOV.blue }}
-                />
-                <label htmlFor="requiresAccessibility" className={`ml-2 ${TYPO.body}`} style={{ color: GOV.textMuted }}>
-                  I require accessibility accommodations
-                </label>
               </div>
             </div>
           </SectionCard>
@@ -672,6 +816,12 @@ export default function Profile() {
                 {rc.label}
               </span>
             </div>
+            {displayUserType && (
+              <div>
+                <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Profile Type</p>
+                <p className="text-sm" style={{ color: GOV.text }}>{displayUserType}</p>
+              </div>
+            )}
             <div>
               <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Email Verified</p>
               <p className="text-sm flex items-center gap-1" style={{ color: GOV.text }}>
@@ -694,16 +844,24 @@ export default function Profile() {
                 {userData?.createdAt ? new Date(userData.createdAt).toLocaleDateString() : '–'}
               </p>
             </div>
-            {userData?.institution?.name && (
+            {assignedInstitutionName && !isProfessionalTaker && (
               <div>
-                <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Institution</p>
-                <p className="text-sm" style={{ color: GOV.text }}>{userData.institution.name}</p>
+                <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>
+                  {role === 'Test Administrator' ? 'Assigned Institution' : 'Institution'}
+                </p>
+                <p className="text-sm" style={{ color: GOV.text }}>{assignedInstitutionName}</p>
               </div>
             )}
-            {userData?.lastLoginAt && (
+            {workplaceDisplayName && isProfessionalTaker && (
+              <div>
+                <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Workplace</p>
+                <p className="text-sm" style={{ color: GOV.text }}>{workplaceDisplayName}</p>
+              </div>
+            )}
+            {userData?.lastLogin && (
               <div>
                 <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Last Login</p>
-                <p className="text-sm" style={{ color: GOV.text }}>{new Date(userData.lastLoginAt).toLocaleString()}</p>
+                <p className="text-sm" style={{ color: GOV.text }}>{new Date(userData.lastLogin).toLocaleString()}</p>
               </div>
             )}
           </div>
@@ -749,6 +907,7 @@ export default function Profile() {
         </SectionCard>
 
         {/* Academic Qualifications / Certificates Section */}
+        {isTestTaker && (
         <div className="rounded-md border overflow-hidden" style={{ borderColor: GOV.border, backgroundColor: 'white' }}>
           <div className="flex items-center gap-2 px-5 py-4" style={{ borderBottom: `1px solid ${GOV.borderLight}` }}>
             <GraduationCap size={16} style={{ color: GOV.blue }} />
@@ -928,12 +1087,13 @@ export default function Profile() {
             )}
           </div>
         </div>
+        )}
 
         {/* Data subject rights */}
         <div className="rounded-md border p-5" style={{ borderColor: GOV.border, backgroundColor: 'white' }}>
           <h2 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Your data rights</h2>
           <p className={`mt-1 mb-4 ${TYPO.body}`} style={{ color: GOV.textMuted }}>
-            Under data protection law you can request a copy of your data or request account deletion.
+            Under data protection law you can request a copy of your data{canDeleteAccount ? ' or request account deletion' : ''}.
           </p>
           <div className="flex flex-wrap gap-3">
             <button
@@ -944,25 +1104,27 @@ export default function Profile() {
             >
               <Download size={14} /> Export my data
             </button>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                placeholder="Type DELETE to confirm"
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value)}
-                className="form-control w-48"
-                style={{ color: GOV.text }}
-              />
-              <button
-                type="button"
-                onClick={handleDeleteAccount}
-                disabled={deleteConfirm !== 'DELETE' || isDeleting}
-                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                style={{ backgroundColor: GOV.error }}
-              >
-                <Trash2 size={14} /> {isDeleting ? 'Deleting...' : 'Delete account'}
-              </button>
-            </div>
+            {canDeleteAccount && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Type DELETE to confirm"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value)}
+                  className="form-control w-48"
+                  style={{ borderBottomColor: GOV.border, color: GOV.text }}
+                />
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirm !== 'DELETE' || isDeleting}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  style={{ backgroundColor: GOV.error }}
+                >
+                  <Trash2 size={14} /> {isDeleting ? 'Deleting...' : 'Delete account'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

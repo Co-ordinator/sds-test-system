@@ -33,6 +33,7 @@ export default function Register() {
       const response = await api.post('/api/v1/auth/register', payload);
       const verificationEmailSent = response?.data?.verificationEmailSent !== false;
       const verifiedEmail = response?.data?.data?.email || payload.email;
+      const resendAvailableInSeconds = response?.data?.resendAvailableInSeconds ?? response?.data?.data?.resendAvailableInSeconds ?? 120;
       try { sessionStorage.setItem('pendingVerificationEmail', verifiedEmail); } catch (_) {}
       navigate('/verify-otp', {
         state: {
@@ -219,7 +220,7 @@ export default function Register() {
                   {...register('password', {
                     required: 'Password is required.',
                     minLength: { value: 12, message: 'Password must be at least 12 characters.' },
-                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/, message: 'Password must be at least 12 characters and contain both letters and numbers.' }
+                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d).{12,}$/, message: 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.' }
                   })}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
@@ -293,8 +294,8 @@ export default function Register() {
 
           </form>
         </div>
-      </form>
-    </AuthShell>
+      </div>
+    </OnboardingLayout>
   );
 }
 

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -16,17 +15,50 @@ import {
 import { LOGO_ALT } from '../theme/government';
 import { useAccessibility } from '../context/AccessibilityContext';
 
-/**
- * Break out of OnboardingLayout `max-w-5xl` so background paints edge-to-edge.
- * Avoid `width: 100vw` — with a vertical scrollbar, 100vw is wider than the layout
- * and causes a horizontal scrollbar in many browsers.
- */
-const fullBleed = {
-  position: 'relative',
-  boxSizing: 'border-box',
-  marginLeft: 'calc(50% - 50vw)',
-  marginRight: 'calc(50% - 50vw)',
-};
+const heroHighlights = [
+  {
+    title: 'Understand yourself',
+    text: 'Identify interests, strengths, and preferred work activities.',
+    Icon: Target,
+  },
+  {
+    title: 'Read your code',
+    text: 'Turn your answers into a clear Holland Code profile.',
+    Icon: BookOpenCheck,
+  },
+  {
+    title: 'Plan your path',
+    text: 'Use results to explore education and career options.',
+    Icon: GraduationCap,
+  },
+];
+
+const steps = [
+  {
+    number: '01',
+    title: 'Register',
+    description: 'Create your secure SDS profile.',
+    Icon: UserPlus,
+  },
+  {
+    number: '02',
+    title: 'Complete SDS',
+    description: 'Answer guided interest and ability questions.',
+    Icon: ClipboardList,
+  },
+  {
+    number: '03',
+    title: 'View results',
+    description: 'Review your Holland Code and recommendations.',
+    Icon: BarChart3,
+  },
+  {
+    number: '04',
+    title: 'Take action',
+    description: 'Discuss and plan suitable pathways.',
+    Icon: Map,
+  },
+];
 
 export default function Home() {
   const { getAriaLabel } = useAccessibility();
@@ -86,61 +118,115 @@ export default function Home() {
       <main id="main-content" className="flex flex-1 flex-col" role="main">
         <section className="relative isolate overflow-hidden bg-[#07183d] lg:hidden">
           <img
-            src="/hero-group.png"
-            alt=""
-            className="mx-auto block h-auto w-full max-w-[min(100%,420px)] object-contain object-bottom sm:max-w-[min(100%,520px)] lg:mx-0 lg:max-w-[580px]"
-            style={{ maxHeight: 'min(52vh, 640px)' }}
+            src="/landing-assessment-testing.jpg"
+            alt="Pencil marking an assessment answer sheet"
+            className="absolute inset-0 -z-20 h-full w-full object-cover object-[70%_center] opacity-70"
           />
-        </div>
-      </section>
+          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#07183d]/92 via-[#07183d]/84 to-[#07183d]/96" />
+          <div className="absolute inset-x-0 top-0 flex h-1.5">
+            <div className="flex-1 bg-[#3b82c4]" />
+            <div className="w-20 bg-[#ffeb3b]" />
+            <div className="w-28 bg-[#f44336]" />
+            <div className="w-20 bg-[#ffeb3b]" />
+            <div className="flex-1 bg-[#3b82c4]" />
+          </div>
 
-      {/* ── Programme pathway ── */}
-      <section style={{ ...fullBleed, background: GOV.borderLight }}>
-        <div className="mx-auto max-w-[1100px] px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
-        <div className="flex flex-col items-stretch gap-6 lg:flex-row lg:items-start lg:gap-8">
-          <div className="order-1 min-w-0 w-full lg:order-2 lg:min-w-0 lg:flex-[4]">
-            <h2 className="mb-4 text-left text-lg font-extrabold sm:text-xl lg:mb-6 lg:text-2xl" style={{ color: GOV.text }}>
-              Programme pathway from registration to guidance
-            </h2>
-            <div className="relative -mx-1 overflow-x-auto pb-2 lg:mx-0 lg:overflow-visible">
-            <div className="relative flex min-w-[600px] justify-between lg:min-w-0" style={{ alignItems: 'flex-start' }}>
-              <div
-                className="pointer-events-none absolute left-5 right-5 top-5 z-0 hidden h-0.5 sm:block"
-                style={{ background: GOV.border }}
-              />
-              {[
-                { num: 'one', title: 'Register and verify', desc: 'Establish your account and confirm contact details as required for programme access.' },
-                { num: 'two', title: 'Complete the instrument', desc: 'Work through the assessment items within the secure session provided by the system.' },
-                { num: 'three', title: 'Review your profile', desc: 'Consult outputs and explanatory material consistent with the SDS framework.' },
-                { num: 'four', title: 'Plan next steps', desc: 'Use documented results, together with qualified advisers where appropriate, to inform career decisions.' },
-              ].map((step) => (
-                <div key={step.num} className="relative z-[1] flex-1 px-1 text-center sm:px-2">
-                  <div style={{
-                    width: '42px', height: '42px', borderRadius: '50%',
-                    background: GOV.blue, color: GOV.ministryBarText,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, fontSize: '0.75rem',
-                    margin: '0 auto 0.75rem',
-                  }}>
-                    {step.num}
+          <div className="mx-auto w-full max-w-5xl px-3 py-5 sm:px-5 sm:py-7 md:px-6 md:py-10">
+            <div className="grid w-full min-w-0 gap-3.5 sm:gap-4 md:grid-cols-[minmax(0,1fr)_19rem] md:items-start">
+              <div className="w-full min-w-0 rounded-lg border border-white/20 bg-[#07183d]/90 p-3 shadow-xl shadow-black/20 backdrop-blur-sm sm:p-5">
+                <div className="flex max-w-full flex-wrap items-center gap-2">
+                  <span className="max-w-full rounded-full border border-white/30 bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-white sm:px-3 sm:text-[10px]">
+                    Official portal
+                  </span>
+                  <span className="max-w-full rounded-full border border-[#ffeb3b] bg-[#ffeb3b] px-2.5 py-1 text-[9px] font-bold uppercase tracking-wide text-[#4b3b00] sm:px-3 sm:text-[10px]">
+                    National career assessment
+                  </span>
+                </div>
+
+                <h2 className="mt-4 max-w-full text-[1.75rem] font-extrabold leading-[1.04] text-white sm:mt-5 sm:text-[2.7rem]">
+                  <span className="block sm:inline">Self-Directed</span>{' '}
+                  <span className="block sm:inline">Search</span>
+                  <span className="block">(SDS)</span>
+                </h2>
+                <p className="mt-3 max-w-full text-[0.9rem] font-bold leading-6 text-[#d9efff] sm:mt-4 sm:text-lg">
+                  Career guidance for informed education and work decisions.
+                </p>
+                <p className="mt-3 max-w-full text-[0.8rem] font-medium leading-6 text-white/90 sm:mt-4 sm:text-sm">
+                  SDS helps you understand your interests, abilities, and preferred work activities, then turns your answers into a Holland Code profile for practical study and career planning.
+                </p>
+
+                <div className="mt-4 grid w-full min-w-0 grid-cols-2 gap-2 sm:mt-5">
+                  <Link
+                    to="/login"
+                    className="group inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md bg-[#2d8bc4] px-4 text-sm font-bold text-white shadow-lg shadow-black/20 transition-all duration-200 hover:bg-[#256b9a] sm:h-11 sm:px-5"
+                  >
+                    <Lock className="h-4 w-4" aria-hidden="true" />
+                    Login
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-md border border-white/75 bg-white px-4 text-sm font-bold text-[#086fcf] shadow-lg shadow-black/20 transition-all duration-200 hover:bg-[#f7fbff] sm:h-11 sm:px-5"
+                  >
+                    <UserPlus className="h-4 w-4" aria-hidden="true" />
+                    Register
+                  </Link>
+                </div>
+              </div>
+
+              <aside className="w-full min-w-0 rounded-lg border border-white/20 bg-white/[0.13] p-3 text-white shadow-2xl shadow-black/20 backdrop-blur-xl ring-1 ring-white/10 sm:p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-[#ffeb3b]">How it works</p>
+                    <h2 className="mt-1 text-xl font-extrabold text-white">Four simple steps</h2>
                   </div>
-                  <p style={{ fontWeight: 700, fontSize: '0.85rem', margin: '0 0 0.35rem', color: GOV.text }}>{step.title}</p>
-                  <p style={{ fontSize: '0.75rem', color: GOV.textMuted, margin: 0 }}>{step.desc}</p>
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-[#ffeb3b] ring-1 ring-white/20">
+                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid w-full min-w-0 gap-2 sm:grid-cols-2 md:grid-cols-1">
+                  {steps.map(({ number, title, description, Icon }) => (
+                    <div
+                      key={number}
+                      className="flex min-w-0 gap-3 rounded-md border border-white/20 bg-gradient-to-r from-[#07183d] via-[#0b214c] to-[#112f64] p-3 shadow-sm shadow-black/30"
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-[#ffeb3b] ring-1 ring-white/20">
+                        <Icon className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-extrabold text-[#ffeb3b]">{number}</span>
+                          <h3 className="text-sm font-extrabold text-white">{title}</h3>
+                        </div>
+                        <p className="mt-0.5 text-xs leading-5 text-white/80">{description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            </div>
+
+            <div className="mt-4 grid w-full min-w-0 gap-2 sm:grid-cols-3">
+              {heroHighlights.map(({ title, text, Icon }) => (
+                <div
+                  key={title}
+                  className="rounded-lg border border-white/20 bg-white/[0.11] p-3 text-white backdrop-blur-sm"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-[#ffeb3b] ring-1 ring-white/20">
+                      <Icon className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-extrabold">{title}</h3>
+                      <p className="mt-1 text-xs leading-5 text-white/80">{text}</p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
-            </div>
           </div>
-          <div className="order-2 flex w-full shrink-0 justify-center lg:order-1 lg:flex-[1] lg:max-w-[240px] lg:justify-start">
-            <img
-              src="/auth-white.png"
-              alt=""
-              className="block h-auto w-full max-w-[200px] object-contain sm:max-w-[220px] lg:max-w-full"
-            />
-          </div>
-        </div>
-        </div>
-      </section>
+        </section>
 
         <section className="relative isolate hidden flex-1 overflow-hidden bg-[#07183d] lg:flex">
           <img
@@ -269,19 +355,6 @@ export default function Home() {
           </a>
         </p>
       </footer>
-
-      </div>
-    </OnboardingLayout>
+    </div>
   );
 }
-
-const btnPrimary = {
-  background: GOV.blue,
-  color: GOV.ministryBarText,
-  border: 'none',
-  borderRadius: '6px',
-  padding: '10px 24px',
-  fontWeight: 700,
-  fontSize: '0.9rem',
-  cursor: 'pointer',
-};

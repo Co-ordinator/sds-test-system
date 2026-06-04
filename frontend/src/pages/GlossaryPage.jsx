@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, Volume2, X, Filter, BookOpen, GraduationCap, Briefcase, Users } from 'lucide-react';
+import { Search, Volume2, X, BookOpen, GraduationCap, Briefcase, Users } from 'lucide-react';
 import { GOV } from '../theme/government';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,41 @@ import AppShell from '../components/layout/AppShell';
  * Full-page glossary with search, filtering, and detailed term views
  * Features: category filtering, search, text-to-speech, learning tracking
  */
+const SECTION_META = {
+  riasec: { label: 'RIASEC Types', icon: Users },
+  structure: { label: 'Assessment Terms', icon: GraduationCap },
+  actions: { label: 'Action Words', icon: Briefcase },
+  activities: { label: 'Activities', icon: BookOpen },
+  competencies: { label: 'Competencies', icon: GraduationCap },
+  occupations: { label: 'Occupations', icon: Briefcase },
+  self_estimates: { label: 'Self Estimates', icon: Users },
+  general: { label: 'General', icon: BookOpen }
+};
+
+const SECTION_ORDER = [
+  'riasec',
+  'structure',
+  'actions',
+  'activities',
+  'competencies',
+  'occupations',
+  'self_estimates',
+  'general'
+];
+
+const normalizeSection = (section) => String(section || 'general').trim().toLowerCase();
+const getSectionMeta = (section) => SECTION_META[normalizeSection(section)] || SECTION_META.general;
+const getSearchText = (term) => {
+  const sectionMeta = getSectionMeta(term.section);
+  return [
+    term.term,
+    term.definition,
+    term.example,
+    term.section,
+    sectionMeta.label
+  ].filter(Boolean).join(' ').toLowerCase();
+};
+
 const GlossaryPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -18,7 +53,7 @@ const GlossaryPage = () => {
   
   const { getAriaLabel, highContrast } = useAccessibility();
   const { user } = useAuth();
-  const { glossaryUtils, markTermAsLearned, glossaryTerms, handleTermView, getStats } = useGlossary();
+  const { glossaryUtils, markTermAsLearned, glossaryTerms, loading, handleTermView, getStats } = useGlossary();
 
   const role = user?.role || 'Test Taker';
   const backTo = role === 'System Administrator'
@@ -33,17 +68,13 @@ const GlossaryPage = () => {
 
     // Category filter
     if (selectedCategory !== 'all') {
-      terms = terms.filter(term => term.section === selectedCategory);
+      terms = terms.filter(term => normalizeSection(term.section) === selectedCategory);
     }
     
     // Search filter
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      terms = terms.filter(term => 
-        term.term.toLowerCase().includes(query) ||
-        term.definition.toLowerCase().includes(query) ||
-        (term.example && term.example.toLowerCase().includes(query))
-      );
+      const query = searchQuery.trim().toLowerCase();
+      terms = terms.filter(term => getSearchText(term).includes(query));
     }
     
     return terms.sort((a, b) => a.term.localeCompare(b.term));
@@ -51,19 +82,30 @@ const GlossaryPage = () => {
 
   // Memoize categories to prevent re-renders
   const categories = useMemo(() => {
-    const allTerms = glossaryTerms;
+    const counts = glossaryTerms.reduce((acc, term) => {
+      const section = normalizeSection(term.section);
+      acc[section] = (acc[section] || 0) + 1;
+      return acc;
+    }, {});
+
     return [
-      { value: 'all', label: 'All Terms', count: allTerms.length, icon: BookOpen },
-      { value: 'riasec', label: 'RIASEC Types', count: allTerms.filter(term => term.section === 'riasec').length, icon: Users },
-      { value: 'structure', label: 'Assessment Terms', count: allTerms.filter(term => term.section === 'structure').length, icon: GraduationCap },
-      { value: 'actions', label: 'Activity Words', count: allTerms.filter(term => term.section === 'actions').length, icon: Briefcase },
-      { value: 'activities', label: 'Activities', count: allTerms.filter(term => term.section === 'activities').length, icon: BookOpen },
-      { value: 'competencies', label: 'Competencies', count: allTerms.filter(term => term.section === 'competencies').length, icon: GraduationCap },
-      { value: 'occupations', label: 'Occupations', count: allTerms.filter(term => term.section === 'occupations').length, icon: Briefcase },
-      { value: 'self_estimates', label: 'Self Estimates', count: allTerms.filter(term => term.section === 'self_estimates').length, icon: Users },
-      { value: 'general', label: 'General', count: allTerms.filter(term => term.section === 'general').length, icon: BookOpen }
+      { value: 'all', label: 'All Terms', count: glossaryTerms.length, icon: BookOpen },
+      ...SECTION_ORDER
+        .filter(section => counts[section] > 0)
+        .map(section => ({
+          value: section,
+          label: SECTION_META[section].label,
+          count: counts[section],
+          icon: SECTION_META[section].icon
+        }))
     ];
   }, [glossaryTerms]);
+
+  useEffect(() => {
+    if (selectedCategory !== 'all' && !categories.some(category => category.value === selectedCategory)) {
+      setSelectedCategory('all');
+    }
+  }, [categories, selectedCategory]);
 
   // Handle text-to-speech
   const speakText = (text) => {
@@ -183,51 +225,55 @@ const GlossaryPage = () => {
                 </h2>
               </div>
               <div className="max-h-96 lg:max-h-[600px] overflow-y-auto">
-                {filteredTerms.length === 0 ? (
+                {loading ? (
+                  <div className="p-8 text-center">
+                    <p className="text-gray-500">Loading glossary terms...</p>
+                  </div>
+                ) : filteredTerms.length === 0 ? (
                   <div className="p-8 text-center">
                     <p className="text-gray-500">No terms found matching your search.</p>
                   </div>
                 ) : (
                   <div className="divide-y" style={{ borderColor: GOV.borderLight }}>
-                    {filteredTerms.map(term => (
-                      <button
-                        key={`${term.section}-${term.term}`}
-                        onClick={() => handleTermSelect(term)}
-                        className={`
-                          w-full text-left p-4 hover:bg-gray-50 transition-colors
-                          ${selectedTerm?.term === term.term ? 'bg-blue-50' : ''}
-                        `}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-medium mb-1" style={{ color: GOV.text }}>
-                              {term.term}
-                            </h4>
-                            <p className="text-sm text-gray-600 line-clamp-2">
-                              {term.definition}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <span 
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                                style={{
-                                  backgroundColor: term.difficulty === 'high' ? '#fef2f2' : 
-                                                 term.difficulty === 'medium' ? '#fef3c7' : '#f0fdf4',
-                                  color: term.difficulty === 'high' ? '#dc2626' : 
-                                        term.difficulty === 'medium' ? '#d97706' : '#16a34a'
-                                }}
-                              >
-                                {term.section}
-                              </span>
-                              {term.difficulty && (
-                                <span className="text-xs text-gray-500">
-                                  {term.difficulty}
+                    {filteredTerms.map(term => {
+                      const sectionMeta = getSectionMeta(term.section);
+                      const isSelected = selectedTerm?.id
+                        ? selectedTerm.id === term.id
+                        : selectedTerm?.term === term.term && selectedTerm?.section === term.section;
+
+                      return (
+                        <button
+                          key={term.id || `${term.section}-${term.term}`}
+                          onClick={() => handleTermSelect(term)}
+                          className={`
+                            w-full text-left p-4 hover:bg-gray-50 transition-colors
+                            ${isSelected ? 'bg-blue-50' : ''}
+                          `}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium mb-1" style={{ color: GOV.text }}>
+                                {term.term}
+                              </h4>
+                              <p className="text-sm text-gray-600 line-clamp-2">
+                                {term.definition}
+                              </p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                  style={{
+                                    backgroundColor: '#eff6ff',
+                                    color: GOV.primary
+                                  }}
+                                >
+                                  {sectionMeta.label}
                                 </span>
-                              )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -248,16 +294,11 @@ const GlossaryPage = () => {
                         <span 
                           className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                           style={{
-                            backgroundColor: selectedTerm.difficulty === 'high' ? '#fef2f2' : 
-                                           selectedTerm.difficulty === 'medium' ? '#fef3c7' : '#f0fdf4',
-                            color: selectedTerm.difficulty === 'high' ? '#dc2626' : 
-                                  selectedTerm.difficulty === 'medium' ? '#d97706' : '#16a34a'
+                            backgroundColor: '#eff6ff',
+                            color: GOV.primary
                           }}
                         >
-                          {selectedTerm.section}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {selectedTerm.difficulty} difficulty
+                          {getSectionMeta(selectedTerm.section).label}
                         </span>
                       </div>
                     </div>

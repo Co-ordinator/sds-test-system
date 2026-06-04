@@ -4,12 +4,47 @@ const fg = require('fast-glob');
 const esbuild = require('esbuild');
 
 const backendRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(backendRoot, '..');
 const distRoot = path.join(backendRoot, 'dist');
+const pdfAssetNames = ['letterhead.png', 'siyinqaba.png', 'watermark.png'];
 
 async function copyPath(sourceRelPath) {
   const source = path.join(backendRoot, sourceRelPath);
   const destination = path.join(distRoot, sourceRelPath);
   await fs.cp(source, destination, { recursive: true });
+}
+
+async function pathExists(candidate) {
+  try {
+    await fs.access(candidate);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function findPdfAsset(fileName) {
+  const candidates = [
+    path.join(backendRoot, 'assets', fileName),
+    path.join(repoRoot, 'frontend', 'public', fileName),
+    path.join(repoRoot, 'docs', fileName)
+  ];
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return candidate;
+  }
+
+  throw new Error(`Required PDF asset not found: ${fileName}`);
+}
+
+async function copyPdfAssets() {
+  const destinationDir = path.join(distRoot, 'assets');
+  await fs.mkdir(destinationDir, { recursive: true });
+
+  for (const fileName of pdfAssetNames) {
+    const source = await findPdfAsset(fileName);
+    await fs.copyFile(source, path.join(destinationDir, fileName));
+  }
 }
 
 async function build() {
@@ -51,6 +86,8 @@ async function build() {
       }
     }
   }
+
+  await copyPdfAssets();
 }
 
 build().catch((error) => {
