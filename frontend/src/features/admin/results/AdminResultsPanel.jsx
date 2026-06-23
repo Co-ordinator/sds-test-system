@@ -1,14 +1,15 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { Search, Eye, Download, Award, CheckCircle } from 'lucide-react';
+import { Search, Eye, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { GOV, TYPO } from '../../../theme/government';
+import { GOV } from '../../../theme/government';
 import DataTable from '../../../components/data/DataTable';
 import { StatusBadge, useToast, ErrorBanner } from '../../../components/ui/StatusIndicators';
 import ActionMenu from '../../../components/ui/ActionMenu';
 import { adminService } from '../../../services/adminService';
 import { usePermissions } from '../../../context/PermissionContext';
 
-const getHollandDisplayCode = (assessment) => assessment?.hollandCodeDisplay || assessment?.hollandCode || '–';
+const getHollandDisplayCode = (assessment) =>
+  assessment?.hollandCodeDisplay || assessment?.hollandCode || '-';
 
 const getInstitutionLabel = (assessment) => {
   const user = assessment?.user || {};
@@ -21,8 +22,7 @@ const AdminResultsPanel = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
-  const [generatingCert, setGeneratingCert] = useState(null);
-  const [generatedCerts, setGeneratedCerts] = useState({});
+  const [downloadingCert, setDownloadingCert] = useState(null);
   const { toast, showToast, Toast: ToastComp } = useToast();
   const { hasPermission } = usePermissions();
   const [selectedResults, setSelectedResults] = useState(new Set());
@@ -32,40 +32,36 @@ const AdminResultsPanel = () => {
     setError(null);
     try {
       setAssessments(await adminService.getAssessments(200));
-    } catch { setError('Failed to load assessments'); }
-    finally { setLoading(false); }
+    } catch {
+      setError('Failed to load assessments');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const handleGenerateCert = async (a) => {
-    setGeneratingCert(a.id);
-    try {
-      const result = await adminService.generateCertificate(a.id);
-      setGeneratedCerts(prev => ({ ...prev, [a.id]: result?.data }));
-      showToast(`Certificate ${result?.data?.certNumber || ''} generated — student notified`);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to generate certificate', 'error');
-    } finally {
-      setGeneratingCert(null);
-    }
-  };
+  const handleDownloadCert = async (assessment) => {
+    if (downloadingCert === assessment.id) return;
 
-  const handleDownloadCert = async (a) => {
-    const certData = generatedCerts[a.id];
+    setDownloadingCert(assessment.id);
     try {
-      await adminService.downloadCertificate(a.id, certData?.certNumber);
-    } catch {
-      showToast('Certificate download failed', 'error');
+      await adminService.downloadCertificate(assessment.id);
+      showToast('Certificate downloaded');
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Certificate download failed', 'error');
+    } finally {
+      setDownloadingCert(null);
     }
   };
 
   const filtered = useMemo(() => {
     if (!search) return assessments;
     const q = search.toLowerCase();
-    return assessments.filter(a =>
-      `${a.user?.firstName} ${a.user?.lastName} ${a.user?.email} ${getHollandDisplayCode(a)} ${getInstitutionLabel(a)}`
-        .toLowerCase().includes(q)
+    return assessments.filter((assessment) =>
+      `${assessment.user?.firstName} ${assessment.user?.lastName} ${assessment.user?.email} ${getHollandDisplayCode(assessment)} ${getInstitutionLabel(assessment)}`
+        .toLowerCase()
+        .includes(q)
     );
   }, [assessments, search]);
 
@@ -74,19 +70,26 @@ const AdminResultsPanel = () => {
       key: 'student',
       header: 'Student',
       sortable: false,
-      render: (a) => (
+      render: (assessment) => (
         <div>
-          <p className="text-sm font-medium" style={{ color: GOV.text }}>{a.user?.firstName} {a.user?.lastName}</p>
-          <p className="text-xs" style={{ color: GOV.textMuted }}>{a.user?.email || '–'}</p>
+          <p className="text-sm font-medium" style={{ color: GOV.text }}>
+            {assessment.user?.firstName} {assessment.user?.lastName}
+          </p>
+          <p className="text-xs" style={{ color: GOV.textMuted }}>
+            {assessment.user?.email || '-'}
+          </p>
         </div>
       ),
     },
     {
       key: 'institution',
       header: 'Institution / Workplace',
-      render: (a) => {
-        const label = getInstitutionLabel(a);
-        const isWorkplace = !a.user?.institution?.name && !a.user?.currentInstitution && Boolean(a.user?.workplaceName);
+      render: (assessment) => {
+        const label = getInstitutionLabel(assessment);
+        const isWorkplace = !assessment.user?.institution?.name
+          && !assessment.user?.currentInstitution
+          && Boolean(assessment.user?.workplaceName);
+
         return (
           <span className="text-xs" style={{ color: label ? GOV.textMuted : GOV.textHint }}>
             {label || 'Not specified'}{isWorkplace ? ' (workplace)' : ''}
@@ -98,29 +101,52 @@ const AdminResultsPanel = () => {
       key: 'status',
       header: 'Status',
       sortable: true,
-      render: (a) => <StatusBadge status={a.status} />,
+      render: (assessment) => <StatusBadge status={assessment.status} />,
     },
     {
       key: 'hollandCode',
       header: 'Holland Code',
       sortable: true,
-      render: (a) => <span className="font-mono font-semibold text-sm" style={{ color: GOV.text }}>{getHollandDisplayCode(a)}</span>,
+      render: (assessment) => (
+        <span className="font-mono font-semibold text-sm" style={{ color: GOV.text }}>
+          {getHollandDisplayCode(assessment)}
+        </span>
+      ),
     },
     {
       key: 'completedAt',
       header: 'Completed',
       sortable: true,
-      render: (a) => <span className="text-xs" style={{ color: GOV.textMuted }}>{a.completedAt ? new Date(a.completedAt).toLocaleDateString() : '–'}</span>,
+      render: (assessment) => (
+        <span className="text-xs" style={{ color: GOV.textMuted }}>
+          {assessment.completedAt ? new Date(assessment.completedAt).toLocaleDateString() : '-'}
+        </span>
+      ),
     },
     {
-      key: 'actions', header: '', stopPropagation: true, width: 'w-10', align: 'right',
-      render: (a) => a.status !== 'completed' ? null : (
+      key: 'actions',
+      header: '',
+      stopPropagation: true,
+      width: 'w-10',
+      align: 'right',
+      render: (assessment) => assessment.status !== 'completed' ? null : (
         <ActionMenu actions={[
-          { label: 'View Results', Icon: Eye, onClick: () => navigate('/results', { state: { assessmentId: a.id } }) },
-          hasPermission('results.download_pdf') && { label: 'Download PDF', Icon: Download, onClick: () => adminService.downloadResultPdf(a.id).catch(() => showToast('PDF download failed', 'error')) },
-          hasPermission('certificates.generate') && generatedCerts[a.id]
-            ? { label: `Download Certificate`, Icon: CheckCircle, onClick: () => handleDownloadCert(a) }
-            : hasPermission('certificates.generate') && { label: generatingCert === a.id ? 'Generating…' : 'Generate Certificate', Icon: Award, onClick: () => handleGenerateCert(a) },
+          {
+            label: 'View Results',
+            Icon: Eye,
+            onClick: () => navigate('/results', { state: { assessmentId: assessment.id } }),
+          },
+          hasPermission('results.download_pdf') && {
+            label: 'Download PDF',
+            Icon: Download,
+            onClick: () => adminService.downloadResultPdf(assessment.id)
+              .catch(() => showToast('PDF download failed', 'error')),
+          },
+          hasPermission('certificates.download') && {
+            label: downloadingCert === assessment.id ? 'Downloading...' : 'Download Certificate',
+            Icon: Download,
+            onClick: () => handleDownloadCert(assessment),
+          },
         ]} />
       ),
     },
@@ -134,9 +160,9 @@ const AdminResultsPanel = () => {
         <input
           className="text-xs outline-none"
           style={{ color: GOV.text }}
-          placeholder="Search student, institution, code…"
+          placeholder="Search student, institution, code..."
           value={search}
-          onChange={e => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value)}
         />
       </div>
     </>

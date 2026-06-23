@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
 import { GOV, TYPO } from '../../theme/government';
+import TestTakerSideNav from './TestTakerSideNav';
+import PoweredFooter from './PoweredFooter';
 
 export default function AssessmentShell({
   title,
@@ -15,10 +17,12 @@ export default function AssessmentShell({
 }) {
   const { user, logout } = useAuth();
   const { getAriaLabel } = useAccessibility();
+  const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'User';
   const role = user?.role || 'Test Taker';
+  const useTestTakerSideLayout = role === 'Test Taker' && location.pathname === '/results';
   const isAdminLike = role === 'System Administrator' || role === 'Test Administrator';
   const adminDashboardPath = role === 'System Administrator' ? '/admin/dashboard' : '/test-administrator';
   const dashboardPath = role === 'System Administrator'
@@ -38,7 +42,7 @@ export default function AssessmentShell({
       : { bg: '#f0fdf4', text: '#15803d' };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className={`${useTestTakerSideLayout ? 'h-screen overflow-hidden' : 'min-h-screen'} flex flex-col bg-white`}>
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -163,28 +167,30 @@ export default function AssessmentShell({
           </div>
         </div>
 
-        <div className="border-t" style={{ borderColor: GOV.borderLight }}>
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 text-left">
-                <h1 className="text-lg font-semibold" style={{ color: GOV.text }}>{title}</h1>
-                {subtitle ? (
-                  <p className={`${TYPO.body} mt-0.5`} style={{ color: GOV.textMuted }}>
-                    {subtitle}
-                  </p>
+        {!useTestTakerSideLayout && (
+          <div className="border-t" style={{ borderColor: GOV.borderLight }}>
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0 text-left">
+                  <h1 className="text-lg font-semibold" style={{ color: GOV.text }}>{title}</h1>
+                  {subtitle ? (
+                    <p className={`${TYPO.body} mt-0.5`} style={{ color: GOV.textMuted }}>
+                      {subtitle}
+                    </p>
+                  ) : null}
+                </div>
+                {actions ? (
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 max-w-full">
+                    {actions}
+                  </div>
                 ) : null}
               </div>
-              {actions ? (
-                <div className="flex flex-wrap items-center gap-2 shrink-0 max-w-full">
-                  {actions}
-                </div>
-              ) : null}
             </div>
           </div>
-        </div>
+        )}
       </header>
 
-      {contextLabel ? (
+      {!useTestTakerSideLayout && contextLabel ? (
         <div className="border-b" style={{ borderColor: GOV.borderLight }} role="status" aria-live="polite">
           <div className="max-w-5xl mx-auto px-6 py-1.5">
             <span className="text-xs font-medium" style={{ color: GOV.textMuted }}>
@@ -194,13 +200,53 @@ export default function AssessmentShell({
         </div>
       ) : null}
 
-      <main className="flex-1" id="main-content" role="main">
-        <div id="glossary-section" className="sr-only">
-          <h2>Glossary Navigation</h2>
-          <p>Use the Glossary action in the header to open full SDS term definitions.</p>
+      {useTestTakerSideLayout ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden bg-white">
+          <TestTakerSideNav />
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden" id="main-content" role="main">
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+              <div className="border-b bg-white" style={{ borderColor: GOV.borderLight }}>
+                <div className="max-w-5xl mx-auto px-4 py-5 sm:px-6">
+                  {contextLabel ? (
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide" style={{ color: GOV.textMuted }}>
+                      {contextLabel}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 text-left">
+                      <h1 className="text-2xl font-bold" style={{ color: GOV.text }}>{title}</h1>
+                      {subtitle ? (
+                        <p className={`${TYPO.body} mt-1`} style={{ color: GOV.textMuted }}>
+                          {subtitle}
+                        </p>
+                      ) : null}
+                    </div>
+                    {actions ? (
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 max-w-full">
+                        {actions}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+              <div id="glossary-section" className="sr-only">
+                <h2>Glossary Navigation</h2>
+                <p>Use the Glossary action in the header to open full SDS term definitions.</p>
+              </div>
+              <div className={contentClassName}>{children}</div>
+            </div>
+            <PoweredFooter compact />
+          </main>
         </div>
-        <div className={contentClassName}>{children}</div>
-      </main>
+      ) : (
+        <main className="flex-1" id="main-content" role="main">
+          <div id="glossary-section" className="sr-only">
+            <h2>Glossary Navigation</h2>
+            <p>Use the Glossary action in the header to open full SDS term definitions.</p>
+          </div>
+          <div className={contentClassName}>{children}</div>
+        </main>
+      )}
     </div>
   );
 }

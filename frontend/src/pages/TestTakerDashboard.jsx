@@ -1,15 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Award,
   BarChart3,
-  ClipboardList,
-  Clock,
+  BookOpen,
+  Calendar,
   FileText,
-  Hand,
-  Info,
+  GraduationCap,
   Loader2,
+  MapPin,
   Play,
+  Settings,
+  User,
   X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -17,150 +19,206 @@ import api from '../services/api';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 
+const HERO_IMAGE = '/1299-1750835531.webp';
+
 const getHollandDisplayCode = (assessment) =>
   assessment?.hollandCodeDisplay || assessment?.hollandCode || '-';
-
-const clampPercent = (value) =>
-  Math.max(0, Math.min(Math.round(Number(value) || 0), 100));
 
 const assessmentTime = (assessment) => {
   const raw = assessment?.completedAt || assessment?.updatedAt || assessment?.createdAt;
   return raw ? new Date(raw).getTime() : 0;
 };
 
-const formatDate = (value) => {
+const clampPercent = (value) =>
+  Math.max(0, Math.min(Math.round(Number(value) || 0), 100));
+
+const sameId = (left, right) => String(left) === String(right);
+
+const formatDate = (value, options = { day: 'numeric', month: 'short', year: 'numeric' }) => {
   if (!value) return '-';
-  return new Date(value).toLocaleDateString('en-GB');
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('en-GB', options);
 };
 
 const formatHollandCode = (code) => {
   if (!code || code === '-') return '-';
-  return String(code).replace(/\s+/g, '').replace(/([A-Z])(?=[A-Z])/g, '$1 ').trim();
+  return String(code)
+    .replace(/\s+/g, '')
+    .replace(/\//g, ' / ')
+    .replace(/([A-Z])(?=[A-Z])/g, '$1 ')
+    .trim();
 };
 
-/* ── Flat progress ring ── */
-function ProgressRing({ percent }) {
-  const r = 44;
-  const circ = 2 * Math.PI * r;
-  const dash = (percent / 100) * circ;
+const formatLabel = (value, fallback = '-') => {
+  if (!value) return fallback;
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+};
 
+const profileTypeLabel = (userType) => {
+  if (userType === 'school_student') return 'High School Student';
+  if (userType === 'university_student') return 'Tertiary Student';
+  if (userType === 'professional') return 'Professional';
+  return formatLabel(userType, 'Test Taker');
+};
+
+function InfoRow({ label, value, badge }) {
   return (
-    <div style={{ position: 'relative', width: 112, height: 112, flexShrink: 0 }}>
-      <svg width="112" height="112" viewBox="0 0 112 112" style={{ transform: 'rotate(-90deg)' }}>
-        <circle cx="56" cy="56" r={r} fill="none" stroke={GOV.borderLight} strokeWidth="10" />
-        <circle
-          cx="56" cy="56" r={r} fill="none"
-          stroke={GOV.blue} strokeWidth="10"
-          strokeDasharray={`${dash} ${circ}`}
-          strokeLinecap="round"
-        />
-      </svg>
-      <div style={{
-        position: 'absolute', inset: 0,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <span style={{ fontSize: '1.35rem', fontWeight: 800, lineHeight: 1, color: GOV.text }}>{percent}%</span>
-        <span style={{ fontSize: '0.62rem', fontWeight: 600, color: GOV.textMuted, marginTop: 2 }}>Complete</span>
-      </div>
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">{label}</p>
+      {badge ? (
+        <span className="mt-1 inline-block rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+          {value || '-'}
+        </span>
+      ) : (
+        <p className="mt-1 text-sm font-medium text-gray-900">{value || '-'}</p>
+      )}
     </div>
   );
 }
 
-/* ── Detail tile for modal ── */
-const DetailTile = ({ label, value }) => (
-  <div style={{ border: `1px solid ${GOV.border}`, borderRadius: 8, padding: '0.85rem 1rem', background: '#fff' }}>
-    <p style={{ fontSize: '0.7rem', fontWeight: 700, color: GOV.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>{label}</p>
-    <p style={{ fontSize: '1.1rem', fontWeight: 800, color: GOV.text, margin: '6px 0 0' }}>{value}</p>
-  </div>
-);
+function InfoCard({ icon: Icon, iconClass, title, children }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 font-bold text-gray-900">
+          <Icon className={`h-5 w-5 ${iconClass}`} />
+          {title}
+        </h3>
+        <Link to="/profile" className="text-sm font-medium" style={{ color: GOV.blue }}>
+          Edit
+        </Link>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
+  );
+}
 
-/* ── Certificate button ── */
-const CertificateAction = ({ assessment, certificate, downloadingCert, generatingCert, onDownload, onGenerate }) => {
-  const busy = downloadingCert === assessment.id || generatingCert === assessment.id;
+function ActionButton({ children, primary = false, className = '', ...props }) {
   return (
     <button
       type="button"
-      onClick={() => certificate ? onDownload(certificate) : onGenerate(assessment.id)}
-      disabled={busy}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition hover:-translate-y-0.5 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60 ${className}`}
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        height: 34, minWidth: 120, padding: '0 12px',
-        background: GOV.blue, color: GOV.ministryBarText,
-        border: 'none', borderRadius: 6,
-        fontSize: '0.75rem', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer',
-        opacity: busy ? 0.6 : 1,
+        backgroundColor: primary ? GOV.blue : '#ffffff',
+        border: `1px solid ${primary ? GOV.blue : GOV.border}`,
+        color: primary ? '#ffffff' : GOV.text,
       }}
+      {...props}
     >
-      {busy
-        ? <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" />
-        : <Award style={{ width: 14, height: 14 }} />}
-      {certificate
-        ? (downloadingCert === assessment.id ? 'Downloading…' : 'Certificate')
-        : (generatingCert === assessment.id ? 'Generating…' : 'Certificate')}
+      {children}
     </button>
   );
-};
+}
 
-/* ── Flat outline button ── */
-const FlatBtn = ({ children, primary, ...props }) => (
-  <button
-    type="button"
-    style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-      height: 38, padding: '0 16px',
-      background: primary ? GOV.blue : '#fff',
-      color: primary ? GOV.ministryBarText : GOV.text,
-      border: `1px solid ${primary ? GOV.blue : GOV.border}`,
-      borderRadius: 6, fontSize: '0.82rem', fontWeight: 700,
-      cursor: 'pointer',
-    }}
-    {...props}
-  >
-    {children}
-  </button>
-);
+function CertificateAction({
+  assessment,
+  downloadingCert,
+  onDownload,
+}) {
+  const busy = sameId(downloadingCert, assessment.id);
+  return (
+    <button
+      type="button"
+      onClick={() => onDownload(assessment)}
+      disabled={busy}
+      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-bold text-white transition hover:-translate-y-0.5 hover:shadow-sm disabled:pointer-events-none disabled:opacity-60"
+      style={{ backgroundColor: GOV.blue }}
+    >
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Award className="h-3.5 w-3.5" />}
+      {busy ? 'Downloading...' : 'Download Certificate'}
+    </button>
+  );
+}
 
-/* ══════════════════════════════════════════════════════════ */
 const TestTakerDashboard = () => {
   const { user, setSession } = useAuth();
   const navigate = useNavigate();
   const [assessments, setAssessments] = useState([]);
-  const [profileUser, setProfileUser] = useState(null);
+  const [profileUser, setProfileUser] = useState(user || null);
+  const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedAssessment, setSelectedAssessment] = useState(null);
   const [loadingAssessmentDetail, setLoadingAssessmentDetail] = useState(false);
-  const [certificates, setCertificates] = useState([]);
   const [downloadingCert, setDownloadingCert] = useState(null);
-  const [generatingCert, setGeneratingCert] = useState(null);
-
-  useEffect(() => { setProfileUser(user || null); }, [user?.id]);
 
   useEffect(() => {
-    const fetchAssessments = async () => {
+    setProfileUser(user || null);
+  }, [user?.id, user]);
+
+  useEffect(() => {
+    let alive = true;
+
+    const fetchDashboardData = async () => {
       try {
         const [assessmentsRes, meRes, certsRes] = await Promise.all([
           api.get('/api/v1/assessments'),
           api.get('/api/v1/auth/me').catch(() => null),
           api.get('/api/v1/assessments/my/certificates').catch(() => null),
         ]);
+
+        if (!alive) return;
+
         setAssessments(assessmentsRes.data?.data?.assessments || []);
         setCertificates(certsRes?.data?.data?.certificates || []);
+
         const freshUser = meRes?.data?.data?.user ?? meRes?.data?.user;
-        if (freshUser) { setProfileUser(freshUser); setSession(null, freshUser); }
-      } catch { setAssessments([]); }
-      finally { setLoading(false); }
+        if (freshUser) {
+          setProfileUser(freshUser);
+          setSession(null, freshUser);
+        }
+      } catch {
+        if (alive) setAssessments([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
     };
-    fetchAssessments();
+
+    fetchDashboardData();
+    return () => {
+      alive = false;
+    };
   }, [user?.id, setSession]);
 
-  const inProgress = assessments.find((a) => a.status === 'in_progress');
+  const inProgress = assessments.find((assessment) => assessment.status === 'in_progress');
   const completed = useMemo(
-    () => assessments.filter((a) => a.status === 'completed').sort((a, b) => assessmentTime(b) - assessmentTime(a)),
+    () => assessments
+      .filter((assessment) => assessment.status === 'completed')
+      .sort((a, b) => assessmentTime(b) - assessmentTime(a)),
     [assessments],
   );
-  const progressPercent = clampPercent(inProgress?.progress);
+  const allAssessments = useMemo(
+    () => [...assessments].sort((a, b) => assessmentTime(b) - assessmentTime(a)),
+    [assessments],
+  );
+  const latestCompleted = completed[0] || null;
+  const latestCode = formatHollandCode(getHollandDisplayCode(latestCompleted));
   const fullName = [profileUser?.firstName, profileUser?.lastName].filter(Boolean).join(' ').trim();
-  const displayName = fullName || profileUser?.studentCode || 'Student';
+  const displayName = fullName || profileUser?.studentCode || 'Test Taker';
+  const institutionName = profileUser?.institution?.name
+    || profileUser?.currentInstitution
+    || profileUser?.workplaceName
+    || '-';
+  const institutionLabel = profileUser?.userType === 'professional' ? 'WORKPLACE / EMPLOYER' : 'INSTITUTION';
+  const highestQualification = [
+    profileUser?.gradeLevel,
+    profileUser?.degreeProgram,
+  ].filter(Boolean).join(' - ')
+    || profileUser?.highestQualification
+    || profileUser?.educationLevel?.name
+    || '-';
+
+  const goToAssessment = () => {
+    if (inProgress) {
+      navigate('/questionnaire', { state: { resumeAssessment: true } });
+      return;
+    }
+    navigate('/test');
+  };
 
   const viewResults = (id) => navigate('/results', { state: { assessmentId: id } });
 
@@ -171,377 +229,321 @@ const TestTakerDashboard = () => {
       const res = await api.get(`/api/v1/assessments/${id}`);
       setSelectedAssessment(res.data?.data?.assessment || null);
     } catch {
-      setSelectedAssessment(assessments.find((a) => a.id === id) || null);
-    } finally { setLoadingAssessmentDetail(false); }
+      setSelectedAssessment(assessments.find((assessment) => assessment.id === id) || null);
+    } finally {
+      setLoadingAssessmentDetail(false);
+    }
   };
 
-  const handleDownloadCertificate = async (cert) => {
-    setDownloadingCert(cert.assessmentId);
+  const handleDownloadCertificate = async (assessment) => {
+    const assessmentId = assessment.id || assessment.assessmentId;
+    setDownloadingCert(assessmentId);
     try {
-      const res = await api.get(`/api/v1/assessments/${cert.assessmentId}/certificate/download`, { responseType: 'blob' });
+      const res = await api.get(`/api/v1/assessments/${assessmentId}/certificate/download`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `SDS_Certificate_${(cert.certNumber || cert.assessmentId).replace(/\//g, '-')}.pdf`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `SDS_Certificate_${String(assessmentId).replace(/\//g, '-')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
-    } catch {} finally { setDownloadingCert(null); }
+      setCertificates((prev) => prev.some((item) => sameId(item.assessmentId, assessmentId))
+        ? prev
+        : [{ assessmentId, available: true }, ...prev]);
+    } catch {
+      // Keep the dashboard stable; certificate failures are handled by the API logs.
+    } finally {
+      setDownloadingCert(null);
+    }
   };
 
-  const handleGenerateCertificate = async (assessmentId) => {
-    setGeneratingCert(assessmentId);
-    try {
-      const res = await api.post(`/api/v1/assessments/${assessmentId}/certificate/generate`);
-      const cert = { ...(res.data?.data || {}), assessmentId };
-      setCertificates((prev) => [cert, ...prev.filter((i) => i.assessmentId !== assessmentId)]);
-      await handleDownloadCertificate(cert);
-    } catch {} finally { setGeneratingCert(null); }
+  const closeAssessmentModal = () => {
+    setSelectedAssessment(null);
+    setLoadingAssessmentDetail(false);
   };
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: '100vh',
-          background: GOV.borderLight,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'sans-serif',
-        }}
-      >
-        <Loader2 className="animate-spin" style={{ width: 36, height: 36, color: GOV.blue }} />
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-9 w-9 animate-spin" style={{ color: GOV.blue }} />
       </div>
     );
   }
 
   return (
     <AppShell hideBreadcrumbs>
-
-      {/* ── Detail modal ── */}
       {(loadingAssessmentDetail || selectedAssessment) && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 40,
-          background: 'rgba(0,0,0,0.35)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
-        }}>
-          <div style={{
-            background: '#fff', borderRadius: 12, width: '100%', maxWidth: 720,
-            maxHeight: '82vh', display: 'flex', flexDirection: 'column',
-            border: `1px solid ${GOV.border}`,
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '1.25rem 1.5rem', borderBottom: `1px solid ${GOV.border}`,
-            }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: GOV.text, margin: 0 }}>Assessment Details</h3>
-              <button type="button"
-                onClick={() => { setSelectedAssessment(null); setLoadingAssessmentDetail(false); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 6, color: GOV.textMuted }}
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
+          <div className="flex max-h-[82vh] w-full max-w-3xl flex-col rounded-xl border bg-white shadow-2xl" style={{ borderColor: GOV.border }}>
+            <div className="flex items-center justify-between border-b px-5 py-4" style={{ borderColor: GOV.border }}>
+              <h3 className="m-0 text-base font-extrabold" style={{ color: GOV.text }}>Assessment Details</h3>
+              <button
+                type="button"
+                onClick={closeAssessmentModal}
+                className="rounded-md p-1.5 transition hover:bg-gray-100"
+                style={{ color: GOV.textMuted }}
+                aria-label="Close assessment details"
               >
-                <X style={{ width: 18, height: 18 }} />
+                <X className="h-5 w-5" />
               </button>
             </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem' }}>
+            <div className="flex-1 overflow-y-auto p-5">
               {loadingAssessmentDetail && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem 0' }}>
-                  <Loader2 className="animate-spin" style={{ width: 32, height: 32, color: GOV.blue }} />
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin" style={{ color: GOV.blue }} />
                 </div>
               )}
               {!loadingAssessmentDetail && selectedAssessment && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                  <div style={{ background: GOV.borderLight, borderRadius: 8, padding: '1rem 1.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div className="space-y-5">
+                  <div className="rounded-xl border p-4" style={{ borderColor: GOV.border, backgroundColor: '#f8fafc' }}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <p style={{ fontWeight: 800, fontSize: '0.95rem', margin: 0, color: GOV.text }}>Assessment #{selectedAssessment.id}</p>
-                        <p style={{ fontSize: '0.78rem', color: GOV.textMuted, margin: '4px 0 0' }}>
+                        <p className="m-0 text-sm font-extrabold" style={{ color: GOV.text }}>Assessment #{selectedAssessment.id}</p>
+                        <p className="m-0 mt-1 text-xs" style={{ color: GOV.textMuted }}>
                           Started {selectedAssessment.createdAt ? new Date(selectedAssessment.createdAt).toLocaleString() : '-'}
                         </p>
                       </div>
-                      <span style={{
-                        background: GOV.blueLightAlt, color: GOV.blue, border: `1px solid ${GOV.blueLight}`,
-                        borderRadius: 99, padding: '3px 12px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase',
-                      }}>
-                        {selectedAssessment.status?.replace('_', ' ') || 'unknown'}
+                      <span className="rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase" style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}>
+                        {formatLabel(selectedAssessment.status, 'Unknown')}
                       </span>
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: '0.75rem' }}>
-                    <DetailTile label="Progress" value={`${clampPercent(selectedAssessment.progress)}%`} />
-                    <DetailTile label="Holland Code" value={formatHollandCode(getHollandDisplayCode(selectedAssessment))} />
-                    <DetailTile label="Completed" value={selectedAssessment.completedAt ? new Date(selectedAssessment.completedAt).toLocaleDateString() : 'Not yet'} />
-                    <DetailTile label="Updated" value={selectedAssessment.updatedAt ? new Date(selectedAssessment.updatedAt).toLocaleDateString() : '-'} />
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <InfoMetric label="Progress" value={`${clampPercent(selectedAssessment.progress)}%`} />
+                    <InfoMetric label="Holland Code" value={formatHollandCode(getHollandDisplayCode(selectedAssessment))} />
+                    <InfoMetric label="Completed" value={selectedAssessment.completedAt ? formatDate(selectedAssessment.completedAt) : 'Not yet'} />
+                    <InfoMetric label="Updated" value={formatDate(selectedAssessment.updatedAt)} />
                   </div>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: '0.9rem', margin: '0 0 0.75rem', color: GOV.text }}>Response Summary</p>
-                    <div style={{ border: `1px solid ${GOV.border}`, borderRadius: 8, padding: '1rem' }}>
-                      <p style={{ fontSize: '0.82rem', color: GOV.textMuted, margin: 0 }}>
-                        Saved answers: {Array.isArray(selectedAssessment.answers) ? selectedAssessment.answers.length : 0}
-                      </p>
-                      <div style={{ marginTop: 12, height: 8, borderRadius: 99, background: GOV.borderLight, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${clampPercent(selectedAssessment.progress)}%`, background: GOV.blue, borderRadius: 99 }} />
-                      </div>
+                  <div className="rounded-xl border p-4" style={{ borderColor: GOV.border }}>
+                    <p className="m-0 text-sm font-bold" style={{ color: GOV.text }}>Response Summary</p>
+                    <p className="m-0 mt-2 text-sm" style={{ color: GOV.textMuted }}>
+                      Saved answers: {Array.isArray(selectedAssessment.answers) ? selectedAssessment.answers.length : 0}
+                    </p>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full" style={{ backgroundColor: GOV.borderLight }}>
+                      <div className="h-full rounded-full" style={{ width: `${clampPercent(selectedAssessment.progress)}%`, backgroundColor: GOV.blue }} />
                     </div>
                   </div>
                 </div>
               )}
             </div>
             {!loadingAssessmentDetail && selectedAssessment && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '1rem 1.5rem', borderTop: `1px solid ${GOV.border}` }}>
+              <div className="flex flex-wrap justify-end gap-2 border-t px-5 py-4" style={{ borderColor: GOV.border }}>
                 {selectedAssessment.status === 'in_progress' && (
-                  <FlatBtn primary onClick={() => { setSelectedAssessment(null); navigate('/questionnaire', { state: { resumeAssessment: true } }); }}>
-                    Resume Assessment
-                  </FlatBtn>
+                  <ActionButton primary onClick={() => { closeAssessmentModal(); navigate('/questionnaire', { state: { resumeAssessment: true } }); }}>
+                    <Play className="h-4 w-4" /> Resume assessment
+                  </ActionButton>
                 )}
                 {selectedAssessment.status === 'completed' && (
-                  <FlatBtn primary onClick={() => { setSelectedAssessment(null); viewResults(selectedAssessment.id); }}>
-                    View Results
-                  </FlatBtn>
+                  <ActionButton primary onClick={() => { closeAssessmentModal(); viewResults(selectedAssessment.id); }}>
+                    <BarChart3 className="h-4 w-4" /> View results
+                  </ActionButton>
                 )}
-                <FlatBtn onClick={() => setSelectedAssessment(null)}>Close</FlatBtn>
+                <ActionButton onClick={closeAssessmentModal}>Close</ActionButton>
               </div>
             )}
           </div>
         </div>
       )}
 
-      <div
-        className="mx-0 mt-0 w-full"
-        style={{ fontFamily: 'sans-serif', color: GOV.text, background: 'transparent', padding: 0 }}
-      >
-        <section className="mx-auto w-full max-w-[1100px] px-4 pt-8 pb-2 sm:px-6 sm:pt-10 lg:px-8 lg:pt-12">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#edf6ff]">
-              <Hand className="sds-dashboard-hand-shake h-7 w-7 text-[#f2b632]" strokeWidth={1.8} aria-hidden="true" />
-            </div>
-            <div className="min-w-0">
-              <h1
-                className="mb-2 text-[1.65rem] font-extrabold leading-tight sm:text-[1.85rem] lg:text-[2.05rem]"
-                style={{ color: GOV.text }}
-              >
-                Welcome back, {displayName}
+      <div className="min-h-[calc(100vh-4.5rem)] bg-gray-50">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+          <section className="relative min-h-[10.5rem] overflow-hidden rounded-2xl sm:h-40">
+            <img
+              src={HERO_IMAGE}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover object-right"
+              aria-hidden="true"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
+            <div className="relative z-10 flex min-h-[10.5rem] flex-col justify-center p-5 sm:h-full sm:p-7">
+              <h1 className="max-w-2xl text-2xl font-bold leading-tight text-white sm:text-[1.7rem]">
+                Welcome back, {displayName}!
               </h1>
-              <p className="m-0 max-w-[640px] text-[0.9rem] leading-relaxed sm:text-[0.92rem]" style={{ color: GOV.textMuted }}>
-                Continue your Self-Directed Search, review results, and download certificates from this page.
+              <p className="mt-2 text-sm font-medium text-white/90">
+                Ready to discover your career path?
               </p>
-            </div>
-          </div>
-        </section>
-
-        <div className="mx-auto w-full max-w-[1100px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:pb-12">
-          <div
-            style={{
-              border: `1px solid ${GOV.border}`,
-              borderRadius: 10,
-              background: '#fff',
-              padding: '1.5rem',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-              <div
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 8,
-                  background: GOV.blueLightAlt,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
+              <button
+                type="button"
+                onClick={goToAssessment}
+                className="mt-4 inline-flex w-fit items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium text-white transition hover:-translate-y-0.5 hover:shadow-md sm:mt-3"
+                style={{ backgroundColor: GOV.blue }}
               >
-                <ClipboardList style={{ width: 18, height: 18, color: GOV.blue }} />
-              </div>
-              <h2 className="text-lg font-extrabold sm:text-xl" style={{ color: GOV.text, margin: 0 }}>
-                Your test status
-              </h2>
-              <span
-                style={{
-                  background: inProgress ? GOV.blueLightAlt : '#e8f7ef',
-                  color: inProgress ? GOV.blue : '#15803d',
-                  borderRadius: 99,
-                  padding: '2px 10px',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                }}
-              >
-                {inProgress ? 'In progress' : 'Ready'}
-              </span>
+                <Play className="h-4 w-4" />
+                {inProgress ? 'Resume Assessment' : 'Take New Assessment'}
+              </button>
             </div>
+          </section>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-              <ProgressRing percent={progressPercent} />
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <p
-                  className="text-[0.85rem] sm:text-[0.88rem]"
-                  style={{ color: GOV.textMuted, margin: '0 0 0.75rem', lineHeight: 1.6, maxWidth: 520 }}
-                >
-                  {inProgress
-                    ? "You're making progress — each step brings you closer to valuable insights about your strengths and interests."
-                    : 'You can begin your Self-Directed Search assessment when you are ready.'}
-                </p>
-                <div style={{ height: 6, borderRadius: 99, background: GOV.borderLight, overflow: 'hidden', maxWidth: 400 }}>
-                  <div style={{ height: '100%', width: `${progressPercent}%`, background: GOV.blue, borderRadius: 99 }} />
+          <section className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <InfoCard icon={User} iconClass="text-blue-500" title="Personal Info">
+              <InfoRow label="FULL NAME" value={displayName} />
+              <InfoRow label="DATE OF BIRTH" value={formatDate(profileUser?.dateOfBirth)} />
+              <InfoRow label="NATIONAL ID" value={profileUser?.nationalId || '-'} />
+            </InfoCard>
+
+            <InfoCard icon={MapPin} iconClass="text-green-500" title="Address Info">
+              <InfoRow label="PRIMARY RESIDENCE" value={profileUser?.address || profileUser?.town || '-'} />
+              <InfoRow label="REGION" value={formatLabel(profileUser?.region, '-')} />
+              <InfoRow label="CONTACT" value={profileUser?.phoneNumber || '-'} />
+            </InfoCard>
+
+            <InfoCard icon={GraduationCap} iconClass="text-purple-500" title="Education & Career">
+              <InfoRow label="CURRENT STATUS" value={profileTypeLabel(profileUser?.userType)} badge />
+              <InfoRow label="HIGHEST QUALIFICATION" value={highestQualification} />
+              <InfoRow label={institutionLabel} value={institutionName} />
+            </InfoCard>
+          </section>
+
+          <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              {allAssessments.length === 0 ? (
+                <div className="py-6 text-center">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+                    <FileText className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="mb-2 text-xl font-bold text-gray-900">All Assessments (0)</h3>
+                  <p className="mx-auto max-w-md text-sm leading-6 text-gray-500">
+                    You have not completed any career assessments yet. Start your journey today to discover your RIASEC code and potential career matches.
+                  </p>
+                  <ActionButton primary className="mt-5" onClick={goToAssessment}>
+                    <Play className="h-4 w-4" /> Start Assessment
+                  </ActionButton>
                 </div>
-                <p style={{ fontSize: '0.75rem', fontWeight: 700, color: GOV.blue, margin: '6px 0 1rem' }}>
-                  {progressPercent}% complete
-                </p>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {inProgress ? (
-                    <FlatBtn primary onClick={() => navigate('/questionnaire', { state: { resumeAssessment: true } })}>
-                      <Play style={{ width: 14, height: 14 }} /> Resume test
-                    </FlatBtn>
-                  ) : (
-                    <FlatBtn primary onClick={() => navigate('/test')}>
-                      <Play style={{ width: 14, height: 14 }} /> Start test
-                    </FlatBtn>
-                  )}
-                  <FlatBtn onClick={() => navigate('/questionnaire-intro')}>
-                    <Info style={{ width: 14, height: 14 }} /> Instructions
-                  </FlatBtn>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              marginTop: '1.25rem',
-              border: `1px solid ${GOV.border}`,
-              borderRadius: 10,
-              background: '#fff',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                padding: '1.1rem 1.5rem',
-                borderBottom: `1px solid ${GOV.border}`,
-              }}
-            >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: GOV.blueLightAlt,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Clock style={{ width: 16, height: 16, color: GOV.blue }} />
-              </div>
-              <h2 className="text-lg font-extrabold sm:text-xl" style={{ color: GOV.text, margin: 0 }}>
-                Past assessments
-              </h2>
-            </div>
-
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', minWidth: 700, borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                <thead>
-                  <tr style={{ background: GOV.borderLight }}>
-                    {['Date', 'Status', 'Holland code', 'Actions'].map((h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: '0.7rem 1.25rem',
-                          textAlign: 'left',
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                          color: GOV.textMuted,
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {completed.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        style={{ padding: '2.5rem', textAlign: 'center', color: GOV.textMuted, fontSize: '0.85rem' }}
-                      >
-                        No completed assessments yet.
-                      </td>
-                    </tr>
-                  )}
-                  {completed.map((assessment, idx) => {
-                    const cert = certificates.find((c) => c.assessmentId === assessment.id);
-                    return (
-                      <tr
-                        key={assessment.id}
-                        style={{
-                          borderTop: `1px solid ${GOV.border}`,
-                          background: idx % 2 === 1 ? GOV.borderLight : '#fff',
-                        }}
-                      >
-                        <td style={{ padding: '0.85rem 1.25rem', color: GOV.textMuted, fontWeight: 500 }}>
-                          {formatDate(assessment.completedAt || assessment.createdAt)}
-                        </td>
-                        <td style={{ padding: '0.85rem 1.25rem' }}>
-                          <span
-                            style={{
-                              background: GOV.blueLightAlt,
-                              color: GOV.blue,
-                              borderRadius: 99,
-                              padding: '2px 10px',
-                              fontSize: '0.68rem',
-                              fontWeight: 700,
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            Completed
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.85rem 1.25rem', fontWeight: 800, letterSpacing: '0.08em', color: GOV.text }}>
-                          {formatHollandCode(getHollandDisplayCode(assessment))}
-                        </td>
-                        <td style={{ padding: '0.7rem 1.25rem' }}>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <button type="button" onClick={() => viewResults(assessment.id)} style={tableActionBtn}>
-                              <BarChart3 style={{ width: 13, height: 13 }} /> View results
-                            </button>
-                            <button type="button" onClick={() => viewAssessmentDetail(assessment.id)} style={tableActionBtn}>
-                              <FileText style={{ width: 13, height: 13 }} /> View details
-                            </button>
-                            <CertificateAction
-                              assessment={assessment}
-                              certificate={cert}
-                              downloadingCert={downloadingCert}
-                              generatingCert={generatingCert}
-                              onDownload={handleDownloadCertificate}
-                              onGenerate={handleGenerateCertificate}
-                            />
+              ) : (
+                <>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <h3 className="text-xl font-bold text-gray-900">All Assessments ({allAssessments.length})</h3>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Latest first</span>
+                  </div>
+                  <div className="space-y-3">
+                    {allAssessments.slice(0, 4).map((assessment) => {
+                      const completedAssessment = assessment.status === 'completed';
+                      return (
+                        <article key={assessment.id} className="rounded-xl border border-gray-100 p-4 transition hover:border-blue-100 hover:bg-blue-50/30">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase"
+                                  style={{
+                                    backgroundColor: completedAssessment ? '#dcfce7' : GOV.blueLightAlt,
+                                    color: completedAssessment ? '#047857' : GOV.blue,
+                                  }}
+                                >
+                                  {formatLabel(assessment.status, 'Unknown')}
+                                </span>
+                                <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                                  <Calendar className="h-3.5 w-3.5" />
+                                  {formatDate(assessment.completedAt || assessment.updatedAt || assessment.createdAt)}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-lg font-black tracking-[0.16em] text-gray-900">
+                                {completedAssessment ? formatHollandCode(getHollandDisplayCode(assessment)) : `${clampPercent(assessment.progress)}% COMPLETE`}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {completedAssessment ? (
+                                <>
+                                  <AssessmentAction onClick={() => viewResults(assessment.id)}>
+                                    <BarChart3 className="h-3.5 w-3.5" /> Results
+                                  </AssessmentAction>
+                                  <AssessmentAction onClick={() => viewAssessmentDetail(assessment.id)}>
+                                    <FileText className="h-3.5 w-3.5" /> Details
+                                  </AssessmentAction>
+                                  <CertificateAction
+                                    assessment={assessment}
+                                    downloadingCert={downloadingCert}
+                                    onDownload={handleDownloadCertificate}
+                                  />
+                                </>
+                              ) : (
+                                <>
+                                  <AssessmentAction onClick={goToAssessment}>
+                                    <Play className="h-3.5 w-3.5" /> Resume
+                                  </AssessmentAction>
+                                  <AssessmentAction onClick={() => viewAssessmentDetail(assessment.id)}>
+                                    <FileText className="h-3.5 w-3.5" /> Details
+                                  </AssessmentAction>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </section>
+
+            <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h3 className="flex items-center gap-2 font-bold text-gray-900">
+                  <Award className="h-5 w-5 text-orange-500" />
+                  Top Career Recommendations
+                </h3>
+                <button type="button" className="rounded-md p-1.5 hover:bg-gray-100" aria-label="Recommendation settings">
+                  <Settings className="h-4 w-4 text-gray-400" />
+                </button>
+              </div>
+
+              {!latestCompleted ? (
+                <div className="rounded-xl border border-dashed border-gray-300 p-4 text-center">
+                  <BookOpen className="mx-auto mb-3 h-7 w-7 text-gray-400" />
+                  <p className="text-sm italic leading-6 text-gray-500">
+                    Complete your first assessment to unlock personalized recommendations based on your unique personality profile.
+                  </p>
+                  <Link to="/help" className="mt-2 inline-block text-sm font-medium uppercase" style={{ color: GOV.blue }}>
+                    Learn more about RIASEC
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Latest Holland Code</p>
+                    <p className="mt-2 text-4xl font-black tracking-[0.2em] text-gray-900">{latestCode}</p>
+                    <p className="mt-3 text-sm leading-6 text-gray-600">
+                      Open your results to view career options, priority fields, study pathways, and recommendations generated from this completed assessment.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <ActionButton primary onClick={() => viewResults(latestCompleted.id)}>
+                      <BarChart3 className="h-4 w-4" /> View Results
+                    </ActionButton>
+                    <ActionButton onClick={() => viewAssessmentDetail(latestCompleted.id)}>
+                      <FileText className="h-4 w-4" /> Details
+                    </ActionButton>
+                  </div>
+                </div>
+              )}
+            </section>
+          </section>
         </div>
       </div>
     </AppShell>
   );
 };
 
-export default TestTakerDashboard;
+function AssessmentAction({ children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 text-xs font-bold text-gray-700 transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-sm"
+    >
+      {children}
+    </button>
+  );
+}
 
-const tableActionBtn = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  height: 32, padding: '0 10px',
-  background: '#fff', color: GOV.text,
-  border: `1px solid ${GOV.border}`,
-  borderRadius: 6, fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
-};
+function InfoMetric({ label, value }) {
+  return (
+    <div className="rounded-lg border bg-white p-4" style={{ borderColor: GOV.border }}>
+      <p className="m-0 text-[0.68rem] font-bold uppercase tracking-wide" style={{ color: GOV.textMuted }}>{label}</p>
+      <p className="m-0 mt-1 text-lg font-extrabold" style={{ color: GOV.text }}>{value}</p>
+    </div>
+  );
+}
+
+export default TestTakerDashboard;

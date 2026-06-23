@@ -111,9 +111,10 @@ module.exports = {
       throw new ForbiddenError('Not authorized', 'CERTIFICATE_NOT_AUTHORIZED');
     }
 
-    const cert = await Certificate.findOne({ where: { assessmentId } });
+    let cert = await Certificate.findOne({ where: { assessmentId } });
     if (!cert) {
-      throw new NotFoundError('Certificate has not been generated yet. Please contact your administrator.', 'CERTIFICATE_NOT_GENERATED');
+      const generated = await module.exports.generateCertificate(assessmentId, userId, isOwner ? { ownerUserId: userId } : {});
+      cert = generated.cert;
     }
 
     const sectionScores = await module.exports.computeSectionScores(assessmentId);

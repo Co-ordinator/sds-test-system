@@ -12,6 +12,14 @@ dist/
 build/
 .turbo/
 
+# Local archives
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+
 # IDEs
 .vscode/
 .idea/

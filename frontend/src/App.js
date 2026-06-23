@@ -5,6 +5,7 @@ import { PermissionProvider } from './context/PermissionContext';
 import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import Home from './pages/Home';
+import About from './pages/About';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
@@ -44,6 +45,7 @@ import './index.css';
 
 const ROUTE_LABELS = [
   { match: (path) => path === '/', label: 'Home' },
+  { match: (path) => path === '/about', label: 'About SDS' },
   { match: (path) => path === '/help', label: 'Help center' },
   { match: (path) => path === '/login', label: 'Login' },
   { match: (path) => path === '/register', label: 'Registration' },
@@ -101,6 +103,7 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
           <Route path="/help" element={<Help />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />

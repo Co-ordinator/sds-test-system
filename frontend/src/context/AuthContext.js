@@ -113,8 +113,10 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
 
   // Require email verification only for self-registered accounts.
   const needsEmailVerification = user?.email && !user?.isEmailVerified && !user?.createdByTestAdministrator;
-  const isOnVerifyPage = /\/verify-otp(\/|$)/.test(window.location.pathname)
-    || /\/verify-email(\/|$)/.test(window.location.pathname);
+  const needsOnboarding = user?.role === 'Test Taker' && profileNeedsOnboarding(user);
+  const isOnVerifyPage = /\/verify-otp(\/|$)/.test(location.pathname)
+    || /\/verify-email(\/|$)/.test(location.pathname);
+  const isOnboardingPage = /\/onboarding(\/|$)/.test(location.pathname);
   
   const roleDashboard = (role) => {
     if (role === 'System Administrator') return '/admin';
@@ -143,7 +145,17 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
         navigate(roleDashboard(user?.role));
       }
     }
-  }, [loading, isAuthenticated, user, allowedRoles, navigate, needsEmailVerification, isOnVerifyPage, needsOnboarding, isOnboardingPage]);
+  }, [
+    loading,
+    isAuthenticated,
+    user,
+    allowedRoles,
+    navigate,
+    needsEmailVerification,
+    isOnVerifyPage,
+    needsOnboarding,
+    isOnboardingPage
+  ]);
 
   if (
     loading ||

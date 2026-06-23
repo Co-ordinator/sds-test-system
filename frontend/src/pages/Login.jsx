@@ -5,6 +5,7 @@ import { AlertCircle, Eye, EyeOff, LockKeyhole, LogIn, UserRound } from 'lucide-
 import { useAuth } from '../context/AuthContext';
 import OnboardingLayout from '../components/onboarding/OnboardingLayout';
 import { GOV } from '../theme/government';
+import { profileNeedsOnboarding } from '../utils/profileOnboarding';
 
 const EMAIL_REGEX = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
@@ -74,23 +75,24 @@ const Login = () => {
   return (
     <OnboardingLayout wide>
       <div
-        className="mx-auto flex w-full min-w-0 max-w-[860px] min-h-0 flex-col overflow-hidden bg-white lg:min-h-[560px] lg:flex-row"
-        style={{ borderRadius: '0' }}
+        className="mx-auto flex w-full min-w-0 max-w-[420px] flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_18px_45px_rgba(15,45,75,0.12)] lg:max-w-[860px] lg:min-h-[560px] lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
+        style={{ borderColor: GOV.border }}
       >
         <div
-          className="hidden items-center justify-center bg-white p-8 lg:flex lg:grow-0 lg:shrink-0 lg:basis-[42%]"
+          className="relative flex h-40 shrink-0 items-center justify-center overflow-hidden bg-[#f6f9fc] px-4 sm:h-48 lg:h-auto lg:grow-0 lg:shrink-0 lg:basis-[42%] lg:bg-white lg:p-8"
         >
           <img
-            src="/auth.png"
+            src="/login_cover.png"
             alt=""
-            style={{ width: '100%', maxWidth: '320px', height: 'auto', objectFit: 'contain' }}
+            className="relative z-10 h-[210px] w-auto max-w-none object-contain sm:h-[250px] lg:h-auto lg:w-full lg:max-w-[500px]"
+            style={{ maxWidth: '500px' }}
           />
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-center px-4 py-8 sm:px-6 lg:px-10 lg:py-8">
-          <div style={{ marginBottom: '1.25rem' }}>
+        <div className="flex min-h-0 flex-1 flex-col justify-center px-5 py-6 sm:px-7 lg:px-10 lg:py-8">
+          <div style={{ marginBottom: '1rem' }}>
             <h1
-              className="text-[1.65rem] font-bold leading-tight sm:text-[1.85rem] lg:text-[2rem]"
+              className="text-[1.7rem] font-extrabold leading-tight sm:text-[1.85rem] lg:text-[2rem]"
               style={{
                 lineHeight: 1.15,
                 color: GOV.text,
@@ -101,7 +103,7 @@ const Login = () => {
             </h1>
             <p
               style={{
-                fontSize: '1.1rem',
+                fontSize: '0.85rem',
                 fontWeight: 400,
                 color: GOV.textMuted,
                 margin: '0.15rem 0 0.5rem',
@@ -112,7 +114,7 @@ const Login = () => {
             </p>
             <p
               style={{
-                fontSize: '0.8rem',
+                fontSize: '0.7rem',
                 fontWeight: 600,
                 color: GOV.text,
                 margin: 0,
@@ -124,7 +126,7 @@ const Login = () => {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <div>
               <div style={styles.inputWrapper(!!errors.email)}>
                 <span style={styles.inputIcon}>
@@ -193,13 +195,13 @@ const Login = () => {
               className="transition-opacity hover:opacity-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:hover:opacity-100"
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: '0.82rem',
                 background: GOV.blue,
                 color: GOV.ministryBarText,
                 border: 'none',
-                borderRadius: '8px',
-                fontSize: '1rem',
-                fontWeight: 600,
+                borderRadius: '10px',
+                fontSize: '0.95rem',
+                fontWeight: 700,
                 cursor: isSubmitting ? 'not-allowed' : 'pointer',
                 opacity: isSubmitting ? 0.7 : 1,
                 marginTop: '0.25rem',
@@ -210,7 +212,7 @@ const Login = () => {
               {isSubmitting ? 'Signing in…' : 'Sign in'}
             </button>
 
-            <p style={{ textAlign: 'center', fontSize: '0.75rem', color: GOV.textMuted, margin: '0.25rem 0 0' }}>
+            <p style={{ textAlign: 'center', fontSize: '0.75rem', color: GOV.textMuted, margin: '0.35rem 0 0' }}>
               Not yet registered?{' '}
               <Link to="/register" style={{ color: GOV.blue, fontWeight: 600, textDecoration: 'none' }}>
                 Create an account
@@ -227,11 +229,11 @@ const styles = {
   inputWrapper: (hasError) => ({
     display: 'flex',
     alignItems: 'center',
-    background: GOV.borderLight,
+    background: '#f8fafc',
     border: `1px solid ${hasError ? GOV.error : GOV.border}`,
-    borderRadius: '6px',
-    padding: '0 10px',
-    height: '40px',
+    borderRadius: '10px',
+    padding: '0 12px',
+    height: '44px',
   }),
   inputIcon: {
     display: 'flex',

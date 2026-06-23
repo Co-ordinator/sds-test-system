@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { GOV, LOGO, LOGO_ALT } from '../../theme/government';
+import { useAuth } from '../../context/AuthContext';
 
 const navLinkClass =
   'text-sm font-medium transition-colors hover:opacity-90';
@@ -36,7 +37,7 @@ function WideNavLinks({ className, onNavigate, linkClassName = navLinkClass }) {
       <Link to="/" className={linkClassName} style={{ color: GOV.textMuted }} onClick={onNavigate}>
         Home
       </Link>
-      <Link to="/#about" className={linkClassName} style={{ color: GOV.textMuted }} onClick={onNavigate}>
+      <Link to="/about" className={linkClassName} style={{ color: GOV.textMuted }} onClick={onNavigate}>
         About
       </Link>
       <Link to="/help" className={linkClassName} style={{ color: GOV.textMuted }} onClick={onNavigate}>
@@ -49,6 +50,7 @@ function WideNavLinks({ className, onNavigate, linkClassName = navLinkClass }) {
 export default function OnboardingLayout({ children, wide = false }) {
   const innerMax = wide ? 'max-w-5xl' : 'max-w-xl';
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const isRegister = pathname === '/register';
   const isLogin = pathname === '/login';
   /** Lock shell to viewport on login/register so header + padding cannot exceed dvh and force a body scrollbar. */
@@ -74,6 +76,13 @@ export default function OnboardingLayout({ children, wide = false }) {
   }, [menuOpen, wide]);
 
   const closeMenu = () => setMenuOpen(false);
+  const logoTarget = user?.role === 'System Administrator'
+    ? '/admin/dashboard'
+    : user?.role === 'Test Administrator'
+      ? '/test-administrator'
+      : user?.role === 'Test Taker'
+        ? '/dashboard'
+        : '/';
 
   return (
     <div
@@ -104,7 +113,7 @@ export default function OnboardingLayout({ children, wide = false }) {
         <header className="relative z-30 flex-shrink-0 bg-white">
           <div className={`${innerMax} relative mx-auto`}>
             <div className="relative z-50 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-3 bg-white px-3 py-4 sm:px-4 sm:py-5">
-              <Link to="/" className="min-w-0 shrink" aria-label="Home">
+              <Link to={logoTarget} className="min-w-0 shrink" aria-label={user ? 'Go to dashboard' : 'Home'}>
                 <img
                   src="/letterhead.png"
                   alt={LOGO_ALT}
@@ -170,14 +179,14 @@ export default function OnboardingLayout({ children, wide = false }) {
         className={
           wide
             ? pinAuthViewport
-              ? 'flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-white px-3 py-6 sm:px-4 sm:py-8'
+              ? 'flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-[#eef4f8] px-4 py-4 sm:px-4 sm:py-8 lg:bg-white'
               : 'flex min-h-0 w-full min-w-0 flex-1 flex-col bg-white px-3 py-6 sm:px-4 sm:py-8'
             : 'flex min-h-0 w-full min-w-0 flex-1 flex-col px-4 py-8 sm:px-6'
         }
       >
         <div className={`${innerMax} mx-auto flex min-h-0 w-full min-w-0 max-w-full flex-1 flex-col`}>
           {!wide && (
-            <Link to="/" className={`self-center ${LOGO.marginBottom}`} aria-label="Home">
+            <Link to={logoTarget} className={`self-center ${LOGO.marginBottom}`} aria-label={user ? 'Go to dashboard' : 'Home'}>
               <img src="/letterhead.png" alt={LOGO_ALT} className={LOGO.className} />
             </Link>
           )}

@@ -47,7 +47,7 @@ const validateNationalId = (value, helpers) => {
 // OWASP Authentication Cheat Sheet considers < 15 chars without MFA weak; we
 // land at 12 as a pragmatic floor that still rules out the bulk of bot-tier
 // password lists.
-const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/;
+const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{12,}$/;
 
 const phonePattern = /^\+268\d{8}$/;
 
@@ -74,7 +74,7 @@ const register = Joi.object({
     'any.required': 'Email is required'
   }),
   password: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers',
+    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
     'any.required': 'Password is required'
   }),
   consent: Joi.boolean().valid(true).required().messages({
@@ -97,7 +97,7 @@ const login = Joi.object({
 
 const resetPassword = Joi.object({
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers',
+    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
     'any.required': 'New password is required'
   }),
   password: Joi.string().pattern(passwordPattern).optional(),
@@ -114,7 +114,7 @@ const resetPasswordWithToken = Joi.object({
     'any.required': 'Reset token is required'
   }),
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers',
+    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
     'any.required': 'New password is required'
   }),
   password: Joi.string().pattern(passwordPattern).optional(),
@@ -189,12 +189,32 @@ const verifyEmail = Joi.object({
   })
 });
 
+const resetPasswordWithOtp = Joi.object({
+  email: Joi.string().email().required().messages({
+    'string.email': 'Please provide a valid email address',
+    'any.required': 'Email is required'
+  }),
+  code: Joi.string().length(6).pattern(/^\d{6}$/).required().messages({
+    'string.length': 'Reset code must be exactly 6 digits',
+    'string.pattern.base': 'Reset code must contain only digits',
+    'any.required': 'Reset code is required'
+  }),
+  newPassword: Joi.string().pattern(passwordPattern).required().messages({
+    'string.pattern.base': 'New password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
+    'any.required': 'New password is required'
+  }),
+  confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
+    'any.only': 'Passwords do not match',
+    'any.required': 'Please confirm your new password'
+  })
+});
+
 const changePassword = Joi.object({
   currentPassword: Joi.string().required().messages({
     'any.required': 'Current password is required'
   }),
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'New password must be at least 12 characters and contain both letters and numbers',
+    'string.pattern.base': 'New password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
     'any.required': 'New password is required'
   }),
   confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
@@ -212,5 +232,6 @@ module.exports = {
   forgotPasswordBody,
   resendVerification,
   verifyEmail,
+  resetPasswordWithOtp,
   changePassword
 };

@@ -9,16 +9,12 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
 import { GOV, LOGO_ALT } from '../../theme/government';
 import { useNotificationCount } from '../../hooks/useNotificationCount';
+import TestTakerSideNav from './TestTakerSideNav';
+import PoweredFooter from './PoweredFooter';
 
 /** Match OnboardingLayout wide header — text links, no icons. */
 const widePublicNavClass =
   'text-sm font-medium transition-colors hover:opacity-90';
-
-const TEST_TAKER_PUBLIC_LINKS = [
-  { to: '/', label: 'Home' },
-  { to: '/#about', label: 'About' },
-  { to: '/help', label: 'FAQ' },
-];
 
 // All possible admin nav links with required permissions
 const ADMIN_NAV_LINKS = [
@@ -32,9 +28,8 @@ const ADMIN_NAV_LINKS = [
 
 const TEST_TAKER_NAV = [
   { to: '/dashboard', label: 'Dashboard', Icon: Home },
-  { to: '/profile', label: 'Profile', Icon: User },
+  { to: '/results', label: 'Results', Icon: Award },
   { to: '/glossary', label: 'Glossary', Icon: BookOpen },
-  { to: '/accessibility', label: 'Accessibility', Icon: Accessibility },
 ];
 
 const ROLE_LABELS = {
@@ -75,7 +70,6 @@ const BREADCRUMB_MAP = {
 export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hideBreadcrumbs = false }) {
   const { user, logout } = useAuth();
   const { hasPermission } = usePermissions();
-  const { getAriaLabel } = useAccessibility();
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -109,6 +103,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
   const roleLabel = ROLE_LABELS[role] || 'Test Taker';
   const roleColor = ROLE_COLORS[role] || ROLE_COLORS['Test Taker'];
   const breadcrumbs = customBreadcrumbs || BREADCRUMB_MAP[location.pathname] || [];
+  const useTestTakerSideLayout = isTestTaker && !hideBreadcrumbs;
 
   const isActive = useCallback((to) => {
     if (to === '/test-administrator') {
@@ -191,8 +186,19 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
               style={{ color: GOV.text }}
               onClick={() => setUserMenuOpen(false)}
             >
-              <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> My Profile
+              <User className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> {isTestTaker ? 'Edit Profile' : 'My Profile'}
             </Link>
+
+            {isTestTaker && (
+              <Link
+                to="/accessibility"
+                className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50"
+                style={{ color: GOV.text }}
+                onClick={() => setUserMenuOpen(false)}
+              >
+                <Accessibility className="w-3.5 h-3.5" style={{ color: GOV.textMuted }} /> Accessibility
+              </Link>
+            )}
 
             {isAdminLike && (
               <Link
@@ -221,7 +227,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className={`${useTestTakerSideLayout ? 'h-screen overflow-hidden' : 'min-h-screen'} flex flex-col bg-white`}>
       {/* Ministry strip — OnboardingLayout (wide): thin bar; admin: bar + caption */}
       <div
         className="flex-shrink-0 border-b py-1.5"
@@ -239,68 +245,51 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
 
       {isTestTaker ? (
         <>
-          <header className="relative z-30 flex-shrink-0 border-b bg-white" style={{ borderColor: GOV.border }}>
-            <div className="max-w-5xl relative mx-auto">
-              <div className="relative z-50 flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-3 bg-white px-3 py-4 sm:px-4 sm:py-5">
-                <div className="flex min-w-0 shrink items-center gap-2 sm:gap-3">
-                  <button
-                    type="button"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border lg:hidden"
-                    style={{ borderColor: GOV.border, backgroundColor: '#fff' }}
-                    aria-expanded={mobileNavOpen}
-                    aria-controls="test-taker-wide-nav-mobile"
-                    aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
-                    onClick={() => setMobileNavOpen((o) => !o)}
-                  >
-                    {mobileNavOpen ? (
-                      <X className="w-5 h-5" style={{ color: GOV.text }} />
-                    ) : (
-                      <Menu className="w-5 h-5" style={{ color: GOV.text }} />
-                    )}
-                  </button>
-                  <Link to="/" className="min-w-0 shrink" aria-label="Home">
-                    <img
-                      src="/letterhead.png"
-                      alt={LOGO_ALT}
-                      className="h-14 w-auto max-w-[16rem] object-contain sm:h-16 sm:max-w-[18rem] md:h-[4.5rem] md:max-w-[21rem]"
-                    />
-                  </Link>
+          <header className="sticky top-0 z-30 flex-shrink-0 border-b bg-white" style={{ borderColor: GOV.border }}>
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+              <div className="flex h-16 items-center justify-between gap-4">
+                <Link to={dashboardPath} className="flex min-w-0 items-center gap-2" aria-label="Go to dashboard">
+                  <img src="/letterhead.png" alt={LOGO_ALT} className="h-12 w-auto object-contain" />
+                </Link>
+
+                <div className="hidden items-center gap-6 lg:flex">
+                  {!useTestTakerSideLayout && (
+                    <nav className="flex items-center gap-6" aria-label="Primary">
+                      {navLinks.map(({ to, label, badge }) => {
+                        const active = isActive(to);
+                        return (
+                          <Link
+                            key={`${to}-${label}`}
+                            to={to}
+                            className={`relative ${widePublicNavClass}`}
+                            style={{ color: active ? GOV.text : GOV.textMuted, fontWeight: active ? 700 : 500 }}
+                            onClick={closeMobileNav}
+                          >
+                            {label}
+                            {badge && notificationCount > 0 && (
+                              <span className="absolute -top-1.5 -right-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                                {notificationCount > 99 ? '99+' : notificationCount}
+                              </span>
+                            )}
+                          </Link>
+                        );
+                      })}
+                    </nav>
+                  )}
+                  {userMenuButton}
                 </div>
 
-                <nav className="hidden min-w-0 shrink-0 items-center justify-end gap-3 sm:gap-4 md:gap-5 lg:flex" aria-label="Primary">
-                  {TEST_TAKER_PUBLIC_LINKS.map(({ to, label }) => (
-                    <Link
-                      key={to + label}
-                      to={to}
-                      className={widePublicNavClass}
-                      style={{ color: GOV.textMuted }}
-                      onClick={closeMobileNav}
-                    >
-                      {label}
-                    </Link>
-                  ))}
-                  {navLinks.map(({ to, label, badge }) => {
-                    const active = isActive(to);
-                    return (
-                      <Link
-                        key={`${to}-${label}`}
-                        to={to}
-                        className={`relative ${widePublicNavClass}`}
-                        style={{ color: active ? GOV.blue : GOV.textMuted, fontWeight: active ? 700 : 500 }}
-                        onClick={closeMobileNav}
-                      >
-                        {label}
-                        {badge && notificationCount > 0 && (
-                          <span className="absolute -top-1.5 -right-2 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-                            {notificationCount > 99 ? '99+' : notificationCount}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </nav>
-
-                {userMenuButton}
+                <button
+                  type="button"
+                  className="rounded-md border p-2 lg:hidden"
+                  style={{ borderColor: GOV.border }}
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="test-taker-wide-nav-mobile"
+                  aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+                  onClick={() => setMobileNavOpen((o) => !o)}
+                >
+                  {mobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                </button>
               </div>
 
               {mobileNavOpen && (
@@ -313,21 +302,10 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                   />
                   <div
                     id="test-taker-wide-nav-mobile"
-                    className="absolute left-0 right-0 top-full z-50 border-b px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:px-6 lg:hidden"
+                    className="absolute left-0 right-0 top-full z-50 border-b bg-white px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:px-6 lg:hidden"
                     style={{ borderColor: GOV.border, backgroundColor: '#fff' }}
                   >
-                    <nav className="flex flex-col gap-4" aria-label="Primary mobile">
-                      {TEST_TAKER_PUBLIC_LINKS.map(({ to, label }) => (
-                        <Link
-                          key={`m-pub-${to}`}
-                          to={to}
-                          className="text-base font-medium py-1 transition-colors hover:opacity-90"
-                          style={{ color: GOV.textMuted }}
-                          onClick={closeMobileNav}
-                        >
-                          {label}
-                        </Link>
-                      ))}
+                    <nav className="flex flex-col gap-3" aria-label="Primary mobile">
                       {navLinks.map(({ to, label, Icon, badge }) => {
                         const active = isActive(to);
                         return (
@@ -348,6 +326,32 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                           </Link>
                         );
                       })}
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-2 py-1 text-base font-medium transition-colors"
+                        style={{ color: GOV.textMuted }}
+                        onClick={closeMobileNav}
+                      >
+                        <Settings className="h-4 w-4 shrink-0" />
+                        Edit Profile
+                      </Link>
+                      <Link
+                        to="/accessibility"
+                        className="flex items-center gap-2 py-1 text-base font-medium transition-colors"
+                        style={{ color: GOV.textMuted }}
+                        onClick={closeMobileNav}
+                      >
+                        <Accessibility className="h-4 w-4 shrink-0" />
+                        Accessibility
+                      </Link>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 py-1 text-left text-base font-medium text-red-600"
+                        onClick={() => { closeMobileNav(); logout(); }}
+                      >
+                        <LogOut className="h-4 w-4 shrink-0" />
+                        Sign Out
+                      </button>
                     </nav>
                   </div>
                 </>
@@ -446,7 +450,7 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
         </>
       )}
 
-      {!hideBreadcrumbs && breadcrumbs.length > 0 && (
+      {!hideBreadcrumbs && !useTestTakerSideLayout && breadcrumbs.length > 0 && (
         <nav className="border-b" style={{ backgroundColor: '#fafafa', borderColor: GOV.borderLight }} aria-label="Breadcrumb">
           <div className="max-w-7xl mx-auto px-6 py-1.5 flex items-center gap-1">
             {breadcrumbs.map((crumb, idx) => (
@@ -465,13 +469,30 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
         </nav>
       )}
 
-      <main className="flex-1 overflow-auto custom-scrollbar" id="main-content" role="main">
-        <div id="glossary-section" className="sr-only">
-          <h2>Glossary Navigation</h2>
-          <p>Open the glossary page from navigation for complete SDS term explanations.</p>
+      {useTestTakerSideLayout ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden bg-white">
+          <TestTakerSideNav />
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden" id="main-content" role="main">
+            <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+              <div id="glossary-section" className="sr-only">
+                <h2>Glossary Navigation</h2>
+                <p>Open the glossary page from navigation for complete SDS term explanations.</p>
+              </div>
+              {children}
+            </div>
+            <PoweredFooter compact />
+          </main>
         </div>
-        {children}
-      </main>
+      ) : (
+        <main className="flex-1 overflow-auto custom-scrollbar" id="main-content" role="main">
+          <div id="glossary-section" className="sr-only">
+            <h2>Glossary Navigation</h2>
+            <p>Open the glossary page from navigation for complete SDS term explanations.</p>
+          </div>
+          {children}
+          {isTestTaker && <PoweredFooter />}
+        </main>
+      )}
     </div>
   );
 }

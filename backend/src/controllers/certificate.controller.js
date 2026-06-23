@@ -208,9 +208,6 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
   doc.text('THULANI E. MKHALIPHI', lm, sigY + 28);
   doc.text('PRINCIPAL SECRETARY', lm, sigY + 40);
 
-  // Simple signature line (underline style)
-  doc.moveTo(lm, sigY + 22).lineTo(lm + 140, sigY + 22).strokeColor('#000000').lineWidth(0.5).stroke();
-
   const pages = doc.bufferedPageRange();
   for (let pageIndex = 0; pageIndex < pages.count; pageIndex += 1) {
     doc.switchToPage(pageIndex);
@@ -334,7 +331,6 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
   });
 
   const sigY = 666;
-  doc.moveTo(lm, sigY).lineTo(lm + 116, sigY).strokeColor('#111827').lineWidth(0.7).stroke();
   doc.font('Helvetica-Bold').fontSize(14).fillColor('#111827');
   doc.text('S.M MNDAWE', lm, sigY + 8);
   doc.fontSize(13);

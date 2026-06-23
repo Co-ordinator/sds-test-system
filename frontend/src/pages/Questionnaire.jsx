@@ -25,10 +25,11 @@ const SECTIONS = [
     id: 'competencies', 
     num: 'II', 
     label: 'Competencies', 
-    description: 'Click Yes for activities you have knowledge of or can do well or competently. Click No for activities you have little or no knowledge of, have never performed, or perform poorly.',
+    description: 'SECTION II: COMPETENCIES\n\nShade YES for those activities that you HAVE KNOWLEDGE of or that you CAN DO WELL or COMPETENTLY.\n\nShade NO for those activities that you HAVE LITTLE or NO KNOWLEDGE of or that you HAVE NEVER PERFORMED or PERFORM POORLY.',
     transitionNarrative: [
       'The next section changes from what you like to do to what you know about or can do well.',
-      'Choose YES for activities that you have knowledge of, or that you can do well or competently. Choose NO for activities that you have little or no knowledge of, have never performed, or perform poorly.',
+      'Shade YES for those activities that you have knowledge of or that you can do well or competently.',
+      'Shade NO for those activities that you have little or no knowledge of or that you have never performed or perform poorly.',
       'Answer honestly based on your current knowledge and ability. This helps the assessment compare your interests with the skills and competencies you already recognize in yourself.'
     ]
   },
@@ -1367,7 +1368,7 @@ const Questionnaire = () => {
               <p className="text-[11px] font-bold uppercase tracking-wide mb-1" style={{ color: GOV.textMuted }}>
                 Section {currentSectionMeta?.num} Instruction
               </p>
-              <p className="text-sm leading-relaxed" style={{ color: GOV.textMuted }}>
+              <p className="text-sm leading-relaxed whitespace-pre-line" style={{ color: GOV.textMuted }}>
                 <DescriptionWithGlossary text={currentSectionMeta?.description} />
               </p>
             </div>

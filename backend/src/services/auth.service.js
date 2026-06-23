@@ -606,6 +606,7 @@ module.exports = {
     await user.save();
 
     return {
+      shouldSend: true,
       user,
       resetOtp: resetRecord.otpCode,
       resendAvailableInSeconds: toSeconds(PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS),
@@ -644,9 +645,22 @@ module.exports = {
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
     user.passwordResetSentAt = null;
+    user.refreshToken = null;
+    user.refreshTokenExpires = null;
+    user.previousRefreshToken = null;
+    user.previousRefreshTokenExpires = null;
+    user.failedLoginAttempts = 0;
+    user.lockoutUntil = null;
+    user.mustChangePassword = false;
     await user.save();
 
-    return { shouldSend: true, user, resetToken };
+    const token = signToken(user.id, user.role);
+    const refreshToken = signRefreshToken(user.id, user.role);
+    user.refreshToken = hashToken(refreshToken);
+    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    await user.save();
+
+    return { user, token, refreshToken };
   },
 
   /* ─── Reset Password ──────────────────────────────────────────────────── */

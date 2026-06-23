@@ -632,7 +632,7 @@ export default function Profile() {
                       institutionId={institution.institutionId}
                       onChange={(name, id) => setInstitution({ name, institutionId: id })}
                       placeholder={isHighSchoolTaker ? 'Search for your high school...' : 'Search for your tertiary institution...'}
-                      region={isHighSchoolTaker ? selectedRegion : ''}
+                      region=""
                       type={institutionTypeFilter}
                       userType={institutionUserTypeFilter}
                       error={!!errors.currentInstitution}

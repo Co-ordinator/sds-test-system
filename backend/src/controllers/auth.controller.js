@@ -57,6 +57,12 @@ const clearAccessTokenCookie = (res) => {
   res.clearCookie('accessToken', { ...ACCESS_COOKIE_OPTIONS(), maxAge: undefined });
 };
 
+const minutesFromMs = (value, fallbackMs) => {
+  const parsed = Number.parseInt(value, 10);
+  const ms = Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
+  return Math.ceil(ms / 60000);
+};
+
 const resolveFrontendBaseUrl = (req) => {
   const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
   const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
@@ -66,14 +72,22 @@ const resolveFrontendBaseUrl = (req) => {
   return configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
 };
 
+const getEmailRecipientName = (user) => {
+  const fullName = [user?.firstName, user?.lastName]
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return fullName || 'there';
+};
+
 const createEmailAudit = async (req, user, description, details = {}) => {
   await AuditLog.create({
-    userId: user.id,
+    userId: user?.id || null,
     actionType: 'SYSTEM',
     description,
     details: {
       resourceType: 'email',
-      resourceId: user.id,
+      resourceId: user?.id || null,
       requestMethod: req.method,
       requestPath: req.originalUrl || req.path,
       ...details
@@ -85,6 +99,7 @@ const createEmailAudit = async (req, user, description, details = {}) => {
 
 const sendVerificationEmail = async (req, user, emailOtp, { subject, successDescription, failureDescription, successLogMessage, failureLogMessage }) => {
   const frontendBaseUrl = resolveFrontendBaseUrl(req);
+  const otpExpiresMinutes = minutesFromMs(process.env.EMAIL_OTP_TTL_MS, 10 * 60 * 1000);
 
   try {
     const delivery = await sendEmail({
@@ -92,12 +107,14 @@ const sendVerificationEmail = async (req, user, emailOtp, { subject, successDesc
       subject,
       template: 'verify-email',
       context: {
-        firstName: user.firstName || 'Student',
+        firstName: getEmailRecipientName(user),
         lastName: user.lastName || '',
         email: user.email,
         region: user.region,
+        verificationCode: emailOtp,
         verificationOtp: emailOtp,
-        verificationUrl: `${frontendBaseUrl}/verify-otp`
+        verificationUrl: `${frontendBaseUrl}/verify-otp`,
+        otpExpiresMinutes
       }
     });
 
@@ -128,15 +145,10 @@ const sendVerificationEmail = async (req, user, emailOtp, { subject, successDesc
   }
 };
 
-const queueVerificationCodeEmail = (...args) => {
-  setImmediate(() => {
-    sendVerificationCodeEmail(...args).catch(() => {});
-  });
-};
-
 const register = async (req, res, next) => {
   try {
-    const { user, emailOtp } = await authService.register(req.body);
+    const { user, emailOtp, resendAvailableInSeconds = 120 } = await authService.register(req.body);
+    let emailResult = null;
     logger.info({ actionType: 'REGISTER', message: `User registered: ${maskEmailForLog(user.email)}`, req, details: { emailHint: maskEmailForLog(user.email), role: user.role } });
     await logAuthAction(req, 'REGISTER', user.id);
 
@@ -150,17 +162,19 @@ const register = async (req, res, next) => {
       });
     }
 
+    const verificationEmailSent = emailResult?.sent ?? false;
+
     res.status(201).json({
       status: 'success',
       message: verificationEmailSent
         ? 'Account created. Enter the verification code we just emailed you to continue.'
         : 'Account created, but the verification code could not be sent right now. Please request a new code.',
       requiresEmailVerification: true,
-      verificationEmailSent: true,
+      verificationEmailSent,
       emailDelivery: 'queued',
       resendAvailableInSeconds,
       data: {
-        user: user.toJSON(),
+        user: user?.toJSON ? user.toJSON() : user,
         email: user.email,
         emailDelivery: verificationEmailSent
           ? { attempts: emailResult.delivery.attempts }
@@ -272,7 +286,7 @@ const forgotPassword = async (req, res, next) => {
 
   try {
     const identifier = (req.body.identifier || req.body.email || '').trim();
-    const { shouldSend, user, resetToken } = await authService.forgotPassword(identifier);
+    const { shouldSend, user, resetOtp, resendAvailableInSeconds, otpExpiresInSeconds } = await authService.forgotPassword(identifier);
 
     if (!shouldSend) {
       logger.info({
@@ -284,22 +298,16 @@ const forgotPassword = async (req, res, next) => {
       return res.status(200).json(genericResponse);
     }
 
-    const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
-    const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
-    const hostProtocol = forwardedProto || req.protocol;
-    const hostBasedUrl = `${hostProtocol}://${req.get('host')}`;
-    const shouldFallbackToHost = process.env.NODE_ENV === 'production' && /localhost|127\.0\.0\.1/i.test(configuredFrontendUrl);
-    const resetUrlBase = configuredFrontendUrl && !shouldFallbackToHost ? configuredFrontendUrl : hostBasedUrl;
-    const resetUrl = `${resetUrlBase}/reset-password/${resetToken}`;
+    const otpExpiresMinutes = Math.ceil((otpExpiresInSeconds || 10 * 60) / 60);
 
     await sendEmail({
       email: user.email,
       subject: 'Your SDS password reset code',
       template: 'reset-password-otp',
       context: {
-        firstName: user.firstName || 'Test Taker',
+        firstName: getEmailRecipientName(user),
         verificationCode: resetOtp,
-        otpExpiresMinutes: RESET_OTP_EXPIRY_MINUTES
+        otpExpiresMinutes
       }
     });
 
@@ -351,6 +359,24 @@ const resetPassword = async (req, res, next) => {
     res.status(200).json({ status: 'success', token });
   } catch (error) {
     logger.error({ actionType: 'RESET_PASSWORD_FAILED', message: 'Failed to reset password', req, details: { code: error.code, error: error.message } });
+    next(error);
+  }
+};
+
+const resetPasswordWithOtp = async (req, res, next) => {
+  try {
+    const { user, token, refreshToken: newRT } = await authService.resetPasswordWithOtp({
+      email: req.body.email,
+      code: req.body.code,
+      newPassword: req.body.newPassword
+    });
+    setRefreshTokenCookie(res, newRT);
+    setAccessTokenCookie(res, token);
+    logger.info({ actionType: 'RESET_PASSWORD', message: `Password reset with OTP for user: ${maskEmailForLog(user.email)}`, req, details: { userId: user.id } });
+    await logAuthAction(req, 'PASSWORD_CHANGE', user.id);
+    res.status(200).json({ status: 'success', message: 'Password reset successfully', token, data: { user: user?.toJSON ? user.toJSON() : user } });
+  } catch (error) {
+    logger.error({ actionType: 'RESET_PASSWORD_FAILED', message: 'Failed to reset password with OTP', req, details: { code: error.code, error: error.message } });
     next(error);
   }
 };
@@ -519,7 +545,7 @@ module.exports = {
   resetPasswordWithOtp,
   resetPassword,
   verifyEmailOtp,
-  verifyEmail,
+  verifyEmail: verifyEmailOtp,
   resendVerificationEmail,
   refreshToken,
   logout,

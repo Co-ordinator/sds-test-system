@@ -19,14 +19,4 @@ const apiLimiter = rateLimit({
   }
 });
 
-const authLimiter = rateLimit({
-  ...baseConfig,
-  windowMs: 15 * 60 * 1000,
-  max: 25,
-  message: {
-    status: 'error',
-    message: 'Too many authentication attempts from this IP, please try again after 15 minutes'
-  }
-});
-
-module.exports = { apiLimiter, authLimiter };
+module.exports = { apiLimiter };

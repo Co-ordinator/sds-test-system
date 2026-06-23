@@ -7,6 +7,14 @@ import { glossaryService } from '../services/glossaryService';
  * Now loads from database instead of static data
  */
 
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildGlossaryRegex = (term) => {
+  const escaped = escapeRegExp(term).replace(/\s+/g, '\\s+');
+  const pluralSuffix = /[a-z]$/i.test(term) && !/s$/i.test(term) ? 's?' : '';
+  return new RegExp(`\\b${escaped}${pluralSuffix}\\b`, 'gi');
+};
+
 export const useGlossary = () => {
   const [learnedTerms, setLearnedTerms] = useState(new Set());
   const [termInteractions, setTermInteractions] = useState({});
@@ -133,7 +141,7 @@ export const useGlossary = () => {
 
     for (const term of sortedTerms) {
       if (shouldHighlight(term.term.toLowerCase())) {
-        const regex = new RegExp(`\\b${term.term}\\b`, 'gi');
+        const regex = buildGlossaryRegex(term.term);
         const matches = processedText.match(regex);
         
         if (matches) {

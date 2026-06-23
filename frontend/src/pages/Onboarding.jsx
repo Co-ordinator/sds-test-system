@@ -56,12 +56,12 @@ const LANGUAGE_TO_BACKEND = { English: 'en', SiSwati: 'ss' };
 const LANGUAGE_FROM_BACKEND = { en: 'English', ss: 'SiSwati' };
 const GENDER_FROM_BACKEND = { male: 'Male', female: 'Female' };
 const DEFAULT_GRADE = 'Form 5 / O-Level (Senior Secondary)';
+const TERTIARY_INSTITUTION_TYPES = 'university,college,tvet,vocational';
 
 const isBlank = (value) => String(value ?? '').trim() === '';
 const hasSelectionValue = (value) => value !== null && value !== undefined && String(value).trim() !== '';
 
 const buildInitialForm = (user = {}) => ({
-  fullName: [user.firstName, user.lastName].filter((part) => !isBlank(part)).join(' '),
   gender: GENDER_FROM_BACKEND[user.gender] || '',
   region: REGION_FROM_BACKEND[user.region] || 'Hhohho',
   townCity: user.district || '',
@@ -91,24 +91,32 @@ export default function Onboarding() {
   const townDropdownRef = useRef(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [errors, setErrors] = useState({});
 
-  const [form, setForm] = useState({
-    gender: '',
-    region: 'Hhohho',
-    townCity: '',
-    areaNeighborhood: '',
-    schoolUniversity: '',
-    institutionId: null,
-    workplaceName: '',
-    workplaceInstitutionId: null,
-    preferredLanguage: 'English',
-    highestGrade: 'Form 5 / O-Level (Senior Secondary)',
-    degreeProgram: '',
-    yearOfStudy: '',
-    currentOccupation: '',
-    currentOccupationId: null,
-    yearsExperience: '',
-  });
+  const [form, setForm] = useState(() => buildInitialForm(user || {}));
+  const institutionTypeFilter = userType === 'school_student'
+    ? 'school'
+    : userType === 'university_student'
+      ? TERTIARY_INSTITUTION_TYPES
+      : '';
+
+  const update = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+    if (submitError) setSubmitError('');
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    setForm(buildInitialForm(user));
+    setSelectedUserType((current) => current || normalizeUserType(user.userType));
+    setErrors({});
+  }, [user?.id]);
 
   const handleRegionChange = (region) => {
     const shouldClearTown = form.townCity && !townBelongsToRegion(form.townCity, region);
@@ -116,10 +124,6 @@ export default function Onboarding() {
     if (shouldClearTown) {
       update('townCity', '');
       setTownQuery('');
-    }
-    if (userType === 'school_student') {
-      update('schoolUniversity', '');
-      update('institutionId', null);
     }
     setTownDropdownOpen(false);
   };
@@ -162,10 +166,6 @@ export default function Onboarding() {
     }
 
     if (stepNumber === 1) {
-      addRequired(next, 'fullName', 'Full legal name');
-      if (!next.fullName && form.fullName.trim().split(/\s+/).length < 2) {
-        next.fullName = 'Enter both first name and surname.';
-      }
       addRequired(next, 'gender', 'Gender');
       return next;
     }
@@ -251,8 +251,6 @@ export default function Onboarding() {
   };
 
   const buildProfilePayload = () => {
-    // First name + surname are captured at registration; onboarding doesn't
-    // re-collect them. If they need to change, the Profile page handles it.
     const userTypeMap = {
       'school_student': 'High School Student',
       'university_student': 'University Student',
@@ -386,6 +384,13 @@ export default function Onboarding() {
               </div>
 
           <div className="space-y-6">
+            <div className="rounded-md border bg-gray-50 p-3" style={{ borderColor: GOV.borderLight }}>
+              <p className={`${TYPO.label} mb-1`} style={{ color: GOV.textMuted }}>Registered name</p>
+              <p className={`${TYPO.body} font-semibold`} style={{ color: GOV.text }}>
+                {[user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Not available'}
+              </p>
+            </div>
+
             <div>
               <label className={`block ${TYPO.label} mb-1.5`} style={{ color: GOV.text }}>
                 Gender *
@@ -565,14 +570,14 @@ export default function Onboarding() {
                       ? 'Search for your high school...'
                       : 'Search for your school or university...'}
                     inputClassName={TYPO.body}
-                    region={userType === 'school_student' ? REGION_TO_BACKEND[form.region] : ''}
+                    region=""
                     type={institutionTypeFilter}
                     userType={userType}
                     error={!!errors.schoolUniversity}
                   />
                   {fieldError('schoolUniversity')}
                   <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textHint }}>
-                    Select your institution from the filtered search results.
+                    Select your institution from the matching search results.
                   </p>
                 </div>
               )}

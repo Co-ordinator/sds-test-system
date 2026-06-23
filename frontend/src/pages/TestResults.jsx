@@ -408,7 +408,6 @@ const TestResults = () => {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [codeGuideSpeaking, setCodeGuideSpeaking] = useState(false);
   const [certificateInfo, setCertificateInfo] = useState(null);
-  const [generatingCertificate, setGeneratingCertificate] = useState(false);
   const [downloadingCertificate, setDownloadingCertificate] = useState(false);
 
   const getResultsEndpoint = (id) => (
@@ -546,26 +545,10 @@ const TestResults = () => {
   }, [assessmentId, certificateInfo]);
 
   const handleCertificateAction = async () => {
-    if (!assessmentId || generatingCertificate || downloadingCertificate) return;
-
-    if (certificateInfo?.available) {
-      await downloadCertificatePdf(certificateInfo);
-      return;
-    }
-
-    setGeneratingCertificate(true);
-    try {
-      const res = await api.post(`/api/v1/assessments/${assessmentId}/certificate/generate`);
-      const certData = {
-        ...(res.data?.data || {}),
-        available: true
-      };
-      setCertificateInfo(certData);
-      await downloadCertificatePdf(certData);
-    } catch (err) {
-      alert(err.response?.data?.message || 'Failed to generate certificate. Please try again.');
-    } finally {
-      setGeneratingCertificate(false);
+    if (!assessmentId || downloadingCertificate) return;
+    await downloadCertificatePdf(certificateInfo || { certNumber: assessmentId });
+    if (!certificateInfo?.available) {
+      setCertificateInfo((prev) => ({ ...(prev || {}), available: true, certNumber: prev?.certNumber || assessmentId }));
     }
   };
 
@@ -706,16 +689,10 @@ const TestResults = () => {
             {downloadingPdf ? 'Generating...' : 'Download PDF Report'}
           </button>
           {isTestTaker && (
-            <button type="button" onClick={handleCertificateAction} disabled={generatingCertificate || downloadingCertificate}
+            <button type="button" onClick={handleCertificateAction} disabled={downloadingCertificate}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: '#d97706' }}>
-              {generatingCertificate || downloadingCertificate ? <Loader2 className="w-4 h-4 animate-spin" /> : certificateInfo?.available ? <Download className="w-4 h-4" /> : <Award className="w-4 h-4" />}
-              {generatingCertificate
-                ? 'Generating Certificate...'
-                : downloadingCertificate
-                  ? 'Downloading Certificate...'
-                  : certificateInfo?.available
-                    ? 'Download Certificate'
-                    : 'Generate Certificate'}
+              {downloadingCertificate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {downloadingCertificate ? 'Downloading Certificate...' : 'Download Certificate'}
             </button>
           )}
           <button type="button" onClick={() => navigate(getDashboardPath())}

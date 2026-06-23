@@ -7,6 +7,14 @@ import { useGlossary } from '../../hooks/useGlossary';
  * Automatically identifies and highlights glossary terms in text
  * Features: progressive disclosure, context-aware highlighting, zero-friction interaction
  */
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildGlossaryRegex = (term) => {
+  const escaped = escapeRegExp(term).replace(/\s+/g, '\\s+');
+  const pluralSuffix = /[a-z]$/i.test(term) && !/s$/i.test(term) ? 's?' : '';
+  return new RegExp(`\\b${escaped}${pluralSuffix}\\b`, 'gi');
+};
+
 const SmartTextHighlighter = ({ 
   text, 
   className = '',
@@ -49,7 +57,7 @@ const SmartTextHighlighter = ({
     const sortedTerms = [...markedTerms].sort((a, b) => b.term.length - a.term.length);
 
     for (const termInfo of sortedTerms) {
-      const regex = new RegExp(`\\b${termInfo.term}\\b`, 'gi');
+      const regex = buildGlossaryRegex(termInfo.term);
       let match;
       
       while ((match = regex.exec(result)) !== null) {
