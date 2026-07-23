@@ -75,21 +75,21 @@ const Login = () => {
   return (
     <OnboardingLayout wide>
       <div
-        className="mx-auto flex w-full min-w-0 max-w-[420px] flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_18px_45px_rgba(15,45,75,0.12)] lg:max-w-[860px] lg:min-h-[560px] lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
+        className="mx-auto flex w-full min-w-0 max-w-[420px] shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_18px_45px_rgba(15,45,75,0.12)] lg:min-h-[560px] lg:max-w-[860px] lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
         style={{ borderColor: GOV.border }}
       >
         <div
-          className="relative flex h-40 shrink-0 items-center justify-center overflow-hidden bg-[#f6f9fc] px-4 sm:h-48 lg:h-auto lg:grow-0 lg:shrink-0 lg:basis-[42%] lg:bg-white lg:p-8"
+          className="relative flex h-28 shrink-0 items-center justify-center overflow-hidden bg-[#f6f9fc] px-4 sm:h-40 md:h-48 lg:h-auto lg:grow-0 lg:shrink-0 lg:basis-[42%] lg:bg-white lg:p-8"
         >
           <img
             src="/login_cover.png"
             alt=""
-            className="relative z-10 h-[210px] w-auto max-w-none object-contain sm:h-[250px] lg:h-auto lg:w-full lg:max-w-[500px]"
+            className="relative z-10 h-[170px] w-auto max-w-none object-contain sm:h-[220px] md:h-[250px] lg:h-auto lg:w-full lg:max-w-[500px]"
             style={{ maxWidth: '500px' }}
           />
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col justify-center px-5 py-6 sm:px-7 lg:px-10 lg:py-8">
+        <div className="flex shrink-0 flex-col justify-start px-5 py-6 sm:px-7 lg:min-h-0 lg:flex-1 lg:shrink lg:justify-center lg:px-10 lg:py-8">
           <div style={{ marginBottom: '1rem' }}>
             <h1
               className="text-[1.7rem] font-extrabold leading-tight sm:text-[1.85rem] lg:text-[2rem]"
@@ -244,6 +244,7 @@ const styles = {
   },
   input: {
     flex: 1,
+    minWidth: 0,
     border: 'none',
     background: 'transparent',
     fontSize: '0.82rem',

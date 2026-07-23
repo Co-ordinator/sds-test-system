@@ -76,5 +76,6 @@ export const LOGO = {
 };
 
 export const MINISTRY_NAME = 'Ministry of Labour and Social Security';
+export const OFFICIAL_TITLE = 'Pre-Service Tertiary Education & Training';
 export const KINGDOM = 'Kingdom of Eswatini';
 export const LOGO_ALT = 'Government of Eswatini - Ministry of Labour and Social Security';

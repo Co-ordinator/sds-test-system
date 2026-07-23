@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Award,
@@ -19,7 +19,7 @@ import api from '../services/api';
 import { GOV } from '../theme/government';
 import AppShell from '../components/layout/AppShell';
 
-const HERO_IMAGE = '/1299-1750835531.webp';
+const HERO_IMAGE = '/landing-assessment-testing.jpg';
 
 const getHollandDisplayCode = (assessment) =>
   assessment?.hollandCodeDisplay || assessment?.hollandCode || '-';
@@ -145,10 +145,26 @@ const TestTakerDashboard = () => {
   const [selectedAssessment, setSelectedAssessment] = useState(null);
   const [loadingAssessmentDetail, setLoadingAssessmentDetail] = useState(false);
   const [downloadingCert, setDownloadingCert] = useState(null);
+  const [recommendationSettingsOpen, setRecommendationSettingsOpen] = useState(false);
+  const recommendationSettingsButtonRef = useRef(null);
+  const recommendationSettingsPanelRef = useRef(null);
 
   useEffect(() => {
     setProfileUser(user || null);
   }, [user?.id, user]);
+
+  useEffect(() => {
+    if (!recommendationSettingsOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setRecommendationSettingsOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    recommendationSettingsPanelRef.current?.focus();
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      recommendationSettingsButtonRef.current?.focus();
+    };
+  }, [recommendationSettingsOpen]);
 
   useEffect(() => {
     let alive = true;
@@ -346,17 +362,73 @@ const TestTakerDashboard = () => {
         </div>
       )}
 
+      {recommendationSettingsOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setRecommendationSettingsOpen(false);
+          }}
+        >
+          <section
+            ref={recommendationSettingsPanelRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recommendation-options-title"
+            tabIndex={-1}
+            className="w-full max-w-md rounded-xl border bg-white p-5 shadow-2xl outline-none"
+            style={{ borderColor: GOV.border }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 id="recommendation-options-title" className="text-base font-extrabold text-gray-900">
+                  Recommendation options
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-gray-600">
+                  Career recommendations use your latest completed assessment and current education profile.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRecommendationSettingsOpen(false)}
+                className="rounded-md p-1.5 hover:bg-gray-100"
+                aria-label="Close recommendation options"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="mt-5 grid gap-2 sm:grid-cols-2">
+              {latestCompleted && (
+                <ActionButton primary onClick={() => {
+                  setRecommendationSettingsOpen(false);
+                  viewResults(latestCompleted.id);
+                }}>
+                  <BarChart3 className="h-4 w-4" /> View full results
+                </ActionButton>
+              )}
+              <ActionButton onClick={() => {
+                setRecommendationSettingsOpen(false);
+                navigate('/profile');
+              }}>
+                <Settings className="h-4 w-4" /> Update education profile
+              </ActionButton>
+            </div>
+          </section>
+        </div>
+      )}
+
       <div className="min-h-[calc(100vh-4.5rem)] bg-gray-50">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          <section className="relative min-h-[10.5rem] overflow-hidden rounded-2xl sm:h-40">
+          <section className="relative min-h-[13rem] overflow-hidden rounded-2xl sm:h-52 lg:h-56">
             <img
               src={HERO_IMAGE}
               alt=""
-              className="absolute inset-0 h-full w-full object-cover object-right"
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ objectPosition: 'center 58%' }}
               aria-hidden="true"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
-            <div className="relative z-10 flex min-h-[10.5rem] flex-col justify-center p-5 sm:h-full sm:p-7">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#071b3d]/90 via-[#102f63]/60 to-transparent" />
+            <div className="absolute inset-0 bg-[#071b3d]/10" />
+            <div className="relative z-10 flex min-h-[13rem] flex-col justify-center p-5 sm:h-full sm:p-7">
               <h1 className="max-w-2xl text-2xl font-bold leading-tight text-white sm:text-[1.7rem]">
                 Welcome back, {displayName}!
               </h1>
@@ -483,7 +555,15 @@ const TestTakerDashboard = () => {
                   <Award className="h-5 w-5 text-orange-500" />
                   Top Career Recommendations
                 </h3>
-                <button type="button" className="rounded-md p-1.5 hover:bg-gray-100" aria-label="Recommendation settings">
+                <button
+                  ref={recommendationSettingsButtonRef}
+                  type="button"
+                  className="rounded-md p-1.5 hover:bg-gray-100"
+                  aria-label="Recommendation settings"
+                  aria-haspopup="dialog"
+                  aria-expanded={recommendationSettingsOpen}
+                  onClick={() => setRecommendationSettingsOpen(true)}
+                >
                   <Settings className="h-4 w-4 text-gray-400" />
                 </button>
               </div>

@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Cloud, Loader2, PauseCircle, Clock, BookOpen, HelpCircle, LayoutDashboard, Volume2, X } from 'lucide-react';
 import api from '../services/api';
+import {
+  clearQueuedProgress,
+  getProgressQueueStorageKey,
+  readQueuedProgress,
+  writeQueuedProgress,
+} from '../services/assessmentProgressQueue';
 import { GOV, TYPO } from '../theme/government';
 import AssessmentShell from '../components/layout/AssessmentShell';
 import { QuestionTextWithGlossary, DescriptionWithGlossary } from '../components/ui/SmartTextHighlighter';
 import { useAccessibility } from '../context/AccessibilityContext';
 import { useAuth } from '../context/AuthContext';
+import { shouldAutoOpenAssessmentCompletion } from '../utils/questionnaireCompletion';
 
 const SECTIONS = [
   { 
@@ -59,6 +66,9 @@ const SECTIONS = [
     ]
   }
 ];
+
+const PROGRESS_SAVE_DEBOUNCE_MS = 750;
+const PROGRESS_SAVE_MAX_RETRY_MS = 15000;
 
 const ROMAN_LABEL_SPEECH_VALUES = [
   ['IV', '4'],
@@ -349,71 +359,211 @@ const buildQuestionReviewItems = (questionsBySection = {}) => {
   ));
 };
 
-const SkippedQuestionsPanel = ({ skippedQuestions, onJump }) => {
-  if (!skippedQuestions.length) return null;
+const AssessmentCompletionDialog = ({
+  skippedQuestions,
+  answeredCount,
+  totalQuestions,
+  onJump,
+  onClose,
+  onSubmit,
+  submitting,
+  syncing,
+  submissionError
+}) => {
+  const dialogRef = useRef(null);
+  const hasSkippedQuestions = skippedQuestions.length > 0;
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const previousFocusedElement = document.activeElement;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.focus();
+
+    const handleDialogKeyDown = (event) => {
+      if (event.key === 'Escape' && !submitting) {
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(dialogRef.current.querySelectorAll(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      ));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', handleDialogKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleDialogKeyDown);
+      previousFocusedElement?.focus?.();
+    };
+  }, [onClose, submitting]);
 
   return (
-    <aside
-      className="fixed inset-x-3 top-20 z-50 max-h-[34vh] overflow-hidden rounded-md border bg-white shadow-2xl sm:inset-x-4 sm:top-24 md:inset-x-auto md:bottom-4 md:right-4 md:top-28 md:w-72 md:max-h-none"
-      style={{ borderColor: GOV.border }}
-      role="complementary"
-      aria-label="Skipped questions review panel"
+    <div
+      className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/60 p-0 backdrop-blur-[2px] sm:items-center sm:p-5"
+      role="presentation"
     >
-      <div className="flex items-start gap-2 border-b px-3 py-2.5" style={{ borderColor: GOV.borderLight }}>
-        <div className="flex min-w-0 items-start gap-2">
-          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md" style={{ backgroundColor: '#fef3c7' }}>
-            <AlertTriangle className="h-3.5 w-3.5" style={{ color: '#d97706' }} aria-hidden />
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-sm font-bold" style={{ color: GOV.text }}>Skipped questions</h2>
-            <p className="mt-0.5 text-[11px] leading-snug" style={{ color: GOV.textMuted }}>
-              {skippedQuestions.length} question{skippedQuestions.length === 1 ? '' : 's'} need an answer before you submit.
-            </p>
-          </div>
-        </div>
-      </div>
+      <section
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="assessment-completion-title"
+        aria-describedby="assessment-completion-description"
+        className="flex max-h-[96dvh] w-full flex-col overflow-hidden rounded-t-2xl border bg-white shadow-2xl sm:max-h-[90vh] sm:max-w-2xl sm:rounded-2xl"
+        style={{ borderColor: GOV.border }}
+      >
+        <div className="relative overflow-hidden border-b px-4 pb-4 pt-5 sm:px-6 sm:pb-5 sm:pt-6" style={{ borderColor: GOV.borderLight }}>
+          <div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: hasSkippedQuestions ? '#d97706' : '#16a34a' }} />
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border bg-white transition-colors hover:bg-gray-50 disabled:opacity-50 sm:right-4 sm:top-4"
+            style={{ borderColor: GOV.borderLight, color: GOV.textMuted }}
+            aria-label="Close assessment completion dialog"
+          >
+            <X className="h-4 w-4" aria-hidden />
+          </button>
 
-      <div className="max-h-[calc(34vh-5.75rem)] overflow-y-auto px-2.5 py-2.5 md:max-h-[calc(100vh-13rem)]">
-        <div className="space-y-1.5">
-          {skippedQuestions.map((item) => {
-            const color = RIASEC_COLORS[item.question.riasecType] || GOV.blue;
-            const sectionLabel = `Section ${item.section.num}`;
-            const questionText = item.question.text || 'Question text unavailable';
-            return (
-              <button
-                key={item.question.id}
-                type="button"
-                onClick={() => onJump(item)}
-                className="w-full rounded-md border bg-white p-2.5 text-left transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                style={{ borderColor: GOV.borderLight }}
+          <div className="flex items-start gap-3 pr-10 sm:gap-4">
+            <div
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full sm:h-12 sm:w-12"
+              style={{ backgroundColor: hasSkippedQuestions ? '#fef3c7' : '#dcfce7' }}
+            >
+              {hasSkippedQuestions
+                ? <AlertTriangle className="h-6 w-6" style={{ color: '#d97706' }} aria-hidden />
+                : <CheckCircle2 className="h-6 w-6" style={{ color: '#16a34a' }} aria-hidden />}
+            </div>
+            <div className="min-w-0">
+              <p
+                className="mb-1 text-[11px] font-extrabold uppercase tracking-[0.12em]"
+                style={{ color: hasSkippedQuestions ? '#b45309' : '#15803d' }}
               >
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold" style={{ color: GOV.text }}>
-                    Question {item.globalNumber}
-                  </span>
-                  <span
-                    className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-                    style={{ backgroundColor: `${color}14`, color }}
-                  >
-                    {item.question.questionCode || item.question.riasecType || sectionLabel}
-                  </span>
-                </div>
-                <p className="text-[11px] font-semibold" style={{ color: GOV.textMuted }}>
-                  {sectionLabel}: {item.section.label}
-                </p>
-                <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug" style={{ color: GOV.text }}>
-                  {questionText}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+                {hasSkippedQuestions ? 'Review required' : 'Ready to submit'}
+              </p>
+              <h2 id="assessment-completion-title" className="text-xl font-extrabold leading-tight sm:text-2xl" style={{ color: GOV.text }}>
+                You have completed the assessment journey
+              </h2>
+              <p id="assessment-completion-description" className="mt-2 text-sm leading-relaxed" style={{ color: GOV.textMuted }}>
+                {hasSkippedQuestions
+                  ? `You reached the end of all four sections. Answer the ${skippedQuestions.length} skipped question${skippedQuestions.length === 1 ? '' : 's'} below before submitting.`
+                  : `You answered all ${totalQuestions} questions. Review the summary, then submit your assessment when you are ready.`}
+              </p>
+            </div>
+          </div>
 
-      <div className="border-t px-3 py-2 text-[11px]" style={{ borderColor: GOV.borderLight, color: GOV.textMuted }}>
-        Tap a question to jump back and answer it.
-      </div>
-    </aside>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:max-w-sm sm:gap-3">
+            <div className="rounded-lg border px-3 py-2.5" style={{ borderColor: GOV.borderLight, backgroundColor: GOV.backgroundAlt }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: GOV.textHint }}>Answered</p>
+              <p className="mt-0.5 text-lg font-extrabold" style={{ color: GOV.text }}>{answeredCount}</p>
+            </div>
+            <div className="rounded-lg border px-3 py-2.5" style={{ borderColor: hasSkippedQuestions ? '#f59e0b66' : GOV.borderLight, backgroundColor: hasSkippedQuestions ? '#fffbeb' : GOV.backgroundAlt }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: GOV.textHint }}>Skipped</p>
+              <p className="mt-0.5 text-lg font-extrabold" style={{ color: hasSkippedQuestions ? '#b45309' : '#15803d' }}>{skippedQuestions.length}</p>
+            </div>
+          </div>
+        </div>
+
+        {hasSkippedQuestions && (
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4">
+            <div className="mb-2 flex items-center justify-between gap-3 px-1">
+              <h3 className="text-sm font-bold" style={{ color: GOV.text }}>Skipped questions</h3>
+              <span className="text-[11px]" style={{ color: GOV.textMuted }}>Tap one to jump to it</span>
+            </div>
+            <div className="space-y-2">
+              {skippedQuestions.map((item) => {
+                const color = RIASEC_COLORS[item.question.riasecType] || GOV.blue;
+                const sectionLabel = `Section ${item.section.num}`;
+                return (
+                  <button
+                    key={item.question.id}
+                    type="button"
+                    onClick={() => onJump(item)}
+                    className="w-full rounded-xl border bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 sm:p-3.5"
+                    style={{ borderColor: GOV.borderLight }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold" style={{ color: GOV.text }}>Question {item.globalNumber}</p>
+                        <p className="mt-0.5 text-[11px] font-semibold" style={{ color: GOV.textMuted }}>
+                          {sectionLabel}: {item.section.label}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5" style={{ color: GOV.text }}>
+                          {item.question.text || 'Question text unavailable'}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold" style={{ backgroundColor: `${color}14`, color }}>
+                        {item.question.questionCode || item.question.riasecType || sectionLabel}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div
+          className="border-t bg-white px-4 py-3.5 sm:px-6 sm:py-4"
+          style={{ borderColor: GOV.borderLight, paddingBottom: 'max(0.875rem, env(safe-area-inset-bottom))' }}
+        >
+          {submissionError && (
+            <div className="mb-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed" style={{ backgroundColor: GOV.errorBg, borderColor: GOV.errorBorder, color: GOV.error }}>
+              {submissionError}
+            </div>
+          )}
+          {!hasSkippedQuestions && syncing && !submissionError && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border px-3 py-2.5 text-xs" style={{ backgroundColor: GOV.blueLightAlt, borderColor: GOV.border, color: GOV.blue }} role="status" aria-live="polite">
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              Saving your final responses. The Submit button will be available in a moment.
+            </div>
+          )}
+          <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border bg-white px-5 text-sm font-bold transition-colors hover:bg-gray-50 disabled:opacity-50"
+              style={{ borderColor: GOV.border, color: GOV.textMuted }}
+            >
+              Review answers
+            </button>
+            {hasSkippedQuestions ? (
+              <button
+                type="button"
+                onClick={() => onJump(skippedQuestions[0])}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: GOV.blue }}
+              >
+                Go to first skipped question <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onSubmit}
+                disabled={submitting || syncing}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                style={{ backgroundColor: '#16a34a' }}
+              >
+                {submitting || syncing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <CheckCircle2 className="h-4 w-4" aria-hidden />}
+                {submitting ? 'Submitting assessment...' : (syncing ? 'Saving final responses...' : 'Submit assessment')}
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 };
 
@@ -440,14 +590,25 @@ const Questionnaire = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [progressLoaded, setProgressLoaded] = useState(false);
+  const [positionRestored, setPositionRestored] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(null);
   const [sectionTransition, setSectionTransition] = useState(null);
   const [showInitialSectionIntro, setShowInitialSectionIntro] = useState(true);
   const [showResumeSectionIntro, setShowResumeSectionIntro] = useState(false);
-  const [showSkippedReviewPanel, setShowSkippedReviewPanel] = useState(false);
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false);
+  const [completionError, setCompletionError] = useState(null);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [activeNarrationKey, setActiveNarrationKey] = useState(null);
   const hasRestoredPositionRef = useRef(false);
+  const completionPromptedAssessmentRef = useRef(null);
+  const skippedQuestionReturnRef = useRef(null);
+  const queuedProgressRef = useRef({});
+  const progressFlushTimerRef = useRef(null);
+  const progressFlushInFlightRef = useRef(null);
+  const progressFlushRef = useRef(null);
+  const scheduleProgressFlushRef = useRef(() => {});
+  const progressRetryAttemptRef = useRef(0);
+  const [queuedAnswerCount, setQueuedAnswerCount] = useState(0);
 
   const sectionId = SECTIONS[currentSectionIndex]?.id;
   const sectionQuestions = questionsBySection[sectionId] || [];
@@ -455,6 +616,10 @@ const Questionnaire = () => {
   const questionReviewItems = useMemo(
     () => buildQuestionReviewItems(questionsBySection),
     [questionsBySection]
+  );
+  const questionsById = useMemo(
+    () => new Map(questionReviewItems.map(({ question }) => [question.id, question])),
+    [questionReviewItems]
   );
   const skippedQuestions = useMemo(
     () => questionReviewItems.filter(({ question }) => !hasAnswerValue(answers[question.id])),
@@ -473,6 +638,7 @@ const Questionnaire = () => {
   const currentSectionMeta = SECTIONS[currentSectionIndex];
   const timerStorageKey = assessment?.id ? getTimerStorageKey(assessment.id) : null;
   const positionStorageKey = assessment?.id ? getPositionStorageKey(assessment.id) : null;
+  const progressQueueStorageKey = assessment?.id ? getProgressQueueStorageKey(assessment.id) : null;
   const isDashboardResume = Boolean(location.state?.resumeAssessment);
   const shouldShowInitialSectionIntro =
     showInitialSectionIntro &&
@@ -552,18 +718,24 @@ const Questionnaire = () => {
       setLoading(true);
       setError(null);
       setProgressLoaded(false);
-      await loadQuestions();
+      // Questions and assessment initialization are independent remote reads.
+      // Start both together so remote-database latency is not paid sequentially.
+      const questionsPromise = loadQuestions();
       try {
         const res = await api.post('/api/v1/assessments');
         const data = res.data?.data?.assessment;
         if (data) {
           setAssessment(data);
+          const queuedAnswers = readQueuedProgress(getProgressQueueStorageKey(data.id));
+          queuedProgressRef.current = queuedAnswers;
+          setQueuedAnswerCount(Object.keys(queuedAnswers).length);
           try {
             const progRes = await api.get(`/api/v1/assessments/${data.id}/progress`);
             const saved = progRes.data?.data?.answers || {};
-            setAnswers(saved);
+            setAnswers({ ...saved, ...queuedAnswers });
           } catch (_) {
-            setAnswers({});
+            // Answers waiting in this browser remain available even if a restart interrupts the first API read.
+            setAnswers(queuedAnswers);
           } finally {
             setProgressLoaded(true);
           }
@@ -575,64 +747,177 @@ const Questionnaire = () => {
         setError(e.response?.data?.message || 'Failed to start assessment');
         setProgressLoaded(true);
       }
+      await questionsPromise;
       setLoading(false);
     })();
   }, [loadQuestions]);
 
-  const saveProgress = useCallback(
-    async (newAnswers) => {
-      if (!assessment?.id || !Object.keys(newAnswers).length) return;
-      const payload = Object.entries(newAnswers).map(([qId, value]) => {
-        const q = Object.values(questionsBySection)
-          .flat()
-          .find((x) => x.id === qId);
-        return q ? { questionId: q.id, value, section: q.section, riasecType: q.riasecType } : null;
-      }).filter(Boolean);
-      if (!payload.length) return;
+  const syncQueuedProgressStorage = useCallback(() => {
+    writeQueuedProgress(progressQueueStorageKey, queuedProgressRef.current);
+    setQueuedAnswerCount(Object.keys(queuedProgressRef.current).length);
+  }, [progressQueueStorageKey]);
+
+  const scheduleProgressFlush = useCallback((delay = PROGRESS_SAVE_DEBOUNCE_MS) => {
+    if (progressFlushTimerRef.current) {
+      window.clearTimeout(progressFlushTimerRef.current);
+    }
+    progressFlushTimerRef.current = window.setTimeout(() => {
+      progressFlushTimerRef.current = null;
+      progressFlushRef.current?.().catch(() => {
+        // The queue remains in local storage and the flush function schedules its own retry.
+      });
+    }, delay);
+  }, []);
+
+  useEffect(() => {
+    scheduleProgressFlushRef.current = scheduleProgressFlush;
+  }, [scheduleProgressFlush]);
+
+  const flushQueuedProgress = useCallback(async () => {
+    if (progressFlushInFlightRef.current) return progressFlushInFlightRef.current;
+    if (!assessment?.id || !progressQueueStorageKey) return undefined;
+    if (questionsById.size === 0) return undefined;
+
+    const queuedSnapshot = { ...queuedProgressRef.current };
+    const payload = Object.entries(queuedSnapshot)
+      .map(([questionId, value]) => {
+        const question = questionsById.get(questionId);
+        return question
+          ? { questionId: question.id, value, section: question.section, riasecType: question.riasecType }
+          : null;
+      })
+      .filter(Boolean);
+
+    if (!payload.length) {
+      Object.keys(queuedSnapshot).forEach((questionId) => {
+        if (queuedProgressRef.current[questionId] === queuedSnapshot[questionId]) {
+          delete queuedProgressRef.current[questionId];
+        }
+      });
+      syncQueuedProgressStorage();
+      return undefined;
+    }
+
+    let failed = false;
+    const request = (async () => {
       setSaving(true);
       try {
         await api.post(`/api/v1/assessments/${assessment.id}/progress`, { answers: payload });
-      } catch (err) {
-        throw err;
+        Object.entries(queuedSnapshot).forEach(([questionId, value]) => {
+          if (queuedProgressRef.current[questionId] === value) {
+            delete queuedProgressRef.current[questionId];
+          }
+        });
+        progressRetryAttemptRef.current = 0;
+        setError((currentError) => (
+          currentError === 'Connection interrupted. Your response is stored on this device and will retry automatically.'
+            ? null
+            : currentError
+        ));
+      } catch (requestError) {
+        failed = true;
+        progressRetryAttemptRef.current += 1;
+        setError('Connection interrupted. Your response is stored on this device and will retry automatically.');
+        throw requestError;
       } finally {
+        syncQueuedProgressStorage();
         setSaving(false);
+        if (Object.keys(queuedProgressRef.current).length > 0) {
+          const retryDelay = failed
+            ? Math.min(
+              PROGRESS_SAVE_DEBOUNCE_MS * (2 ** progressRetryAttemptRef.current),
+              PROGRESS_SAVE_MAX_RETRY_MS
+            )
+            : 0;
+          scheduleProgressFlushRef.current(retryDelay);
+        }
       }
-    },
-    [assessment?.id, questionsBySection]
-  );
+    })();
+
+    progressFlushInFlightRef.current = request;
+    try {
+      return await request;
+    } finally {
+      progressFlushInFlightRef.current = null;
+    }
+  }, [assessment?.id, progressQueueStorageKey, questionsById, syncQueuedProgressStorage]);
+
+  useEffect(() => {
+    progressFlushRef.current = flushQueuedProgress;
+    return () => {
+      if (progressFlushRef.current === flushQueuedProgress) {
+        progressFlushRef.current = null;
+      }
+    };
+  }, [flushQueuedProgress]);
+
+  const queueProgress = useCallback((newAnswers) => {
+    if (!progressQueueStorageKey) return;
+    Object.entries(newAnswers || {}).forEach(([questionId, value]) => {
+      if (questionId && value !== undefined && value !== null && String(value).trim() !== '') {
+        queuedProgressRef.current[questionId] = String(value);
+      }
+    });
+    syncQueuedProgressStorage();
+    scheduleProgressFlush();
+  }, [progressQueueStorageKey, scheduleProgressFlush, syncQueuedProgressStorage]);
+
+  useEffect(() => {
+    if (!assessment?.id || !progressLoaded || queuedAnswerCount === 0) return;
+    scheduleProgressFlush(0);
+  }, [assessment?.id, progressLoaded, queuedAnswerCount, questionsById, scheduleProgressFlush]);
+
+  useEffect(() => {
+    if (!progressQueueStorageKey) return undefined;
+
+    const flushWhenOnline = () => scheduleProgressFlush(0);
+    const persistBeforeBackgrounding = () => {
+      syncQueuedProgressStorage();
+      if (document.visibilityState === 'hidden') {
+        scheduleProgressFlush(0);
+      }
+    };
+
+    window.addEventListener('online', flushWhenOnline);
+    document.addEventListener('visibilitychange', persistBeforeBackgrounding);
+    return () => {
+      window.removeEventListener('online', flushWhenOnline);
+      document.removeEventListener('visibilitychange', persistBeforeBackgrounding);
+      syncQueuedProgressStorage();
+      if (progressFlushTimerRef.current) {
+        window.clearTimeout(progressFlushTimerRef.current);
+        progressFlushTimerRef.current = null;
+      }
+    };
+  }, [progressQueueStorageKey, scheduleProgressFlush, syncQueuedProgressStorage]);
 
   const setAnswer = async (questionId, value) => {
-    if (saving || isAdvancing || submitting) return;
+    if (isAdvancing || submitting) return;
 
-    const previousValue = answers[questionId];
     setError(null);
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
     setSelectedAnimation(value);
     setIsAdvancing(true);
 
     try {
-      await saveProgress({ [questionId]: value });
+      // Persist locally before moving on. The network queue batches retries without blocking the learner.
+      queueProgress({ [questionId]: value });
 
-      // Only move forward after the response is persisted.
       const isLast =
         currentSectionIndex === totalSections - 1 &&
         currentQuestionIndex === (questionsBySection[sectionId] || []).length - 1;
-      if (!isLast) {
+      const shouldReturnToCompletion = skippedQuestionReturnRef.current === questionId;
+      if (shouldReturnToCompletion) {
+        skippedQuestionReturnRef.current = null;
+        setTimeout(() => {
+          setCompletionError(null);
+          setShowCompletionDialog(true);
+        }, 220);
+      } else if (!isLast) {
         setTimeout(() => {
           goNext();
         }, 200);
       }
-    } catch (e) {
-      setAnswers((prev) => {
-        const restored = { ...prev };
-        if (previousValue === undefined) {
-          delete restored[questionId];
-        } else {
-          restored[questionId] = previousValue;
-        }
-        return restored;
-      });
-      setError('Could not save your response. Please try again.');
     } finally {
       setTimeout(() => setSelectedAnimation(null), 300);
       setIsAdvancing(false);
@@ -687,17 +972,27 @@ const Questionnaire = () => {
     }
   };
 
-  const openSkippedReviewPanel = () => {
-    if (!skippedQuestions.length) return false;
+  const openCompletionDialog = useCallback(() => {
     stopNarration();
     setError(null);
-    setShowSkippedReviewPanel(true);
-    return true;
-  };
+    setCompletionError(null);
+    if (assessment?.id) completionPromptedAssessmentRef.current = assessment.id;
+    setShowCompletionDialog(true);
+  }, [assessment?.id, stopNarration]);
+
+  const closeCompletionDialog = useCallback(() => {
+    if (submitting) return;
+    skippedQuestionReturnRef.current = null;
+    setShowCompletionDialog(false);
+    setCompletionError(null);
+  }, [submitting]);
 
   const jumpToSkippedQuestion = (item) => {
     if (!item) return;
     stopNarration();
+    skippedQuestionReturnRef.current = item.question.id;
+    setShowCompletionDialog(false);
+    setCompletionError(null);
     setIsPaused(false);
     setSectionTransition(null);
     setShowInitialSectionIntro(false);
@@ -713,13 +1008,18 @@ const Questionnaire = () => {
   const handleComplete = async () => {
     if (!assessment?.id || totalQuestions === 0) return;
     if (skippedQuestions.length > 0) {
-      openSkippedReviewPanel();
+      openCompletionDialog();
       return;
     }
     setSubmitting(true);
     setError(null);
+    setCompletionError(null);
     try {
+      await flushQueuedProgress();
       await api.post(`/api/v1/assessments/${assessment.id}/complete`);
+      queuedProgressRef.current = {};
+      clearQueuedProgress(progressQueueStorageKey);
+      setQueuedAnswerCount(0);
       if (timerStorageKey) {
         try { localStorage.removeItem(timerStorageKey); } catch (_) {}
       }
@@ -728,7 +1028,12 @@ const Questionnaire = () => {
       }
       navigate('/test-complete', { replace: true });
     } catch (e) {
-      setError(e.response?.data?.message || 'Failed to submit. You may need to answer all 228 questions.');
+      const hasQueuedProgress = Object.keys(queuedProgressRef.current).length > 0;
+      const message = hasQueuedProgress
+        ? 'Your responses are stored on this device and will retry automatically. Submit again once the connection is restored.'
+        : (e.response?.data?.message || 'Failed to submit. Please try again.');
+      setError(message);
+      setCompletionError(message);
       setSubmitting(false);
     }
   };
@@ -742,16 +1047,52 @@ const Questionnaire = () => {
 
   useEffect(() => {
     hasRestoredPositionRef.current = false;
+    completionPromptedAssessmentRef.current = null;
+    skippedQuestionReturnRef.current = null;
+    setPositionRestored(false);
     setShowInitialSectionIntro(true);
     setShowResumeSectionIntro(false);
-    setShowSkippedReviewPanel(false);
+    setShowCompletionDialog(false);
+    setCompletionError(null);
   }, [assessment?.id]);
 
   useEffect(() => {
-    if (showSkippedReviewPanel && skippedQuestions.length === 0) {
-      setShowSkippedReviewPanel(false);
-    }
-  }, [showSkippedReviewPanel, skippedQuestions.length]);
+    const shouldOpen = shouldAutoOpenAssessmentCompletion({
+      allAnswered,
+      isLastQuestion,
+      canAdvance,
+      assessmentId: assessment?.id,
+      progressLoaded,
+      positionRestored,
+      loading,
+      isPaused,
+      hasSectionTransition: Boolean(sectionTransition),
+      showInitialSectionIntro,
+      showResumeSectionIntro,
+      submitting,
+      dialogOpen: showCompletionDialog,
+      alreadyPrompted: completionPromptedAssessmentRef.current === assessment?.id,
+    });
+    if (!shouldOpen) return;
+
+    completionPromptedAssessmentRef.current = assessment.id;
+    openCompletionDialog();
+  }, [
+    allAnswered,
+    assessment?.id,
+    canAdvance,
+    isLastQuestion,
+    isPaused,
+    loading,
+    openCompletionDialog,
+    positionRestored,
+    progressLoaded,
+    sectionTransition,
+    showCompletionDialog,
+    showInitialSectionIntro,
+    showResumeSectionIntro,
+    submitting
+  ]);
 
   // Restore last viewed question for in-progress assessments.
   useEffect(() => {
@@ -802,6 +1143,7 @@ const Questionnaire = () => {
     }
 
     hasRestoredPositionRef.current = true;
+    setPositionRestored(true);
   }, [loading, progressLoaded, assessment?.id, answers, questionsBySection, positionStorageKey]);
 
   // Restore timer state for the active assessment (if previously saved in this browser).
@@ -869,12 +1211,12 @@ const Questionnaire = () => {
 
   // Keyboard navigation
   useEffect(() => {
-    if (!currentQuestion || loading || isPaused || sectionTransition || shouldShowInitialSectionIntro || shouldShowResumeSectionIntro) return;
+    if (!currentQuestion || loading || isPaused || sectionTransition || showCompletionDialog || shouldShowInitialSectionIntro || shouldShowResumeSectionIntro) return;
 
     const handleKeyDown = (e) => {
       // Prevent keyboard nav if user is typing
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (saving || isAdvancing || submitting) return;
+      if (isAdvancing || submitting) return;
 
       // Arrow navigation
       if (e.key === 'ArrowLeft' && currentQuestionIndex > 0) {
@@ -914,7 +1256,7 @@ const Questionnaire = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentQuestion, currentQuestionIndex, canAdvance, isLastQuestion, isSelfEstimates, loading, saving, isAdvancing, submitting, isPaused, sectionTransition, shouldShowInitialSectionIntro, shouldShowResumeSectionIntro]);
+  }, [currentQuestion, currentQuestionIndex, canAdvance, isLastQuestion, isSelfEstimates, loading, saving, isAdvancing, submitting, isPaused, sectionTransition, showCompletionDialog, shouldShowInitialSectionIntro, shouldShowResumeSectionIntro]);
 
   if (loading || (!assessment && !error)) {
     return (
@@ -979,7 +1321,7 @@ const Questionnaire = () => {
             <HelpCircle className="w-4 h-4 shrink-0" aria-hidden />
             Glossary
           </button>
-          {saving && (
+          {(saving || queuedAnswerCount > 0) && (
             <span className={`${NAV_TEXT_ACTION} pointer-events-none whitespace-nowrap`} style={{ color: GOV.blue }}>
               <Cloud className="w-4 h-4 shrink-0" aria-hidden /> Saving...
             </span>
@@ -997,13 +1339,13 @@ const Questionnaire = () => {
           {allAnswered && (
             <button
               type="button"
-              onClick={handleComplete}
+              onClick={openCompletionDialog}
               disabled={submitting}
               className={`${NAV_TEXT_ACTION} whitespace-nowrap`}
               style={{ color: '#16a34a', fontWeight: 700 }}
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden />
-              {submitting ? 'Submitting...' : 'Submit'}
+              {submitting ? 'Submitting...' : 'Review & submit'}
             </button>
           )}
         </>
@@ -1015,10 +1357,17 @@ const Questionnaire = () => {
         </div>
       )}
 
-      {showSkippedReviewPanel && !isPaused && skippedQuestions.length > 0 && (
-        <SkippedQuestionsPanel
+      {showCompletionDialog && (
+        <AssessmentCompletionDialog
           skippedQuestions={skippedQuestions}
+          answeredCount={answeredCount}
+          totalQuestions={totalQuestions}
           onJump={jumpToSkippedQuestion}
+          onClose={closeCompletionDialog}
+          onSubmit={handleComplete}
+          submitting={submitting}
+          syncing={saving || queuedAnswerCount > 0}
+          submissionError={completionError}
         />
       )}
 
@@ -1414,7 +1763,7 @@ const Questionnaire = () => {
                   key={value}
                   type="button"
                   onClick={() => setAnswer(currentQuestion.id, value)}
-                  disabled={saving || isAdvancing || submitting}
+                  disabled={isAdvancing || submitting}
                   className={`w-full text-left px-5 py-4 rounded-lg border-2 transition-all duration-200 ${
                     currentAnswer === value
                       ? 'font-semibold shadow-sm scale-[0.98]'
@@ -1438,7 +1787,7 @@ const Questionnaire = () => {
                   key={opt}
                   type="button"
                   onClick={() => setAnswer(currentQuestion.id, opt)}
-                  disabled={saving || isAdvancing || submitting}
+                  disabled={isAdvancing || submitting}
                   className={`w-full text-center px-6 py-5 rounded-lg border-2 transition-all duration-200 text-lg font-semibold ${
                     currentAnswer === opt
                       ? 'shadow-sm scale-[0.98]'
@@ -1482,7 +1831,7 @@ const Questionnaire = () => {
             <button
               type="button"
               onClick={goPrev}
-              disabled={saving || isAdvancing || submitting || (currentSectionIndex === 0 && currentQuestionIndex === 0)}
+              disabled={isAdvancing || submitting || (currentSectionIndex === 0 && currentQuestionIndex === 0)}
               className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none border bg-white`}
               style={{ color: GOV.textMuted, borderColor: GOV.border }}
               aria-label={getAriaLabel('Go to previous question', 'Question navigation')}
@@ -1494,20 +1843,20 @@ const Questionnaire = () => {
               {(allAnswered || isLastQuestion) && canAdvance && (
                 <button
                   type="button"
-                  onClick={handleComplete}
-                  disabled={saving || isAdvancing || submitting}
+                  onClick={openCompletionDialog}
+                  disabled={isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: '#16a34a' }}
-                  aria-label={getAriaLabel('Submit completed test', 'Question navigation')}
+                  aria-label={getAriaLabel('Review and finish assessment', 'Question navigation')}
                 >
-                  {submitting ? 'Submitting...' : 'Submit test'}
+                  {submitting ? 'Submitting...' : 'Finish assessment'}
                 </button>
               )}
               {!allAnswered && !isLastQuestion && (
                 <button
                   type="button"
                   onClick={goNext}
-                  disabled={!canAdvance || saving || isAdvancing || submitting}
+                  disabled={!canAdvance || isAdvancing || submitting}
                   className={`${TEST_NAV_BUTTON_BASE} flex-1 sm:flex-none text-white`}
                   style={{ backgroundColor: GOV.blue }}
                   aria-label={getAriaLabel('Go to next question', 'Question navigation')}

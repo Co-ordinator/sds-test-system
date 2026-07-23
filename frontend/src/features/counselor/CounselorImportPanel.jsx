@@ -4,7 +4,12 @@ import { GOV, TYPO } from '../../theme/government';
 import { useToast } from '../../components/ui/StatusIndicators';
 import { counselorService } from '../../services/counselorService';
 
-const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) => {
+const CounselorImportPanel = ({
+  isAdmin,
+  institutions = [],
+  assignedInstitutionName = 'Assigned institution',
+  onImportComplete
+}) => {
   const { toast, showToast, Toast: ToastComp } = useToast();
   const [csvText, setCsvText] = useState('');
   const [importFile, setImportFile] = useState(null);
@@ -49,9 +54,9 @@ const CounselorImportPanel = ({ isAdmin, institutions = [], onImportComplete }) 
 
   const downloadTemplate = () => {
     const csvContent = `student_number,first_name,last_name,national_id,grade,class,gender,email,institution
-ST001,John,Doe,1234567890123,Form5,A,male,john.doe@school.org,"Mbabane Government High School"
-ST002,Jane,Smith,9876543210987,Form4,B,female,jane.smith@school.org,"Manzini Central High School"
-ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Siteki High School"`;
+MCHS-G10A-001,Asanda,Dlamini,,Grade 10,10A,female,,"Mbabane Central High School"
+MCHS-G10A-002,Yenzokuhle,Dlamini,,Grade 10,10A,female,,"Mbabane Central High School"
+MCHS-G10A-003,Skhanyiso,Gama,,Grade 10,10A,female,,"Mbabane Central High School"`;
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -75,8 +80,11 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sitek
           <div className="mb-4 p-3 rounded-lg text-xs space-y-1" style={{ backgroundColor: GOV.blueLightAlt, color: GOV.textMuted }}>
             <p className="font-semibold">CSV columns (header row required):</p>
             <code className="font-mono block">student_number, first_name, last_name, national_id, grade, class, gender, email, institution</code>
-            <p className="text-[11px]">· <strong>national_id</strong> (PIN): 13-digit national ID number - <strong>required for each student</strong></p>
-            <p className="text-[11px]">· <strong>institution</strong>: School name - <strong>required for each student</strong> (must match existing institution in system)</p>
+            <p className="text-[11px]">· <strong>national_id</strong> (PIN): optional for school login-card imports; leave blank when learner PINs are not available</p>
+            <p className="text-[11px]">
+              · <strong>institution</strong>: School name - <strong>required for each student</strong>
+              {isAdmin ? ' (must match an existing institution)' : ' (must match your assigned institution)'}
+            </p>
             <p className="text-[11px]">· System auto-generates a unique <strong>Login Number</strong> (e.g., SDS123456) for each student</p>
             <p className="text-[11px]">· Passwords are auto-generated securely and are never shown in the UI/API</p>
           </div>
@@ -97,6 +105,16 @@ ST003,Mkhaya,Dlamini,4567890123456,Form3,C,male,mkhaya.dlamini@school.org,"Sitek
               </select>
               <p className="text-[11px] mt-1" style={{ color: GOV.textHint }}>
                 When set, all imported rows must belong to this institution.
+              </p>
+            </div>
+          )}
+
+          {!isAdmin && (
+            <div className="mb-4 rounded-md border px-3 py-2" style={{ borderColor: '#bfdbfe', backgroundColor: GOV.blueLightAlt }}>
+              <p className={TYPO.label} style={{ color: GOV.text }}>Import institution</p>
+              <p className="mt-0.5 text-sm font-semibold" style={{ color: GOV.blue }}>{assignedInstitutionName}</p>
+              <p className="mt-1 text-[11px]" style={{ color: GOV.textMuted }}>
+                Your System Administrator assigned this school. Imported learners cannot be placed in another institution.
               </p>
             </div>
           )}

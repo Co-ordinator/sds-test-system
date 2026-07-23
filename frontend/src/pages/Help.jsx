@@ -1,4 +1,7 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 import {
   ArrowLeft,
   Award,
@@ -15,6 +18,66 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { GOV, TYPO, MINISTRY_NAME, KINGDOM } from '../theme/government';
+import { resolveHelpBackTarget } from '../utils/helpNavigation';
+
+const FAQ_VIDEO_URL = (process.env.REACT_APP_FAQ_VIDEO_URL || '').trim();
+
+const getFaqVideoSource = (configuredUrl) => {
+  if (!configuredUrl) return null;
+  try {
+    const parsed = new URL(configuredUrl, 'https://sds.local');
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'youtu.be' || host.endsWith('.youtu.be')) {
+      const videoId = parsed.pathname.split('/').filter(Boolean)[0];
+      return videoId
+        ? { type: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` }
+        : null;
+    }
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) {
+      const videoId = parsed.searchParams.get('v') || parsed.pathname.split('/').filter(Boolean).pop();
+      return videoId
+        ? { type: 'youtube', url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` }
+        : null;
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    return { type: 'video', url: configuredUrl };
+  } catch {
+    return null;
+  }
+};
+
+const FaqVideo = ({ configuredUrl }) => {
+  const source = getFaqVideoSource(configuredUrl);
+  if (!source) return null;
+
+  return (
+    <div className="mt-6 overflow-hidden rounded-xl border bg-white shadow-sm" style={{ borderColor: GOV.border }}>
+      <div className="p-4 sm:p-5">
+        <h2 className="text-base font-extrabold" style={{ color: GOV.text }}>Video Guide</h2>
+        <p className="mt-1 text-xs leading-5" style={{ color: GOV.textMuted }}>
+          An optional walkthrough of registering, taking the SDS assessment, and reading your results.
+        </p>
+      </div>
+      <div className="border-t" style={{ borderColor: GOV.borderLight }}>
+        {source.type === 'youtube' ? (
+          <iframe
+            src={source.url}
+            title="SDS instructional video"
+            loading="lazy"
+            className="aspect-video w-full border-0"
+            allow="accelerometer; autoplay; encrypted-media; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <video controls preload="none" className="aspect-video w-full bg-black" aria-label="SDS instructional video">
+            <source src={source.url} />
+            Your browser does not support embedded video.
+          </video>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const faqGroups = [
   {
@@ -103,6 +166,41 @@ const quickFacts = [
 ];
 
 export default function Help() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  const [publishedFaqs, setPublishedFaqs] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/api/v1/faqs')
+      .then((response) => {
+        if (active) setPublishedFaqs(response.data?.data?.faqs || []);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  const displayedGroups = useMemo(() => {
+    if (publishedFaqs.length === 0) return faqGroups;
+    return [
+      ...faqGroups,
+      {
+        title: 'More Help',
+        icon: HelpCircle,
+        questions: publishedFaqs.map(({ question, answer }) => ({ question, answer }))
+      }
+    ];
+  }, [publishedFaqs]);
+
+  const handleBack = (event) => {
+    event.preventDefault();
+    navigate(resolveHelpBackTarget({
+      historyIndex: window.history.state?.idx,
+      isAuthenticated,
+      role: user?.role
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div
@@ -116,9 +214,9 @@ export default function Help() {
 
       <header className="sticky top-0 z-20 border-b bg-white/95 backdrop-blur" style={{ borderColor: GOV.border }}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold" style={{ color: GOV.blue }}>
+          <Link to="/" onClick={handleBack} className="inline-flex items-center gap-2 text-sm font-bold" style={{ color: GOV.blue }}>
             <ArrowLeft className="h-4 w-4" />
-            Back to Home
+            {isAuthenticated ? 'Back' : 'Back to Home'}
           </Link>
           <div className="flex items-center gap-2">
             <HelpCircle className="h-5 w-5" style={{ color: GOV.blue }} />
@@ -173,11 +271,13 @@ export default function Help() {
               </div>
             ))}
           </div>
+
+          <FaqVideo configuredUrl={FAQ_VIDEO_URL} />
         </section>
 
         <section className="border-t bg-[#f8fafc]" style={{ borderColor: GOV.borderLight }}>
           <div className="mx-auto grid max-w-6xl gap-5 px-4 py-8 sm:px-6 sm:py-10 lg:grid-cols-2 lg:px-8">
-            {faqGroups.map(({ title, icon: Icon, questions }) => (
+            {displayedGroups.map(({ title, icon: Icon, questions }) => (
               <article key={title} className="rounded-xl border bg-white p-4 shadow-sm sm:p-5" style={{ borderColor: GOV.border }}>
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: GOV.blueLightAlt }}>

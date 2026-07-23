@@ -2,6 +2,9 @@ const counselorService = require('../services/counselor.service');
 const PDFDocument = require('pdfkit');
 const logger = require('../utils/logger');
 
+const LOGIN_CARD_URL = process.env.LOGIN_CARD_URL || 'https://brown-cobra-764328.hostingersite.com';
+const LOGIN_CARD_LABEL = LOGIN_CARD_URL.replace(/^https?:\/\//, '');
+
 const getMyStudents = async (req, res, next) => {
   try {
     const { formatted, actor, institutionId } = await counselorService.getMyStudents(req.user.id, req.query.institutionId);
@@ -60,7 +63,10 @@ const updateStudent = async (req, res, next) => {
 
 const getStudentResults = async (req, res, next) => {
   try {
-    const { student, assessments, recommendations } = await counselorService.getStudentResults(req.params.studentId);
+    const { student, assessments, recommendations } = await counselorService.getStudentResults(
+      req.user.id,
+      req.params.studentId
+    );
     return res.status(200).json({
       status: 'success',
       data: { student: { id: student.id, firstName: student.firstName, lastName: student.lastName, email: student.email }, assessments, recommendations }
@@ -121,7 +127,7 @@ const generateLoginCards = async (req, res, next) => {
       // Header bar
       doc.rect(x, y, CARD_W, 28).fillColor('#2D8BC4').fill();
       doc.fontSize(7).fillColor('#ffffff').text('ESWATINI CAREER GUIDANCE SYSTEM', x + 5, y + 5, { width: CARD_W - 10, align: 'center' });
-      doc.fontSize(6).fillColor('#c7d2fe').text('careers.gov.sz', x + 5, y + 16, { width: CARD_W - 10, align: 'center' });
+      doc.fontSize(6).fillColor('#c7d2fe').text(LOGIN_CARD_LABEL, x + 5, y + 16, { width: CARD_W - 10, align: 'center' });
 
       // Student name
       doc.fontSize(9).fillColor('#111827').text(
@@ -147,7 +153,7 @@ const generateLoginCards = async (req, res, next) => {
       doc.fontSize(8).fillColor('#111827')
         .text(`Password: ${loginPassword}`, x + 8, y + 84);
       doc.font('Helvetica').fontSize(8).fillColor('#111827')
-        .text(`Website: careers.gov.sz`, x + 8, y + 94);
+        .text(`Website: ${LOGIN_CARD_URL}`, x + 8, y + 94);
 
       // Instructions
       doc.fontSize(6).fillColor('#6b7280')

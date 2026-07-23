@@ -141,7 +141,7 @@ const EswatiniLeafletMap = ({ regionRows, selectedRegion, onSelectRegion }) => {
   }, [regionRows, selectedRegion, onSelectRegion]);
 
   return (
-    <div className="relative">
+    <div className="relative z-0" style={{ isolation: 'isolate' }}>
       <div
         ref={mapRef}
         className="w-full rounded-lg overflow-hidden border"

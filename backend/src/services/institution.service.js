@@ -24,8 +24,12 @@ const parseCsvInstitutions = (csvText) => new Promise((resolve, reject) => {
 
 module.exports = {
 
-  listInstitutions: async () => {
-    return await Institution.findAll({ order: [['name', 'ASC']] });
+  listInstitutions: async (filters = {}) => {
+    const where = {};
+    if (filters.status === 'approved' || filters.status === 'pending_review') {
+      where.status = filters.status;
+    }
+    return await Institution.findAll({ where, order: [['name', 'ASC']] });
   },
 
   searchInstitutions: async (query = '', filters = {}) => {

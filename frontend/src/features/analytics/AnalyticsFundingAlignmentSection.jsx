@@ -100,42 +100,51 @@ const AnalyticsFundingAlignmentSection = ({ data, isLoading }) => {
       {/* ── Alignment Distribution Pie Chart ── */}
       <div className="bg-white rounded-lg p-6 border" style={{ borderColor: GOV.border }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: GOV.text }}>Funding Alignment Distribution</h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <PieChart>
-            <Pie
-              data={alignmentDistribution}
-              cx="50%"
-              cy="50%"
-              labelLine={false}
-              label={({ level, percentage }) => `${level}: ${percentage}%`}
-              outerRadius={80}
-              fill="#8884d8"
-              dataKey="count"
-            >
-              {alignmentDistribution.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(value) => [`${value} assessments`, 'Count']} />
-          </PieChart>
-        </ResponsiveContainer>
+        <div className="flex items-center gap-4">
+          <ResponsiveContainer width="55%" height={250}>
+            <PieChart>
+              <Pie
+                data={alignmentDistribution}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                outerRadius={90}
+                fill="#8884d8"
+                dataKey="count"
+              >
+                {alignmentDistribution.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={PIE_COLORS[index]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => [`${value} assessments`, 'Count']} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="flex-1 space-y-2">
+            {alignmentDistribution.map((entry, index) => (
+              <div key={entry.level} className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index] }} />
+                <span className="flex-1 truncate text-xs" style={{ color: GOV.text }}>{entry.level}</span>
+                <span className="text-xs font-bold tabular-nums" style={{ color: GOV.textMuted }}>{entry.percentage}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* ── Field Alignment ── */}
       <div className="bg-white rounded-lg p-6 border" style={{ borderColor: GOV.border }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: GOV.text }}>Top fields: SLAS priority vs other</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={fieldAlignment} margin={{ top: 20 }}>
+        <ResponsiveContainer width="100%" height={Math.max(300, fieldAlignment.length * 34)}>
+          <BarChart data={fieldAlignment} layout="vertical" margin={{ top: 8, right: 24, left: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
-            <XAxis 
-              dataKey="field" 
-              tick={{ fontSize: 11 }} 
-              angle={-45}
-              textAnchor="end"
-              height={80}
+            <XAxis type="number" tick={{ fontSize: 11 }} stroke={GOV.textMuted} allowDecimals={false} />
+            <YAxis
+              type="category"
+              dataKey="field"
+              tick={{ fontSize: 11 }}
+              width={140}
               stroke={GOV.textMuted}
             />
-            <YAxis tick={{ fontSize: 11 }} stroke={GOV.textMuted} />
             <Tooltip
               formatter={(value, name) => [
                 `${value} assessment–field pairs`,

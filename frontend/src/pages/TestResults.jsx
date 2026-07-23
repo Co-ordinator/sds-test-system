@@ -409,6 +409,7 @@ const TestResults = () => {
   const [codeGuideSpeaking, setCodeGuideSpeaking] = useState(false);
   const [certificateInfo, setCertificateInfo] = useState(null);
   const [downloadingCertificate, setDownloadingCertificate] = useState(false);
+  const [emailingResults, setEmailingResults] = useState(false);
 
   const getResultsEndpoint = (id) => (
     isTestTaker
@@ -552,12 +553,17 @@ const TestResults = () => {
     }
   };
 
-  const handleEmailResults = () => {
-    const subject = encodeURIComponent('My SDS Career Assessment Results');
-    const body = encodeURIComponent(
-      `I completed my Self-Directed Search (SDS) Career Assessment.\n\nHolland Code: ${hollandDisplayCode}\nProfile: ${hollandDisplayLabel}\n\nView the full results on the Eswatini National Career Guidance Platform.`
-    );
-    window.open(`mailto:?subject=${subject}&body=${body}`, '_self');
+  const handleEmailResults = async () => {
+    if (emailingResults) return;
+    setEmailingResults(true);
+    try {
+      const response = await api.post('/api/v1/test-results/email');
+      alert(response.data?.message || 'Your results have been emailed to your registered address.');
+    } catch (err) {
+      alert(err?.uiMessage || 'We could not email your results right now. Please try again later.');
+    } finally {
+      setEmailingResults(false);
+    }
   };
 
   /* Loading / Error states */
@@ -699,9 +705,10 @@ const TestResults = () => {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
             Dashboard
           </button>
-          <button type="button" onClick={handleEmailResults}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
-            <Mail className="w-4 h-4" /> Email Results
+          <button type="button" onClick={handleEmailResults} disabled={emailingResults}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold bg-white border disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2" style={{ color: GOV.text, borderColor: GOV.borderLight }}>
+            {emailingResults ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+            {emailingResults ? 'Sending...' : 'Email Results'}
           </button>
         </>
       )}

@@ -67,9 +67,9 @@ module.exports = {
     const searchTerm = `%${query.trim()}%`;
     return await Occupation.findAll({
       where: {
-        [sequelize.Op.or]: [
-          { name: { [sequelize.Op.iLike]: searchTerm } },
-          { category: { [sequelize.Op.iLike]: searchTerm } }
+        [Op.or]: [
+          { name: { [Op.iLike]: searchTerm } },
+          { category: { [Op.iLike]: searchTerm } }
         ]
       },
       order: [['name', 'ASC']],

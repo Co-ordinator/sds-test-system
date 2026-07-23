@@ -107,19 +107,28 @@ const GlossaryPage = () => {
     }
   }, [categories, selectedCategory]);
 
-  // Handle text-to-speech
+  // Speech stays non-blocking: pressing the button again stops it, and
+  // navigating away cancels any active utterance.
   const speakText = (text) => {
-    if ('speechSynthesis' in window && !isSpeaking) {
-      setIsSpeaking(true);
-      window.speechSynthesis.cancel(); // Stop any previous speech
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+    if (!('speechSynthesis' in window)) return;
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
     }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
   };
+
+  useEffect(() => () => {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }, []);
 
   // Handle term selection
   const handleTermSelect = (term) => {
@@ -356,12 +365,11 @@ const GlossaryPage = () => {
                   <div>
                     <button
                       onClick={() => speakText(`${selectedTerm.term}. ${selectedTerm.definition}${selectedTerm.example ? `. Example: ${selectedTerm.example}` : ''}`)}
-                      disabled={isSpeaking}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      aria-label={isSpeaking ? 'Reading selected glossary term aloud' : 'Read selected glossary term aloud'}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      aria-label={isSpeaking ? 'Stop reading glossary term aloud' : 'Read selected glossary term aloud'}
                     >
                       <Volume2 className={`w-4 h-4 ${isSpeaking ? 'animate-pulse' : ''}`} />
-                      {isSpeaking ? 'Speaking...' : 'Read Aloud'}
+                      {isSpeaking ? 'Stop Reading' : 'Read Aloud'}
                     </button>
                   </div>
                 </div>

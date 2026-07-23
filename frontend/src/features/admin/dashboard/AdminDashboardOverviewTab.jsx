@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MapPin } from 'lucide-react';
+import { analyticsService } from '../../../services/analyticsService';
 import {
   Area,
   AreaChart,
@@ -111,7 +112,8 @@ const AdminDashboardOverviewTab = ({
     if (parts.length === 0) return 'No institutions matched current filters';
     return parts.join(' - ');
   }, [institutionTypeCounts]);
-  const engagementPct = totalUsers > 0 ? Math.round((totalCompleted / totalUsers) * 100) : 0;
+  const engagedUsers = analytics?.totals?.usersWithAssessments ?? totalCompleted;
+  const engagementPct = totalUsers > 0 ? Math.round((engagedUsers / totalUsers) * 100) : 0;
 
   const trendData = useMemo(
     () => trend.map(t => ({
@@ -121,6 +123,29 @@ const AdminDashboardOverviewTab = ({
     })),
     [trend]
   );
+
+  const [dailyTrend, setDailyTrend] = useState(null);
+  useEffect(() => {
+    let active = true;
+    const activeFilters = Object.fromEntries(
+      Object.entries(filters || {}).filter(([, value]) => value)
+    );
+    analyticsService.getTrend({ ...activeFilters, granularity: 'day' })
+      .then((rows) => { if (active) setDailyTrend(rows); })
+      .catch(() => { if (active) setDailyTrend(null); });
+    return () => { active = false; };
+  }, [filters]);
+
+  const adoptionData = useMemo(() => {
+    if (!dailyTrend?.length) return trendData;
+    return dailyTrend.map((row) => ({
+      month: row.month
+        ? new Date(row.month).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })
+        : '',
+      started: Number(row.total || 0),
+      completed: Number(row.completed || 0),
+    }));
+  }, [dailyTrend, trendData]);
 
   const regionalChartData = useMemo(
     () => (regionalData?.regions || []).map((r) => {
@@ -208,7 +233,7 @@ const AdminDashboardOverviewTab = ({
           title="User Engagement"
           value={`${engagementPct}%`}
           status={engagementPct >= 50 ? 'good' : engagementPct >= 25 ? 'warn' : 'bad'}
-          hint={`${totalCompleted} completions / ${totalUsers} users`}
+          hint={`${engagedUsers} users with started or completed attempts / ${totalUsers} users`}
         />
         <KpiCard
           title="Institutions"
@@ -265,11 +290,11 @@ const AdminDashboardOverviewTab = ({
         <div className="rounded-lg border bg-white p-4 xl:col-span-2" style={{ borderColor: GOV.border }}>
           <h3 className="mb-2 text-sm font-bold" style={{ color: GOV.text }}>Monthly SDS Adoption Trend</h3>
           <p className="mb-4 text-xs" style={{ color: GOV.textMuted }}>Track growth of test usage over time.</p>
-          {trendData.length === 0 ? <EmptyChart /> : (
+          {adoptionData.length === 0 ? <EmptyChart /> : (
             <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={trendData}>
+              <AreaChart data={adoptionData}>
                 <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                <XAxis dataKey="month" tick={{ fontSize: 8 }} interval={0} angle={-55} textAnchor="end" height={42} />
                 <YAxis tick={{ fontSize: 10 }} />
                 <Tooltip />
                 <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} />

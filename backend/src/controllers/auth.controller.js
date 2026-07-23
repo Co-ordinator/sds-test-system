@@ -57,12 +57,6 @@ const clearAccessTokenCookie = (res) => {
   res.clearCookie('accessToken', { ...ACCESS_COOKIE_OPTIONS(), maxAge: undefined });
 };
 
-const minutesFromMs = (value, fallbackMs) => {
-  const parsed = Number.parseInt(value, 10);
-  const ms = Number.isFinite(parsed) && parsed > 0 ? parsed : fallbackMs;
-  return Math.ceil(ms / 60000);
-};
-
 const resolveFrontendBaseUrl = (req) => {
   const configuredFrontendUrl = (process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
   const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0]?.trim();
@@ -99,7 +93,7 @@ const createEmailAudit = async (req, user, description, details = {}) => {
 
 const sendVerificationEmail = async (req, user, emailOtp, { subject, successDescription, failureDescription, successLogMessage, failureLogMessage }) => {
   const frontendBaseUrl = resolveFrontendBaseUrl(req);
-  const otpExpiresMinutes = minutesFromMs(process.env.EMAIL_OTP_TTL_MS, 10 * 60 * 1000);
+  const otpExpiresMinutes = authService.OTP_TTL_MINUTES;
 
   try {
     const delivery = await sendEmail({
@@ -154,7 +148,7 @@ const register = async (req, res, next) => {
 
     if (user.email) {
       emailResult = await sendVerificationEmail(req, user, emailOtp, {
-        subject: 'Welcome to SDS Test System - Verify Your Email',
+        subject: 'Self-Directed Search System Verification Code',
         successDescription: 'Welcome email sent',
         failureDescription: 'Failed to send welcome email',
         successLogMessage: `Welcome verification email sent to: ${maskEmailForLog(user.email)}`,
@@ -302,7 +296,7 @@ const forgotPassword = async (req, res, next) => {
 
     await sendEmail({
       email: user.email,
-      subject: 'Your SDS password reset code',
+      subject: 'Self-Directed Search System - Password Reset Code',
       template: 'reset-password-otp',
       context: {
         firstName: getEmailRecipientName(user),
@@ -392,6 +386,15 @@ const refreshToken = async (req, res, next) => {
     if (newRefreshToken) setRefreshTokenCookie(res, newRefreshToken);
     res.status(200).json({ status: 'success', token: newAccessToken });
   } catch (error) {
+    const terminalSessionFailure = [
+      'REFRESH_TOKEN_REUSED',
+      'INVALID_REFRESH_TOKEN',
+      'REFRESH_TOKEN_MISSING'
+    ].includes(error?.code);
+    if (terminalSessionFailure) {
+      clearRefreshTokenCookie(res);
+      clearAccessTokenCookie(res);
+    }
     if (error?.code === 'REFRESH_TOKEN_REUSED') {
       clearRefreshTokenCookie(res);
       clearAccessTokenCookie(res);
@@ -401,7 +404,7 @@ const refreshToken = async (req, res, next) => {
         req,
         details: { code: error.code }
       });
-    } else {
+    } else if (!terminalSessionFailure) {
       logger.error({ actionType: 'REFRESH_TOKEN_FAILED', message: 'Failed to refresh token', req, details: { code: error.code, error: error.message } });
     }
     next(error);
@@ -435,23 +438,8 @@ const exportUserData = async (req, res, next) => {
 
 const deleteUserAccount = async (req, res, next) => {
   try {
-    const { snapshot } = await authService.deleteUserAccount(req.user.id);
-    await AuditLog.create({
-      userId: snapshot.id,
-      actionType: 'SYSTEM',
-      description: 'User soft-deleted own account (PII scrubbed)',
-      details: {
-        resourceType: 'user',
-        resourceId: snapshot.id,
-        requestMethod: req.method,
-        requestPath: req.path,
-        emailHint: maskEmailForLog(snapshot.email),
-        role: snapshot.role
-      },
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    }).catch(() => {});
-    logger.info({ actionType: 'SYSTEM', message: `User account soft-deleted (PII scrubbed): ${maskEmailForLog(snapshot.email)}`, req, details: { userId: snapshot.id } });
+    await authService.deleteUserAccount(req.user.id);
+    logger.info({ actionType: 'SYSTEM', message: 'User account permanently deleted' });
     clearRefreshTokenCookie(res);
     clearAccessTokenCookie(res);
     res.status(200).json({ status: 'success', message: 'Account deleted successfully' });
@@ -490,7 +478,7 @@ const resendVerificationEmail = async (req, res, next) => {
     }
 
     const emailResult = await sendVerificationEmail(req, user, emailOtp, {
-      subject: 'Your SDS verification code',
+      subject: 'Self-Directed Search System Verification Code',
       successDescription: 'Verification email resent',
       failureDescription: 'Failed to resend verification email',
       successLogMessage: `Verification code resent to: ${maskEmailForLog(user.email)}`,

@@ -345,7 +345,7 @@ export default function VerifyOtp() {
               </div>
 
               <p className={`${TYPO.hint} text-center`} style={{ color: GOV.textHint }}>
-                Code expires in 15 minutes.
+                Code expires in 5 minutes.
               </p>
 
               <p className={`${TYPO.bodySmall} text-center mt-2`} style={{ color: GOV.textMuted }}>

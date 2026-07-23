@@ -226,10 +226,7 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
         throw new ValidationError(`Row ${rowNumber}: Each row must have at least first_name, last_name, or student_number.`);
       }
 
-      if (!nationalId) {
-        throw new ValidationError(`Row ${rowNumber}: national_id / PIN is required.`);
-      }
-      if (!/^\d{13}$/.test(nationalId)) {
+      if (nationalId && !/^\d{13}$/.test(nationalId)) {
         throw new ValidationError(`Row ${rowNumber}: national_id must be exactly 13 digits.`);
       }
 
@@ -347,7 +344,7 @@ const bulkCreateStudents = async (csvData, scopedInstitutionId = null) => {
           try {
             await sendEmail({
               email: c.email,
-              subject: 'Your Career Guidance System Login Details',
+              subject: 'Self-Directed Search System - Your Login Details',
               template: 'student-credentials',
               context: {
                 firstName: c.firstName,

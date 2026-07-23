@@ -212,8 +212,8 @@ const AdminUserDetailPage = () => {
               {/* Education & Institution */}
               <Section title="Education & Institution" icon={Building2}>
                 <Field label="Institution" value={user.institution?.name || user.institutionName} />
-                <Field label="School/University" value={user.institutionId} mono />
-                <Field label="Workplace" value={user.workplaceName || user.workplaceInstitution?.name} />
+                <Field label="School/University" value={user.institution?.name || user.currentInstitution} />
+                <Field label="Workplace" value={user.workplaceName || user.workplace?.name} />
                 <Field label="Current Occupation" value={user.currentOccupation} />
               </Section>
 

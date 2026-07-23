@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Directed Search System Account Created</title>
+  <style>
+    body { margin: 0; padding: 0; background: #eef3f8; color: #111827; font-family: Arial, Helvetica, sans-serif; line-height: 1.6; }
+    .wrapper { width: 100%; padding: 28px 12px; }
+    .container { max-width: 620px; margin: 0 auto; background: #ffffff; border: 1px solid #d8e1ea; border-radius: 12px; overflow: hidden; }
+    .topbar { height: 6px; background: linear-gradient(90deg, #2d8bc4 0 42%, #ffeb3b 42% 50%, #f44336 50% 58%, #ffeb3b 58% 66%, #2d8bc4 66% 100%); }
+    .header { padding: 24px 28px 18px; background: #ffffff; border-bottom: 1px solid #edf2f7; }
+    .eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #2d8bc4; }
+    h1 { margin: 0; font-size: 24px; line-height: 1.25; color: #07183d; }
+    .content { padding: 26px 28px 24px; }
+    .details { margin: 22px 0; border: 1px solid #b7cff0; border-radius: 12px; overflow: hidden; background: #ffffff; }
+    .details-title { margin: 0; padding: 14px 18px; background: #f7fbff; border-bottom: 1px solid #d8e7f1; font-size: 13px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #07183d; }
+    .row { padding: 13px 18px; border-bottom: 1px solid #edf2f7; }
+    .row:last-child { border-bottom: 0; }
+    .label { display: block; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; }
+    .value { display: block; margin-top: 3px; font-size: 15px; font-weight: 800; color: #07183d; word-break: break-word; }
+    .mono { font-family: "Courier New", monospace; }
+    .button { display: inline-block; margin: 10px 0 4px; padding: 11px 18px; border-radius: 8px; background: #2d8bc4; color: #ffffff !important; text-decoration: none; font-weight: 700; }
+    .security { margin-top: 18px; padding: 14px 16px; border-left: 4px solid #ffeb3b; background: #fffbeb; border-radius: 6px; font-size: 13px; color: #374151; }
+    .footer { padding: 18px 28px; background: #f8fafc; border-top: 1px solid #edf2f7; font-size: 12px; color: #6b7280; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="container">
+      <div class="topbar"></div>
+      <div class="header">
+        <p class="eyebrow">Account created</p>
+        <h1>Self-Directed Search System</h1>
+      </div>
+      <div class="content">
+        <p>Hello {{#if firstName}}{{firstName}}{{else}}there{{/if}},</p>
+        <p>Your {{role}} account has been created for the Self-Directed Search System.</p>
+
+        <div class="details">
+          <p class="details-title">Account details</p>
+          <div class="row">
+            <span class="label">Email / username</span>
+            <span class="value">{{email}}</span>
+          </div>
+          <div class="row">
+            <span class="label">Temporary password</span>
+            <span class="value mono">{{tempPassword}}</span>
+          </div>
+          <div class="row">
+            <span class="label">Role</span>
+            <span class="value">{{role}}</span>
+          </div>
+          {{#if organization}}
+          <div class="row">
+            <span class="label">Organisation</span>
+            <span class="value">{{organization}}</span>
+          </div>
+          {{/if}}
+        </div>
+
+        <a href="{{loginUrl}}" class="button">Sign in to the system</a>
+
+        <div class="security">
+          For security, change your temporary password after signing in. If you did not expect this account, contact the SDS system administrator.
+        </div>
+      </div>
+      <div class="footer">
+        <strong>Self-Directed Search System</strong><br>
+        Ministry of Labour and Social Security - Kingdom of Eswatini<br>
+        Powered by Datamatics Eswatini
+      </div>
+    </div>
+  </div>
+</body>
+</html>

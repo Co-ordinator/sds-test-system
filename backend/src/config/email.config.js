@@ -10,6 +10,9 @@ const parsePositiveInt = (value, fallback) => {
 
 const smtpPort = Number.parseInt(process.env.SMTP_PORT, 10);
 const smtpHost = process.env.SMTP_HOST;
+const smtpFromEmail = process.env.SMTP_FROM_EMAIL;
+const smtpFromName = process.env.SMTP_FROM_NAME || 'Self-Directed Search System';
+const smtpReplyTo = process.env.SMTP_REPLY_TO || smtpFromEmail;
 const maxConnections = parsePositiveInt(process.env.SMTP_MAX_CONNECTIONS, 1);
 const maxMessages = parsePositiveInt(process.env.SMTP_MAX_MESSAGES, 100);
 const retryAttempts = parsePositiveInt(process.env.SMTP_RETRY_ATTEMPTS, 2);
@@ -21,8 +24,19 @@ const connectionTimeoutMs = parsePositiveInt(process.env.SMTP_CONNECTION_TIMEOUT
 const greetingTimeoutMs = parsePositiveInt(process.env.SMTP_GREETING_TIMEOUT_MS, 10000);
 const socketTimeoutMs = parsePositiveInt(process.env.SMTP_SOCKET_TIMEOUT_MS, 20000);
 
+const resolveDkimConfig = () => {
+  const domainName = String(process.env.DKIM_DOMAIN_NAME || '').trim();
+  const keySelector = String(process.env.DKIM_KEY_SELECTOR || '').trim();
+  const privateKey = String(process.env.DKIM_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim();
+
+  if (!domainName || !keySelector || !privateKey) return null;
+  return { domainName, keySelector, privateKey };
+};
+
+const dkimConfig = resolveDkimConfig();
+
 // Create transporter
-const transporter = nodemailer.createTransport({
+const transporterOptions = {
   host: smtpHost,
   port: Number.isFinite(smtpPort) ? smtpPort : undefined,
   secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
@@ -36,7 +50,13 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS
   }
-});
+};
+
+if (dkimConfig) {
+  transporterOptions.dkim = dkimConfig;
+}
+
+const transporter = nodemailer.createTransport(transporterOptions);
 
 let hbsInitialized = false;
 let hbsInitPromise = null;
@@ -149,17 +169,123 @@ const sendWithRetry = async (mailOptions) => {
   throw lastError;
 };
 
+const buildPlainText = ({ subject, template, context = {} }) => {
+  const name = context.firstName || 'there';
+  const code = context.verificationCode || context.verificationOtp || '';
+  const minutes = context.otpExpiresMinutes || 'a few';
+  const loginUrl = context.loginUrl || process.env.FRONTEND_URL || '';
+
+  if (template === 'verify-email') {
+    return [
+      `Hello ${name},`,
+      '',
+      'Use this one-time verification code to complete your Self-Directed Search System registration:',
+      code,
+      '',
+      `This code expires in ${minutes} minutes.`,
+      'Return to the registration page and enter this code to continue.',
+      '',
+      'If you did not request this code, you can ignore this email.',
+      '',
+      'Self-Directed Search System',
+      'Ministry of Labour and Social Security - Kingdom of Eswatini'
+    ].join('\n');
+  }
+
+  if (template === 'reset-password-otp') {
+    return [
+      `Hello ${name},`,
+      '',
+      'Use this one-time code to reset your Self-Directed Search System account password:',
+      code,
+      '',
+      `This code expires in ${minutes} minutes.`,
+      '',
+      'If you did not request a password reset, you can ignore this email.',
+      '',
+      'Self-Directed Search System',
+      'Ministry of Labour and Social Security - Kingdom of Eswatini'
+    ].join('\n');
+  }
+
+  if (template === 'user-welcome') {
+    return [
+      `Hello ${name},`,
+      '',
+      `Your ${context.role || 'Self-Directed Search System'} account has been created for the Self-Directed Search System.`,
+      context.email ? `Username/email: ${context.email}` : '',
+      (context.tempPassword || context.password) ? `Temporary password: ${context.tempPassword || context.password}` : '',
+      loginUrl ? `Login: ${loginUrl}` : '',
+      '',
+      'You may be asked to change your password after signing in.',
+      '',
+      'Self-Directed Search System',
+      'Ministry of Labour and Social Security - Kingdom of Eswatini'
+    ].filter(Boolean).join('\n');
+  }
+
+  if (template === 'student-credentials') {
+    return [
+      `Hello ${name},`,
+      '',
+      'Your school has created Self-Directed Search System access credentials for you.',
+      context.studentCode ? `Login number: ${context.studentCode}` : '',
+      context.tempPassword ? `Temporary password: ${context.tempPassword}` : '',
+      loginUrl ? `Login: ${loginUrl}` : '',
+      '',
+      'Keep these details safe and change your password after signing in.',
+      '',
+      'Self-Directed Search System',
+      'Ministry of Labour and Social Security - Kingdom of Eswatini'
+    ].filter(Boolean).join('\n');
+  }
+
+  if (template === 'test-results') {
+    const recommendations = (context.recommendations || [])
+      .map((item) => `- ${item.title}: ${item.matchPercentage}% match (${item.field})`);
+    return [
+      `Hello ${name},`,
+      '',
+      'Your Self-Directed Search career assessment results are ready.',
+      context.hollandCode ? `Holland Code: ${context.hollandCode}` : '',
+      context.hollandLabel ? `Profile: ${context.hollandLabel}` : '',
+      '',
+      ...(recommendations.length > 0 ? ['Top career recommendations:', ...recommendations, ''] : []),
+      'Sign in to the SDS Career Assessment System to explore your full results.',
+      '',
+      'Self-Directed Search System',
+      'Ministry of Labour and Social Security - Kingdom of Eswatini'
+    ].filter((line) => line !== '').join('\n');
+  }
+
+  return [
+    subject || 'SDS Test System',
+    '',
+    'This is an automated message from the Self-Directed Search System, Ministry of Labour and Social Security.'
+  ].join('\n');
+};
+
 // Email sending function
 const sendEmail = async (options) => {
   // Lazy-load ESM handlebars plugin once (required for CommonJS).
   await ensureHandlebarsInitialized();
 
   const mailOptions = {
-    from: `"SDS Test System" <${process.env.SMTP_FROM_EMAIL}>`,
+    from: { name: smtpFromName, address: smtpFromEmail },
+    envelope: {
+      from: smtpFromEmail,
+      to: options.email
+    },
     to: options.email,
+    replyTo: smtpReplyTo,
     subject: options.subject,
     template: options.template,
-    context: options.context
+    context: options.context,
+    text: options.text || buildPlainText(options),
+    priority: 'normal',
+    headers: {
+      'Auto-Submitted': 'auto-generated'
+    }
   };
 
   try {

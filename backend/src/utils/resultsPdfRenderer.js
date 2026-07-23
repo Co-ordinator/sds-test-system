@@ -2,6 +2,10 @@
 
 const { drawLetterheadImage } = require('./pdfAssets');
 const { makeDisplayName, makeDisplayDescription } = require('./occupationDisplay');
+const { OFFICIAL_PROGRAM_TITLE } = require('../constants/brand');
+
+const MINISTRY_PHYSICAL_ADDRESS = 'Ministry of Labour and Social Security, Inter-Ministerial Office Block, Mhlambanyatsi Road, Mbabane, Eswatini.';
+const EXPECTED_RESULTS_PDF_PAGES = 3;
 
 const RIASEC_LABELS = {
   R: 'Realistic',
@@ -12,44 +16,43 @@ const RIASEC_LABELS = {
   C: 'Conventional'
 };
 
-const RIASEC_COLORS = {
-  R: '#c83232',
-  I: '#2563eb',
-  A: '#7c3aed',
-  S: '#059669',
-  E: '#d97706',
-  C: '#2d8bc4'
-};
-
 const RIASEC_SUMMARY = {
-  R: 'Practical, hands-on work with tools, equipment, plants, animals, machines, and physical tasks.',
-  I: 'Analytical work involving investigation, science, mathematics, research, and problem solving.',
-  A: 'Creative expression through design, writing, art, music, performance, language, and original ideas.',
-  S: 'Helping, teaching, supporting, advising, caring, and working closely with people.',
-  E: 'Leading, persuading, selling, organizing people, managing activities, and taking initiative.',
-  C: 'Structured work with records, numbers, systems, procedures, accuracy, and organized information.'
+  R: 'Practical interests involving tools, equipment, nature, and hands-on problem solving.',
+  I: 'Analytical interests involving research, science, mathematics, and investigation.',
+  A: 'Creative interests involving design, language, performance, and original expression.',
+  S: 'People-focused interests involving teaching, helping, advising, and community service.',
+  E: 'Leadership interests involving persuasion, business, initiative, and managing activities.',
+  C: 'Structured interests involving records, numbers, systems, accuracy, and organisation.'
 };
 
 const RIASEC_STRENGTHS = {
-  R: ['Practical', 'Technical', 'Physical tasks'],
-  I: ['Analytical', 'Scientific', 'Problem solving'],
-  A: ['Creative', 'Expressive', 'Original ideas'],
-  S: ['Supportive', 'Teaching', 'Service'],
-  E: ['Leadership', 'Persuasion', 'Business'],
-  C: ['Accurate', 'Organized', 'Data handling']
+  R: ['practical work', 'technical tasks', 'physical problem solving'],
+  I: ['analysis', 'research', 'scientific thinking'],
+  A: ['creativity', 'communication', 'original ideas'],
+  S: ['teaching', 'supporting others', 'advising people'],
+  E: ['leadership', 'persuasion', 'business initiative'],
+  C: ['accuracy', 'organisation', 'information handling']
 };
 
-const QUAL_LABELS = {
+const QUALIFICATION_LABELS = {
   certificate: 'Certificate',
   diploma: 'Diploma',
-  bachelor: "Bachelor's Degree",
-  honours: 'Honours Degree',
-  postgrad_diploma: 'Postgraduate Diploma',
-  masters: "Master's Degree",
+  bachelor: "Bachelor's degree",
+  honours: 'Honours degree',
+  postgrad_diploma: 'Postgraduate diploma',
+  masters: "Master's degree",
   doctorate: 'Doctorate',
-  short_course: 'Short Course',
-  tvet: 'TVET Programme',
+  short_course: 'Short course',
+  tvet: 'TVET programme',
   other: 'Qualification'
+};
+
+const DEMAND_LABELS = {
+  critical: 'Critical',
+  very_high: 'Very high',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low'
 };
 
 const USER_TYPE_LABELS = {
@@ -58,31 +61,23 @@ const USER_TYPE_LABELS = {
   professional: 'Professional'
 };
 
-const DEMAND_LABELS = {
-  critical: 'Critical demand',
-  very_high: 'Very high demand',
-  high: 'High demand',
-  medium: 'Medium demand',
-  low: 'Low demand'
-};
-
 const COLORS = {
-  navy: '#07183d',
-  navy2: '#102a5f',
-  blue: '#2d8bc4',
-  red: '#c83232',
-  yellow: '#ffeb3b',
-  text: '#111827',
-  muted: '#5f6b7a',
-  faint: '#f3f7fb',
-  border: '#d7e2ec',
+  navy: '#17324d',
+  blue: '#2b5d7d',
+  ink: '#202a33',
+  muted: '#5f6b76',
+  border: '#cbd3da',
+  pale: '#f4f6f8',
+  paleBlue: '#eef3f6',
   white: '#ffffff'
 };
 
 const PAGE = {
-  margin: 38,
   width: 595.28,
-  height: 841.89
+  height: 841.89,
+  margin: 46,
+  footerRuleY: 802,
+  footerTextY: 812
 };
 
 const contentWidth = () => PAGE.width - PAGE.margin * 2;
@@ -109,11 +104,15 @@ const clean = (value, fallback = 'Not available') => {
   return text || fallback;
 };
 
-const compact = (value, max = 120, fallback = 'Not available') => {
+const brief = (value, max = 140, fallback = 'Not available') => {
   const text = clean(value, fallback);
   if (text.length <= max) return text;
-  return `${text.slice(0, Math.max(0, max - 3)).trim()}...`;
+  const draft = text.slice(0, max - 1);
+  const breakAt = draft.lastIndexOf(' ');
+  return `${draft.slice(0, breakAt > max * 0.55 ? breakAt : max - 1).trim()}...`;
 };
+
+const unique = (values) => [...new Set((values || []).filter(Boolean))];
 
 const normalizeUserType = (value) => {
   const raw = String(value || '').toLowerCase().replace(/[^a-z]+/g, '_').replace(/^_|_$/g, '');
@@ -122,15 +121,6 @@ const normalizeUserType = (value) => {
   return 'high_school_student';
 };
 
-const formatDate = (value, fallback = '') => {
-  if (!value) return fallback || 'Not available';
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return fallback || 'Not available';
-  return date.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' });
-};
-
-const formatQualification = (value) => QUAL_LABELS[String(value || '').toLowerCase()] || clean(value, 'Qualification');
-
 const parseDisplayGroups = (code) => String(code || '')
   .toUpperCase()
   .trim()
@@ -138,250 +128,326 @@ const parseDisplayGroups = (code) => String(code || '')
   .flatMap((group) => {
     const cleaned = group.replace(/[^RIASEC/]/g, '');
     if (!cleaned) return [];
-    if (!cleaned.includes('/')) return cleaned.split('').filter((letter) => RIASEC_LABELS[letter]).map((letter) => [letter]);
-    return [cleaned.split('/').map((letter) => letter.trim()).filter((letter) => RIASEC_LABELS[letter])];
+    if (!cleaned.includes('/')) {
+      return cleaned.split('').filter((letter) => RIASEC_LABELS[letter]).map((letter) => [letter]);
+    }
+    return [cleaned.split('/').filter((letter) => RIASEC_LABELS[letter])];
   })
   .filter((group) => group.length > 0)
   .slice(0, 3);
 
-const scoreRowsFor = (assessment) => {
-  const order = ['R', 'I', 'A', 'S', 'E', 'C'];
-  return order.map((key) => ({
-    key,
-    label: RIASEC_LABELS[key],
-    score: Number(read(assessment, `score${key}`, 0) || 0),
-    color: RIASEC_COLORS[key]
-  }));
+const scoreRowsFor = (assessment) => ['R', 'I', 'A', 'S', 'E', 'C'].map((key) => ({
+  key,
+  label: RIASEC_LABELS[key],
+  score: Number(read(assessment, `score${key}`, 0) || 0)
+}));
+
+const themeCode = (group) => unique(group).join('/');
+const themeLabel = (group) => unique(group).map((letter) => RIASEC_LABELS[letter]).filter(Boolean).join(' / ');
+const themeSummary = (group) => unique(group).map((letter) => RIASEC_SUMMARY[letter]).filter(Boolean).join(' ');
+const themeStrengths = (group) => unique(group).flatMap((letter) => RIASEC_STRENGTHS[letter] || []);
+
+const setText = (doc, font = 'Helvetica', size = 8.5, color = COLORS.ink) => {
+  doc.font(font).fontSize(size).fillColor(color);
 };
 
-const courseInstitutions = (course, limit = 3) => {
-  const links = read(course, 'courseInstitutions', []) || [];
-  return links
+const drawBoundedText = (doc, value, x, y, width, height, options = {}) => {
+  setText(doc, options.font || 'Helvetica', options.size || 8.3, options.color || COLORS.ink);
+  doc.text(clean(value, options.fallback || ''), x, y, {
+    width,
+    height,
+    align: options.align || 'left',
+    lineGap: options.lineGap ?? 1,
+    ellipsis: options.ellipsis !== false
+  });
+};
+
+const drawRule = (doc, x, y, width, color = COLORS.border, lineWidth = 0.6) => {
+  doc.moveTo(x, y).lineTo(x + width, y).strokeColor(color).lineWidth(lineWidth).stroke();
+};
+
+const drawPhysicalAddress = (doc, x, y, width) => {
+  let fontSize = 8.5;
+  doc.font('Helvetica').fontSize(fontSize);
+  while (fontSize > 7 && doc.widthOfString(MINISTRY_PHYSICAL_ADDRESS) > width) {
+    fontSize -= 0.25;
+    doc.fontSize(fontSize);
+  }
+  drawBoundedText(doc, MINISTRY_PHYSICAL_ADDRESS, x, y, width, 13, {
+    size: fontSize,
+    color: '#374151',
+    align: 'center',
+    ellipsis: false
+  });
+  return y + 14;
+};
+
+const drawFirstPageHeader = (doc, generatedDateStr) => {
+  const margin = PAGE.margin;
+  const width = contentWidth();
+  const letterhead = drawLetterheadImage(doc, {
+    x: 0,
+    y: 18,
+    width: PAGE.width,
+    maxHeight: 118
+  });
+  const addressY = (letterhead ? letterhead.bottom : 132) + 2;
+  const addressBottom = drawPhysicalAddress(doc, margin, addressY, width);
+  const ruleY = Math.max(addressBottom + 3, 153);
+  drawRule(doc, margin, ruleY, width, COLORS.navy, 0.8);
+
+  drawBoundedText(doc, OFFICIAL_PROGRAM_TITLE, margin, ruleY + 10, width, 12, {
+    font: 'Helvetica-Bold', size: 8.8, color: COLORS.navy, align: 'center'
+  });
+  drawBoundedText(doc, 'SELF-DIRECTED SEARCH CAREER ASSESSMENT REPORT', margin, ruleY + 32, width, 18, {
+    font: 'Helvetica-Bold', size: 13, color: COLORS.ink, align: 'center'
+  });
+  drawBoundedText(doc, `Official results summary | Generated ${generatedDateStr}`, margin, ruleY + 52, width, 12, {
+    size: 8, color: COLORS.muted, align: 'center'
+  });
+  return ruleY + 74;
+};
+
+const drawContinuationHeader = (doc, title, subtitle, pageNumber) => {
+  const margin = PAGE.margin;
+  const width = contentWidth();
+  doc.rect(0, 0, PAGE.width, 4).fill(COLORS.navy);
+  drawBoundedText(doc, 'MINISTRY OF LABOUR AND SOCIAL SECURITY', margin, 24, width * 0.72, 12, {
+    font: 'Helvetica-Bold', size: 8, color: COLORS.navy
+  });
+  drawBoundedText(doc, title, margin, 39, width * 0.72, 16, {
+    font: 'Helvetica-Bold', size: 11.5, color: COLORS.ink
+  });
+  drawBoundedText(doc, subtitle, margin, 56, width * 0.78, 12, {
+    size: 7.8, color: COLORS.muted
+  });
+  drawBoundedText(doc, `PAGE ${pageNumber} OF ${EXPECTED_RESULTS_PDF_PAGES}`, margin, 29, width, 12, {
+    font: 'Helvetica-Bold', size: 7.5, color: COLORS.blue, align: 'right'
+  });
+  drawRule(doc, margin, 73, width);
+  return 86;
+};
+
+const drawSectionTitle = (doc, title, subtitle, x, y, width = contentWidth()) => {
+  drawBoundedText(doc, title.toUpperCase(), x, y, width, 14, {
+    font: 'Helvetica-Bold', size: 9.2, color: COLORS.navy
+  });
+  drawRule(doc, x, y + 16, width, COLORS.border);
+  if (subtitle) {
+    drawBoundedText(doc, subtitle, x, y + 22, width, 22, { size: 7.7, color: COLORS.muted });
+    return y + 48;
+  }
+  return y + 25;
+};
+
+const drawProfileGrid = (doc, items, x, y, width) => {
+  const height = 72;
+  const columns = 3;
+  const cellWidth = width / columns;
+  doc.rect(x, y, width, height).fillAndStroke(COLORS.white, COLORS.border);
+  items.slice(0, 6).forEach((item, index) => {
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const cellX = x + column * cellWidth;
+    const cellY = y + row * 36;
+    if (column > 0) doc.moveTo(cellX, cellY).lineTo(cellX, cellY + 36).strokeColor(COLORS.border).lineWidth(0.4).stroke();
+    if (row > 0) drawRule(doc, cellX, cellY, cellWidth, COLORS.border, 0.4);
+    drawBoundedText(doc, item.label.toUpperCase(), cellX + 9, cellY + 7, cellWidth - 18, 9, {
+      font: 'Helvetica-Bold', size: 6.8, color: COLORS.muted
+    });
+    drawBoundedText(doc, item.value, cellX + 9, cellY + 18, cellWidth - 18, 14, {
+      font: 'Helvetica-Bold', size: 8.2, color: COLORS.ink
+    });
+  });
+  return y + height;
+};
+
+const drawCodeSummary = (doc, code, labels, audienceFocus, x, y, width) => {
+  const height = 78;
+  const codeWidth = 134;
+  doc.rect(x, y, width, height).fillAndStroke(COLORS.paleBlue, COLORS.border);
+  drawBoundedText(doc, 'HOLLAND CODE', x + 14, y + 12, codeWidth - 28, 10, {
+    font: 'Helvetica-Bold', size: 7, color: COLORS.muted, align: 'center'
+  });
+  drawBoundedText(doc, code, x + 14, y + 28, codeWidth - 28, 30, {
+    font: 'Helvetica-Bold', size: 21, color: COLORS.navy, align: 'center'
+  });
+  doc.moveTo(x + codeWidth, y + 11).lineTo(x + codeWidth, y + height - 11).strokeColor(COLORS.border).lineWidth(0.6).stroke();
+  drawBoundedText(doc, labels, x + codeWidth + 14, y + 12, width - codeWidth - 28, 17, {
+    font: 'Helvetica-Bold', size: 9.2, color: COLORS.ink
+  });
+  drawBoundedText(doc, audienceFocus, x + codeWidth + 14, y + 34, width - codeWidth - 28, 32, {
+    size: 8.1, color: COLORS.muted, lineGap: 1.1
+  });
+  return y + height;
+};
+
+const drawScoreProfile = (doc, scoreRows, x, y, width) => {
+  const sorted = [...scoreRows].sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
+  const maxScore = Math.max(...sorted.map((row) => row.score), 1);
+  const labelWidth = 106;
+  const scoreWidth = 35;
+  const barWidth = width - labelWidth - scoreWidth - 18;
+  sorted.forEach((row, index) => {
+    const rowY = y + index * 29;
+    drawBoundedText(doc, `${row.key}  ${row.label}`, x, rowY + 4, labelWidth, 13, {
+      font: index < 3 ? 'Helvetica-Bold' : 'Helvetica',
+      size: 8.1,
+      color: COLORS.ink
+    });
+    doc.rect(x + labelWidth, rowY + 7, barWidth, 8).fill(COLORS.pale);
+    const fillWidth = Math.max(2, barWidth * (row.score / maxScore));
+    doc.rect(x + labelWidth, rowY + 7, fillWidth, 8).fill(index < 3 ? COLORS.navy : COLORS.blue);
+    drawBoundedText(doc, String(row.score), x + width - scoreWidth, rowY + 3, scoreWidth, 14, {
+      font: 'Helvetica-Bold', size: 8.2, color: COLORS.ink, align: 'right'
+    });
+    drawRule(doc, x, rowY + 24, width, COLORS.pale, 0.4);
+  });
+  return y + sorted.length * 29;
+};
+
+const drawFixedTable = (doc, { x, y, width, columns, rows, rowHeight, emptyMessage }) => {
+  const headerHeight = 23;
+  doc.rect(x, y, width, headerHeight).fillAndStroke(COLORS.navy, COLORS.navy);
+  let columnX = x;
+  columns.forEach((column) => {
+    drawBoundedText(doc, column.label, columnX + 6, y + 7, column.width - 12, 10, {
+      font: 'Helvetica-Bold', size: 7, color: COLORS.white,
+      align: column.align || 'left'
+    });
+    columnX += column.width;
+  });
+
+  const displayRows = rows.length ? rows : [{ __empty: emptyMessage || 'No information is currently available.' }];
+  displayRows.forEach((row, index) => {
+    const rowY = y + headerHeight + index * rowHeight;
+    doc.rect(x, rowY, width, rowHeight).fillAndStroke(index % 2 === 0 ? COLORS.white : COLORS.pale, COLORS.border);
+    if (row.__empty) {
+      drawBoundedText(doc, row.__empty, x + 9, rowY + 10, width - 18, rowHeight - 18, {
+        size: 8.2, color: COLORS.muted
+      });
+      return;
+    }
+    let cellX = x;
+    columns.forEach((column) => {
+      drawBoundedText(doc, row[column.key] ?? '', cellX + 6, rowY + 7, column.width - 12, rowHeight - 13, {
+        font: column.font || 'Helvetica',
+        size: column.size || 7.5,
+        color: column.color || COLORS.ink,
+        align: column.align || 'left',
+        lineGap: 0.8
+      });
+      cellX += column.width;
+    });
+  });
+  return y + headerHeight + displayRows.length * rowHeight;
+};
+
+const normalizeOccupations = (recommendations) => {
+  const output = [];
+  const seen = new Set();
+  for (const occupation of recommendations.occupations || []) {
+    const displayName = read(occupation, 'displayName') || makeDisplayName(read(occupation, 'name'));
+    const key = clean(displayName, '').toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    output.push({
+      name: displayName,
+      code: (() => {
+        const codes = read(occupation, 'hollandCodes', []);
+        if (Array.isArray(codes) && codes.length) return codes.slice(0, 2).join(', ');
+        return clean(read(occupation, 'code') || read(occupation, 'primaryRiasec'), 'RIASEC');
+      })(),
+      demand: (() => {
+        const demand = read(occupation, 'localDemand') || read(occupation, 'demandLevel');
+        return demand ? DEMAND_LABELS[demand] || clean(demand) : 'Not listed';
+      })(),
+      description: brief(
+        read(occupation, 'displayDescription') || makeDisplayDescription(occupation, displayName),
+        145
+      )
+    });
+    if (output.length >= 5) break;
+  }
+  return output;
+};
+
+const normalizeCourses = (recommendations) => (recommendations.courses || []).slice(0, 4).map((course) => {
+  const institutions = (read(course, 'courseInstitutions', []) || [])
     .map((entry) => read(entry, 'institution'))
     .filter(Boolean)
     .map((institution) => clean(read(institution, 'name'), 'Institution'))
-    .slice(0, limit);
-};
-
-const courseRequirements = (course, limit = 4) => {
-  const requirements = read(course, 'requirements', []) || [];
-  return requirements
-    .slice(0, limit)
-    .map((req) => {
-      const subject = clean(read(req, 'subject'), 'Subject');
-      const grade = clean(read(req, 'minimumGrade'), 'required grade');
-      return `${subject}: ${grade}`;
-    });
-};
-
-const occupationCodes = (occupation) => {
-  const codes = read(occupation, 'hollandCodes', []);
-  if (Array.isArray(codes) && codes.length > 0) return codes.slice(0, 3).join(', ');
-  return clean(read(occupation, 'code') || read(occupation, 'primaryRiasec'), 'RIASEC');
-};
-
-const uniqueValues = (values) => [...new Set((values || []).filter(Boolean))];
-
-const themeCode = (group) => uniqueValues(group).join('/');
-
-const themeLabel = (group) => uniqueValues(group)
-  .map((letter) => RIASEC_LABELS[letter])
-  .filter(Boolean)
-  .join('/');
-
-const themeSummary = (group) => uniqueValues(group)
-  .map((letter) => RIASEC_SUMMARY[letter])
-  .filter(Boolean)
-  .join(' Also: ');
-
-const themeStrengths = (group) => uniqueValues(group)
-  .flatMap((letter) => RIASEC_STRENGTHS[letter] || [])
-  .filter(Boolean);
-
-const addSwaziStrip = (doc, y) => {
-  const x = 0;
-  const w = PAGE.width;
-  doc.rect(x, y, w, 4).fill(COLORS.blue);
-  doc.rect(x + w * 0.42, y, 42, 4).fill(COLORS.yellow);
-  doc.rect(x + w * 0.49, y, 54, 4).fill(COLORS.red);
-  doc.rect(x + w * 0.58, y, 42, 4).fill(COLORS.yellow);
-};
-
-const textBlock = (doc, value, x, y, width, height, options = {}) => {
-  doc
-    .font(options.font || 'Helvetica')
-    .fontSize(options.size || 8.5)
-    .fillColor(options.color || COLORS.text)
-    .text(clean(value, ''), x, y, {
-      width,
-      height,
-      lineGap: options.lineGap ?? 1.2,
-      ellipsis: true,
-      align: options.align || 'left'
-    });
-};
-
-const label = (doc, value, x, y, options = {}) => {
-  doc
-    .font(options.font || 'Helvetica-Bold')
-    .fontSize(options.size || 8)
-    .fillColor(options.color || COLORS.muted)
-    .text(value, x, y, { width: options.width || 140, height: options.height || 12, ellipsis: true });
-};
-
-const card = (doc, x, y, w, h, options = {}) => {
-  doc
-    .roundedRect(x, y, w, h, options.radius ?? 7)
-    .fillAndStroke(options.fill || COLORS.white, options.stroke || COLORS.border);
-};
-
-const pill = (doc, value, x, y, options = {}) => {
-  const fontSize = options.size || 7.4;
-  doc.font('Helvetica-Bold').fontSize(fontSize);
-  const w = Math.min(options.maxWidth || 132, doc.widthOfString(value) + 16);
-  doc.roundedRect(x, y, w, 16, 8).fillAndStroke(options.fill || COLORS.faint, options.stroke || COLORS.border);
-  doc.fillColor(options.color || COLORS.text).text(value, x + 8, y + 4, { width: w - 16, height: 9, ellipsis: true });
-  return w;
-};
-
-const sectionTitle = (doc, title, subtitle, x, y, w = contentWidth()) => {
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.navy).text(title, x, y, { width: w, height: 16, ellipsis: true });
-  if (subtitle) {
-    doc.font('Helvetica').fontSize(8.2).fillColor(COLORS.muted).text(subtitle, x, y + 16, { width: w, height: 18, ellipsis: true });
-    return y + 38;
-  }
-  return y + 24;
-};
-
-const pageShell = (doc, title, subtitle, pageNo, totalPages, options = {}) => {
-  const m = PAGE.margin;
-  const w = contentWidth();
-
-  if (options.officialHeader) {
-    const letterhead = drawLetterheadImage(doc, {
-      x: 0,
-      y: 18,
-      width: doc.page.width,
-      maxHeight: 132
-    });
-    const titleY = letterhead ? Math.max(letterhead.bottom + 10, 160) : 58;
-
-    doc.font('Helvetica-Bold').fontSize(12).fillColor(COLORS.text)
-      .text(title, m, titleY, { width: w, align: 'center' });
-    doc.font('Helvetica').fontSize(7.5).fillColor(COLORS.muted)
-      .text(subtitle, m, titleY + 14, { width: w, align: 'center' });
-    const ruleY = titleY + 24;
-    doc.moveTo(m, ruleY).lineTo(m + w, ruleY).strokeColor(COLORS.border).lineWidth(0.6).stroke();
-    return ruleY + 14;
-  }
-
-  addSwaziStrip(doc, 0);
-  const letterhead = drawLetterheadImage(doc, { x: m, y: 20, width: 198, maxHeight: 52, align: 'left' });
-
-  if (!letterhead) {
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.navy).text('KINGDOM OF ESWATINI', m, 26, { width: 180 });
-    doc.font('Helvetica').fontSize(7).fillColor(COLORS.muted).text('Ministry of Labour & Social Security', m, 38, { width: 180 });
-  }
-
-  doc.moveTo(m, 80).lineTo(m + w, 80).strokeColor(COLORS.border).lineWidth(0.7).stroke();
-  doc.font('Helvetica-Bold').fontSize(13).fillColor(COLORS.navy).text(title, m, 94, { width: w * 0.78, height: 18, ellipsis: true });
-  doc.font('Helvetica').fontSize(7.8).fillColor(COLORS.muted).text(subtitle, m, 112, { width: w * 0.76, height: 14, ellipsis: true });
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.blue)
-    .text(`PAGE ${pageNo} OF ${totalPages}`, m, 97, { width: w, align: 'right', lineBreak: false });
-  return 138;
-};
-
-const drawScoreBars = (doc, rows, x, y, w, h) => {
-  card(doc, x, y, w, h, { fill: '#fbfdff' });
-  label(doc, 'RIASEC SCORE PROFILE', x + 14, y + 12, { color: COLORS.blue, width: w - 28 });
-  const max = Math.max(...rows.map((row) => row.score), 1);
-  rows.forEach((row, index) => {
-    const rowY = y + 34 + index * 22;
-    const pct = row.score / max;
-    doc.roundedRect(x + 14, rowY + 8, w - 86, 7, 3.5).fill('#e7eef6');
-    doc.roundedRect(x + 14, rowY + 8, Math.max(3, (w - 86) * pct), 7, 3.5).fill(row.color);
-    doc.font('Helvetica-Bold').fontSize(8.2).fillColor(row.color).text(row.key, x + 14, rowY - 1, { width: 16 });
-    doc.font('Helvetica').fontSize(7.6).fillColor(COLORS.text).text(row.label, x + 34, rowY, { width: 94, height: 10, ellipsis: true });
-    doc.font('Helvetica-Bold').fontSize(8.2).fillColor(COLORS.text).text(String(row.score), x + w - 42, rowY, { width: 28, align: 'right' });
-  });
-};
-
-const drawCodeCard = (doc, groups, labelsText, x, y, w, h) => {
-  card(doc, x, y, w, h, { fill: COLORS.navy, stroke: COLORS.navy });
-  label(doc, 'HOLLAND CODE', x + 16, y + 14, { color: COLORS.yellow, width: w - 32 });
-  let codeX = x + 16;
-  groups.forEach((group) => {
-    const value = group.join('/');
-    doc.font('Helvetica-Bold').fontSize(22);
-    const chipW = Math.max(42, doc.widthOfString(value) + 20);
-    doc.roundedRect(codeX, y + 34, chipW, 38, 7).fillAndStroke(COLORS.white, '#ffffff');
-    doc.fillColor(COLORS.navy).text(value, codeX, y + 42, { width: chipW, align: 'center' });
-    codeX += chipW + 8;
-  });
-  textBlock(doc, labelsText, x + 16, y + 82, w - 32, h - 94, { color: '#dbeafe', size: 8.8, font: 'Helvetica-Bold' });
-};
-
-const drawInfoRow = (doc, title, value, x, y, w) => {
-  label(doc, title.toUpperCase(), x, y, { width: w, color: COLORS.blue, size: 7.2 });
-  textBlock(doc, value, x, y + 11, w, 18, { size: 8.7, font: 'Helvetica-Bold', color: COLORS.text });
-};
-
-const drawOccupationCard = (doc, occupation, index, x, y, w, h) => {
-  const demand = read(occupation, 'localDemand') || read(occupation, 'demandLevel');
-  const demandText = demand ? DEMAND_LABELS[demand] || clean(demand) : 'Demand not listed';
-  const primary = clean(read(occupation, 'primaryRiasec') || occupationCodes(occupation), 'R');
-  const displayName = read(occupation, 'displayName') || makeDisplayName(read(occupation, 'name'));
-  const displayDescription = read(occupation, 'displayDescription') || makeDisplayDescription(occupation, displayName);
-  card(doc, x, y, w, h, { fill: '#fbfdff' });
-  doc.roundedRect(x + 10, y + 11, 26, 26, 6).fillAndStroke(RIASEC_COLORS[primary[0]] || COLORS.blue, RIASEC_COLORS[primary[0]] || COLORS.blue);
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.white).text(String(index + 1), x + 10, y + 19, { width: 26, align: 'center' });
-  textBlock(doc, displayName, x + 44, y + 9, w - 54, 20, { font: 'Helvetica-Bold', size: 9.2, color: COLORS.navy });
-  textBlock(doc, `${occupationCodes(occupation)} | ${demandText}`, x + 44, y + 30, w - 54, 12, { size: 7.4, color: COLORS.blue, font: 'Helvetica-Bold' });
-  textBlock(doc, displayDescription, x + 10, y + 48, w - 20, 34, { size: 7.8, color: COLORS.muted });
-};
-
-const drawCourseCard = (doc, course, index, x, y, w, h) => {
-  const qualification = formatQualification(read(course, 'qualificationType'));
+    .slice(0, 2);
+  const requirements = (read(course, 'requirements', []) || []).slice(0, 2).map((requirement) => (
+    `${clean(read(requirement, 'subject'), 'Subject')}: ${clean(read(requirement, 'minimumGrade'), 'required grade')}`
+  ));
   const duration = read(course, 'durationYears') ? `${read(course, 'durationYears')} year(s)` : 'Duration varies';
-  const institutions = courseInstitutions(course, 2);
-  const requirements = courseRequirements(course, 3);
-  card(doc, x, y, w, h, { fill: '#fbfdff' });
-  doc.font('Helvetica-Bold').fontSize(7.8).fillColor(COLORS.blue).text(String(index + 1).padStart(2, '0'), x + 10, y + 11, { width: 20 });
-  textBlock(doc, read(course, 'name'), x + 34, y + 8, w - 44, 18, { font: 'Helvetica-Bold', size: 8.9, color: COLORS.navy });
-  textBlock(doc, `${qualification} | ${duration}${read(course, 'fundingPriority') ? ' | Priority field' : ''}`, x + 34, y + 27, w - 44, 12, { size: 7.3, color: COLORS.blue, font: 'Helvetica-Bold' });
-  const detail = [
-    institutions.length ? `Institutions: ${institutions.join(', ')}` : 'Institution links: confirm with counselor',
-    requirements.length ? `Entry: ${requirements.join('; ')}` : 'Entry: confirm latest requirements'
-  ].join('   ');
-  textBlock(doc, detail, x + 10, y + 43, w - 20, h - 48, { size: 7.3, color: COLORS.muted });
+  const notes = [
+    institutions.length ? institutions.join(', ') : 'Confirm institution availability',
+    requirements.length ? `Entry: ${requirements.join('; ')}` : 'Confirm current entry requirements'
+  ].join(' | ');
+  return {
+    pathway: clean(read(course, 'name'), 'Study pathway'),
+    qualification: `${QUALIFICATION_LABELS[String(read(course, 'qualificationType') || '').toLowerCase()] || clean(read(course, 'qualificationType'), 'Qualification')} | ${duration}`,
+    funding: read(course, 'fundingPriority') ? 'Priority field' : 'General',
+    notes: brief(notes, 155)
+  };
+});
+
+const drawInfoPanel = (doc, title, body, x, y, width, height) => {
+  doc.rect(x, y, width, height).fillAndStroke(COLORS.pale, COLORS.border);
+  drawBoundedText(doc, title.toUpperCase(), x + 11, y + 10, width - 22, 12, {
+    font: 'Helvetica-Bold', size: 7.4, color: COLORS.navy
+  });
+  drawBoundedText(doc, body, x + 11, y + 29, width - 22, height - 39, {
+    size: 8, color: COLORS.ink, lineGap: 1.1
+  });
 };
 
-const drawActionItem = (doc, number, title, text, x, y, w, h) => {
-  card(doc, x, y, w, h, { fill: '#fbfdff' });
-  doc.roundedRect(x + 10, y + 12, 28, 28, 7).fillAndStroke(COLORS.navy, COLORS.navy);
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.yellow).text(String(number).padStart(2, '0'), x + 10, y + 21, { width: 28, align: 'center' });
-  textBlock(doc, title, x + 48, y + 10, w - 58, 14, { font: 'Helvetica-Bold', size: 9.2, color: COLORS.navy });
-  textBlock(doc, text, x + 48, y + 28, w - 58, h - 32, { size: 7.9, color: COLORS.muted });
+const drawActionSteps = (doc, steps, x, y, width) => {
+  const rowHeight = 43;
+  steps.slice(0, 5).forEach((step, index) => {
+    const rowY = y + index * rowHeight;
+    doc.circle(x + 13, rowY + 15, 10).fill(COLORS.navy);
+    drawBoundedText(doc, String(index + 1), x + 6, rowY + 9, 14, 12, {
+      font: 'Helvetica-Bold', size: 8, color: COLORS.white, align: 'center'
+    });
+    drawBoundedText(doc, step.title, x + 31, rowY + 4, width - 31, 13, {
+      font: 'Helvetica-Bold', size: 8.5, color: COLORS.ink
+    });
+    drawBoundedText(doc, step.body, x + 31, rowY + 18, width - 31, 20, {
+      size: 7.7, color: COLORS.muted
+    });
+    drawRule(doc, x + 31, rowY + 40, width - 31, COLORS.pale, 0.4);
+  });
+  return y + steps.slice(0, 5).length * rowHeight;
 };
 
-const drawPills = (doc, items, x, y, w, maxRows = 2) => {
-  let px = x;
-  let py = y;
-  let rows = 1;
-  for (const item of items) {
-    doc.font('Helvetica-Bold').fontSize(7.4);
-    const value = compact(item, 32);
-    const pillW = Math.min(132, doc.widthOfString(value) + 16);
-    if (px + pillW > x + w) {
-      rows += 1;
-      if (rows > maxRows) break;
-      px = x;
-      py += 20;
-    }
-    pill(doc, value, px, py, { fill: COLORS.white, stroke: COLORS.border, color: COLORS.navy });
-    px += pillW + 6;
+const drawFooters = (doc) => {
+  const range = doc.bufferedPageRange();
+  if (range.count !== EXPECTED_RESULTS_PDF_PAGES) {
+    throw new Error(`Results PDF must contain exactly ${EXPECTED_RESULTS_PDF_PAGES} pages; rendered ${range.count}.`);
   }
-  return py + 20;
+
+  for (let pageIndex = 0; pageIndex < range.count; pageIndex += 1) {
+    doc.switchToPage(range.start + pageIndex);
+    const originalBottomMargin = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    drawRule(doc, PAGE.margin, PAGE.footerRuleY, contentWidth(), COLORS.border, 0.5);
+    drawBoundedText(
+      doc,
+      `SDS Career Assessment System | ${OFFICIAL_PROGRAM_TITLE}`,
+      PAGE.margin,
+      PAGE.footerTextY,
+      contentWidth() * 0.78,
+      10,
+      { size: 7, color: COLORS.muted, ellipsis: false }
+    );
+    drawBoundedText(doc, `Page ${pageIndex + 1} of ${range.count}`, PAGE.margin, PAGE.footerTextY, contentWidth(), 10, {
+      font: 'Helvetica-Bold', size: 7, color: COLORS.navy, align: 'right', ellipsis: false
+    });
+    doc.page.margins.bottom = originalBottomMargin;
+  }
 };
 
 const renderResultsPdf = (doc, context) => {
@@ -393,238 +459,195 @@ const renderResultsPdf = (doc, context) => {
     completedDate
   } = context;
 
+  const margin = PAGE.margin;
+  const width = contentWidth();
   const student = read(assessment, 'user', {}) || {};
   const userType = normalizeUserType(read(student, 'userType'));
-  const userTypeLabel = USER_TYPE_LABELS[userType] || read(recommendations, 'audience')?.label || 'Test taker';
-  const audienceFocus = read(recommendations, 'audience')?.focusMessage || 'Use these results as a guide for career and education planning.';
+  const userTypeLabel = USER_TYPE_LABELS[userType] || 'Test taker';
   const rawCode = read(assessment, 'hollandCodeDisplay') || read(assessment, 'hollandCode') || '';
-  const codeGroups = parseDisplayGroups(rawCode);
   const scoreRows = scoreRowsFor(assessment);
   const sortedScores = [...scoreRows].sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
-  const fallbackGroups = sortedScores.slice(0, 3).map((row) => [row.key]);
-  const displayGroups = codeGroups.length ? codeGroups : fallbackGroups;
-  const labelsText = displayGroups.map((group) => group.map((letter) => RIASEC_LABELS[letter]).join('/')).join(' - ');
-  const topThemeGroups = displayGroups.slice(0, 3);
-  const occupations = [];
-  const seenOccupationNames = new Set();
-  for (const occupation of recommendations.occupations || []) {
-    const displayName = read(occupation, 'displayName') || makeDisplayName(read(occupation, 'name'));
-    const displayDescription = read(occupation, 'displayDescription') || makeDisplayDescription(occupation, displayName);
-    const dedupeKey = displayName.toLowerCase();
-    if (seenOccupationNames.has(dedupeKey)) continue;
-    seenOccupationNames.add(dedupeKey);
-    if (typeof occupation.setDataValue === 'function') {
-      occupation.setDataValue('displayName', displayName);
-      occupation.setDataValue('displayDescription', displayDescription);
-    } else {
-      occupation.displayName = displayName;
-      occupation.displayDescription = displayDescription;
-    }
-    occupations.push(occupation);
-    if (occupations.length >= 6) break;
-  }
-  const courses = (recommendations.courses || []).slice(0, 5);
-  const subjects = (recommendations.suggestedSubjects || []).slice(0, 12);
+  const displayGroups = parseDisplayGroups(rawCode).length
+    ? parseDisplayGroups(rawCode)
+    : sortedScores.slice(0, 3).map((row) => [row.key]);
+  const displayCode = displayGroups.map(themeCode).join(' ') || clean(rawCode);
+  const labelsText = displayGroups.map(themeLabel).join(' - ');
+  const audienceFocus = read(recommendations, 'audience')?.focusMessage
+    || 'Use these results as structured guidance for career and education planning.';
+  const occupations = normalizeOccupations(recommendations);
+  const courses = normalizeCourses(recommendations);
+  const subjects = (recommendations.suggestedSubjects || []).slice(0, 8).map((subject) => clean(subject));
   const funding = recommendations.fundingAlignment || null;
-  const m = PAGE.margin;
-  const w = contentWidth();
-  const totalPages = 4;
 
-  let y = pageShell(
+  // Page 1: official summary and score profile.
+  let y = drawFirstPageHeader(doc, generatedDateStr);
+  y = drawProfileGrid(doc, [
+    { label: 'Prepared for', value: studentName },
+    { label: 'Profile group', value: userTypeLabel },
+    { label: 'Assessment status', value: 'Completed' },
+    { label: 'Completed', value: completedDate },
+    { label: 'Generated', value: generatedDateStr },
+    { label: 'Report reference', value: clean(read(assessment, 'id')).slice(0, 13).toUpperCase() }
+  ], margin, y, width) + 12;
+  y = drawCodeSummary(doc, displayCode, labelsText, audienceFocus, margin, y, width) + 14;
+  y = drawSectionTitle(doc, 'What your result means', null, margin, y);
+  doc.rect(margin, y, width, 55).fillAndStroke(COLORS.white, COLORS.border);
+  drawBoundedText(
     doc,
-    'CAREER ASSESSMENT REPORT',
-    `Detailed personalized results - Generated: ${generatedDateStr}`,
-    1,
-    totalPages,
-    { officialHeader: true }
+    `Your Holland Code summarises the strongest patterns in your interests and self-reported abilities. Codes separated by a slash are tied and should be considered together. The result supports informed discussion; it does not make a career decision for you.`,
+    margin + 11,
+    y + 10,
+    width - 22,
+    37,
+    { size: 8.2, color: COLORS.ink, lineGap: 1.2 }
   );
-  const leftW = 252;
-  const rightW = w - leftW - 16;
-  card(doc, m, y, leftW, 126, { fill: '#fbfdff' });
-  label(doc, 'PREPARED FOR', m + 14, y + 14, { color: COLORS.blue });
-  textBlock(doc, studentName, m + 14, y + 29, leftW - 28, 20, { font: 'Helvetica-Bold', size: 12, color: COLORS.navy });
-  drawInfoRow(doc, 'Profile', userTypeLabel, m + 14, y + 58, 110);
-  drawInfoRow(doc, 'Completed', completedDate, m + 132, y + 58, 102);
-  drawInfoRow(doc, 'Generated', generatedDateStr, m + 14, y + 91, 110);
-  drawInfoRow(doc, 'Report ID', read(assessment, 'id'), m + 132, y + 91, 102);
-  drawCodeCard(doc, displayGroups, labelsText, m + leftW + 16, y, rightW, 126);
-
-  y += 148;
-  drawScoreBars(doc, scoreRows, m, y, 228, 172);
-  card(doc, m + 244, y, w - 244, 172, { fill: '#fbfdff' });
-  label(doc, 'KEY INTERPRETATION', m + 258, y + 14, { color: COLORS.blue, width: w - 272 });
-  textBlock(doc, audienceFocus, m + 258, y + 30, w - 272, 34, { size: 8.4, color: COLORS.muted });
-  topThemeGroups.forEach((group, index) => {
-    const letters = uniqueValues(group);
-    const leadLetter = letters[0];
-    const codeText = themeCode(letters);
-    const labelText = themeLabel(letters);
-    const summaryText = themeSummary(letters);
-    const boxY = y + 72 + index * 31;
-    doc.roundedRect(m + 258, boxY, 32, 24, 6).fill(RIASEC_COLORS[leadLetter] || COLORS.blue);
-    doc.font('Helvetica-Bold').fontSize(codeText.length > 1 ? 8 : 9).fillColor(COLORS.white).text(codeText, m + 258, boxY + 7, { width: 32, align: 'center' });
-    textBlock(doc, labelText, m + 298, boxY, 132, 12, { font: 'Helvetica-Bold', size: 8.4, color: COLORS.navy });
-    textBlock(doc, summaryText, m + 298, boxY + 13, w - 312, 18, { size: 7.4, color: COLORS.muted });
-  });
-
-  y += 196;
-  y = sectionTitle(doc, 'What this result is useful for', 'Use the result to focus your discussion, not to make final decisions automatically.', m, y);
-  const useCards = [
-    ['Career direction', 'Shortlist career environments that fit your interests and abilities.'],
-    ['Study planning', 'Compare subjects, courses, entry requirements, and institutions.'],
-    ['Counseling', 'Take this report to a counselor, teacher, parent, or mentor for planning.']
-  ];
-  const useW = (w - 20) / 3;
-  useCards.forEach(([title, body], index) => {
-    const x = m + index * (useW + 10);
-    card(doc, x, y, useW, 80, { fill: index === 0 ? '#fefce8' : '#fbfdff' });
-    textBlock(doc, title, x + 12, y + 14, useW - 24, 14, { font: 'Helvetica-Bold', size: 9, color: COLORS.navy });
-    textBlock(doc, body, x + 12, y + 32, useW - 24, 36, { size: 7.8, color: COLORS.muted });
-  });
-
-  doc.addPage();
-  y = pageShell(doc, 'PROFILE MEANING AND CAREER MATCHES', 'Top themes and occupations aligned to your SDS profile', 2, totalPages);
-  y = sectionTitle(doc, 'Your strongest Holland themes', labelsText, m, y);
-  const themeW = (w - 20) / 3;
-  topThemeGroups.forEach((group, index) => {
-    const letters = uniqueValues(group);
-    const leadLetter = letters[0];
-    const codeText = themeCode(letters);
-    const labelText = themeLabel(letters);
-    const strengthsText = uniqueValues(themeStrengths(letters)).slice(0, 4).join(' | ');
-    const summaryText = themeSummary(letters);
-    const x = m + index * (themeW + 10);
-    card(doc, x, y, themeW, 118, { fill: '#fbfdff' });
-    doc.roundedRect(x + 12, y + 12, 34, 30, 7).fill(RIASEC_COLORS[leadLetter] || COLORS.blue);
-    doc.font('Helvetica-Bold').fontSize(codeText.length > 1 ? 10 : 13).fillColor(COLORS.white).text(codeText, x + 12, y + 19, { width: 34, align: 'center' });
-    textBlock(doc, labelText, x + 54, y + 12, themeW - 66, 14, { font: 'Helvetica-Bold', size: 8.9, color: COLORS.navy });
-    textBlock(doc, strengthsText, x + 54, y + 29, themeW - 66, 18, { size: 7.1, color: COLORS.blue, font: 'Helvetica-Bold' });
-    textBlock(doc, summaryText, x + 12, y + 55, themeW - 24, 48, { size: 7.6, color: COLORS.muted });
-  });
-
-  y += 140;
-  y = sectionTitle(doc, 'Recommended career paths', 'The report shows the highest-value matches only. Use them as a shortlist for investigation.', m, y);
-  if (occupations.length) {
-    const occW = (w - 12) / 2;
-    occupations.forEach((occupation, index) => {
-      const x = m + (index % 2) * (occW + 12);
-      const rowY = y + Math.floor(index / 2) * 96;
-      drawOccupationCard(doc, occupation, index, x, rowY, occW, 84);
-    });
-  } else {
-    card(doc, m, y, w, 56, { fill: '#fbfdff' });
-    textBlock(doc, 'No occupation matches are currently mapped for this profile. Review the Holland themes above with a counselor.', m + 14, y + 18, w - 28, 24, { color: COLORS.muted });
-  }
-
-  doc.addPage();
-  y = pageShell(doc, 'STUDY, SUBJECTS AND FUNDING GUIDANCE', 'Course, subject, and priority-field information to support planning', 3, totalPages);
-  y = sectionTitle(doc, userType === 'professional' ? 'Upskilling and qualification pathways' : 'Recommended study pathways', 'Confirm entry requirements and accreditation before applying.', m, y);
-  if (courses.length) {
-    courses.forEach((course, index) => {
-      drawCourseCard(doc, course, index, m, y + index * 70, w, 60);
-    });
-    y += courses.length * 70 + 6;
-  } else {
-    card(doc, m, y, w, 54, { fill: '#fbfdff' });
-    textBlock(doc, 'No course matches are currently linked to this profile. A counselor can help map the Holland code to accredited pathways.', m + 14, y + 17, w - 28, 22, { color: COLORS.muted });
-    y += 68;
-  }
-
-  const leftBoxW = (w - 14) / 2;
-  card(doc, m, y, leftBoxW, 128, { fill: '#fbfdff' });
-  label(doc, userType === 'professional' ? 'LEARNING FOCUS' : 'SUBJECT FOCUS', m + 12, y + 12, { color: COLORS.blue });
-  if (subjects.length) {
-    drawPills(doc, subjects, m + 12, y + 32, leftBoxW - 24, 3);
-  } else {
-    textBlock(doc, 'Subject recommendations are not currently available for this result. Use your top Holland themes when discussing subjects with a counselor.', m + 12, y + 32, leftBoxW - 24, 62, { color: COLORS.muted, size: 8 });
-  }
-  textBlock(doc, userType === 'professional'
-    ? 'For professionals, use this section to identify short courses, postgraduate options, or transitions that fit your current experience.'
-    : 'For learners and students, subject choices should support both your interest profile and the entry requirements of your target pathway.',
-  m + 12, y + 94, leftBoxW - 24, 24, { color: COLORS.muted, size: 7.4 });
-
-  card(doc, m + leftBoxW + 14, y, leftBoxW, 128, { fill: '#fffdf0', stroke: '#eadf8b' });
-  label(doc, 'FUNDING PRIORITY ALIGNMENT', m + leftBoxW + 26, y + 12, { color: COLORS.red, width: leftBoxW - 24 });
-  const fundingOverall = funding ? clean(funding.overall, 'LOW').toUpperCase() : 'NOT AVAILABLE';
-  doc.font('Helvetica-Bold').fontSize(15).fillColor(fundingOverall === 'HIGH' ? '#166534' : fundingOverall === 'MEDIUM' ? '#92400e' : COLORS.red)
-    .text(fundingOverall, m + leftBoxW + 26, y + 31, { width: leftBoxW - 28, height: 20 });
-  const priorityFields = funding?.fields || [];
-  const fundingText = priorityFields.length
-    ? `Priority field matches: ${priorityFields.slice(0, 3).map((field) => clean(field.field)).join(', ')}.`
-    : clean(funding?.interpretation, 'Funding priority data is not available for this profile.');
-  textBlock(doc, fundingText, m + leftBoxW + 26, y + 57, leftBoxW - 28, 54, { size: 7.8, color: COLORS.muted });
-
-  doc.addPage();
-  y = pageShell(doc, 'PERSONAL ACTION PLAN', 'Turn your SDS result into clear decisions and conversations', 4, totalPages);
-  y = sectionTitle(doc, 'Recommended next steps', 'Complete these actions before making final study or career decisions.', m, y);
-  const topOccNames = occupations.slice(0, 3).map((occ) => clean(read(occ, 'displayName') || makeDisplayName(read(occ, 'name')))).join(', ');
-  const topCourseNames = courses.slice(0, 2).map((course) => clean(read(course, 'name'))).join(', ');
-  const actions = [
-    ['Review your code', `Focus on ${labelsText || 'your top Holland themes'} and note which descriptions feel accurate.`],
-    ['Research career paths', topOccNames ? `Compare these career options: ${topOccNames}.` : 'Ask a counselor to help identify occupations related to your Holland code.'],
-    ['Check study requirements', topCourseNames ? `Check entry requirements for ${topCourseNames}.` : 'Build a list of accredited courses and confirm entry requirements.'],
-    ['Discuss funding', 'Check government priority fields, application dates, and alternative funding sources early.'],
-    ['Make a short plan', 'Choose one primary path, one backup path, and one action to complete this week.']
-  ];
-  actions.forEach(([title, body], index) => {
-    drawActionItem(doc, index + 1, title, body, m, y + index * 58, w, 48);
-  });
-
-  y += actions.length * 58 + 16;
-  const halfW = (w - 14) / 2;
-  card(doc, m, y, halfW, 142, { fill: '#fbfdff' });
-  label(doc, 'COUNSELOR DISCUSSION GUIDE', m + 12, y + 12, { color: COLORS.blue, width: halfW - 24 });
-  const questions = [
-    'Which parts of my code describe me best?',
-    'Which subjects or modules should I prioritize?',
-    'What are the realistic entry requirements?',
-    'Which careers should I shadow or research first?',
-    'What funding deadlines apply?'
-  ];
-  questions.forEach((question, index) => {
-    textBlock(doc, `${index + 1}. ${question}`, m + 12, y + 32 + index * 18, halfW - 24, 14, { size: 7.8, color: COLORS.text });
-  });
-
-  card(doc, m + halfW + 14, y, halfW, 142, { fill: '#fbfdff' });
-  label(doc, 'IMPORTANT NOTE', m + halfW + 26, y + 12, { color: COLORS.red, width: halfW - 24 });
-  textBlock(doc,
-    'This report is career guidance material. It should be used with counselor support, institution prospectuses, current admission rules, and updated labour-market information before final decisions are made.',
-    m + halfW + 26,
-    y + 32,
-    halfW - 28,
-    62,
-    { size: 8, color: COLORS.muted }
-  );
-  textBlock(doc,
-    `Generated for ${studentName}. Assessment completed ${completedDate}. Keep this report with your school, study, or career planning records.`,
-    m + halfW + 26,
-    y + 102,
-    halfW - 28,
-    28,
-    { size: 7.6, color: COLORS.text }
+  y += 70;
+  y = drawSectionTitle(doc, 'RIASEC score profile', 'Themes are ranked by score. Similar scores should be discussed together.', margin, y);
+  y = drawScoreProfile(doc, scoreRows, margin, y, width) + 8;
+  drawInfoPanel(
+    doc,
+    'Using this report',
+    'Review these findings with a counselor and alongside current requirements, finances, and qualifications.',
+    margin,
+    y,
+    width,
+    50
   );
 
-  const pages = doc.bufferedPageRange();
-  for (let pageIndex = 0; pageIndex < pages.count; pageIndex += 1) {
-    doc.switchToPage(pageIndex);
-    const footerY = PAGE.height - 62;
-    doc.moveTo(PAGE.margin, footerY - 9).lineTo(PAGE.margin + contentWidth(), footerY - 9)
-      .strokeColor(COLORS.border).lineWidth(0.5).stroke();
-    doc.font('Helvetica').fontSize(7.4).fillColor(COLORS.muted)
-      .text('SDS Career Assessment System | Ministry of Labor: Measurement and Testing Unit', PAGE.margin, footerY, {
-        width: contentWidth() * 0.68,
-        align: 'left',
-        lineBreak: false
-      });
-    doc.font('Helvetica-Bold').fontSize(7.6).fillColor(COLORS.blue)
-      .text(`Page ${pageIndex + 1} of ${pages.count}`, PAGE.margin, footerY, {
-        width: contentWidth(),
-        align: 'right',
-        lineBreak: false
-      });
-  }
+  // Page 2: career and study options.
+  doc.addPage();
+  y = drawContinuationHeader(
+    doc,
+    'Career and Study Pathways',
+    'A concise shortlist for further research and professional guidance',
+    2
+  );
+  y = drawSectionTitle(
+    doc,
+    'Recommended career options',
+    'Investigate the day-to-day work, training route, working conditions, and local opportunities for each option.',
+    margin,
+    y
+  );
+  y = drawFixedTable(doc, {
+    x: margin,
+    y,
+    width,
+    rowHeight: 54,
+    columns: [
+      { key: 'number', label: '#', width: 25, align: 'center', font: 'Helvetica-Bold' },
+      { key: 'name', label: 'Career option', width: 132, font: 'Helvetica-Bold', size: 7.7 },
+      { key: 'code', label: 'Code', width: 60, align: 'center' },
+      { key: 'description', label: 'Why it may fit', width: 209 },
+      { key: 'demand', label: 'Demand', width: width - 426 }
+    ],
+    rows: occupations.map((occupation, index) => ({ number: index + 1, ...occupation })),
+    emptyMessage: 'No occupation matches are currently mapped for this profile. Ask a counselor to interpret the Holland themes.'
+  }) + 16;
+  y = drawSectionTitle(
+    doc,
+    userType === 'professional' ? 'Learning and qualification pathways' : 'Recommended study pathways',
+    'Confirm accreditation, current entry requirements, availability, and application dates before applying.',
+    margin,
+    y
+  );
+  y = drawFixedTable(doc, {
+    x: margin,
+    y,
+    width,
+    rowHeight: 58,
+    columns: [
+      { key: 'pathway', label: 'Pathway', width: 142, font: 'Helvetica-Bold', size: 7.7 },
+      { key: 'qualification', label: 'Qualification', width: 102 },
+      { key: 'funding', label: 'Funding', width: 67 },
+      { key: 'notes', label: 'Institution and entry notes', width: width - 311 }
+    ],
+    rows: courses,
+    emptyMessage: 'No linked study pathways are currently available. Use the Holland themes to discuss accredited options with a counselor.'
+  }) + 12;
+  drawInfoPanel(
+    doc,
+    'Important',
+    'Guidance only. Confirm requirements with the relevant institution, employer, or professional body.',
+    margin,
+    y,
+    width,
+    54
+  );
+
+  // Page 3: profile detail and action plan.
+  doc.addPage();
+  y = drawContinuationHeader(
+    doc,
+    'Profile Meaning and Action Plan',
+    'Your strongest themes, planning considerations, and practical next steps',
+    3
+  );
+  y = drawSectionTitle(doc, 'Strongest Holland themes', labelsText, margin, y);
+  const scoreMap = Object.fromEntries(scoreRows.map((row) => [row.key, row.score]));
+  y = drawFixedTable(doc, {
+    x: margin,
+    y,
+    width,
+    rowHeight: 70,
+    columns: [
+      { key: 'code', label: 'Code', width: 54, align: 'center', font: 'Helvetica-Bold' },
+      { key: 'theme', label: 'Theme', width: 104, font: 'Helvetica-Bold' },
+      { key: 'score', label: 'Score', width: 50, align: 'center' },
+      { key: 'strengths', label: 'Likely strengths', width: 135 },
+      { key: 'meaning', label: 'Interpretation', width: width - 343 }
+    ],
+    rows: displayGroups.slice(0, 3).map((group) => ({
+      code: themeCode(group),
+      theme: themeLabel(group),
+      score: unique(group).map((letter) => scoreMap[letter]).join(' / '),
+      strengths: unique(themeStrengths(group)).slice(0, 5).join(', '),
+      meaning: themeSummary(group)
+    }))
+  }) + 16;
+
+  const gap = 14;
+  const half = (width - gap) / 2;
+  const focusTitle = userType === 'professional' ? 'Learning focus' : 'Subject focus';
+  const focusText = subjects.length
+    ? subjects.join(', ')
+    : 'No specific subject list is available. Use the top Holland themes when reviewing subjects or learning priorities.';
+  const fundingFields = funding?.fields || [];
+  const fundingText = funding
+    ? `${clean(funding.overall, 'Alignment not rated')}. ${fundingFields.length
+      ? `Priority matches: ${fundingFields.slice(0, 4).map((field) => clean(field.field)).join(', ')}.`
+      : clean(funding.interpretation, 'Confirm current funding priorities and application dates.')}`
+    : 'Funding alignment is not currently available. Confirm current priority fields, deadlines, and alternative funding sources.';
+  drawInfoPanel(doc, focusTitle, focusText, margin, y, half, 96);
+  drawInfoPanel(doc, 'Funding priority alignment', fundingText, margin + half + gap, y, half, 96);
+  y += 112;
+
+  y = drawSectionTitle(doc, 'Recommended next steps', null, margin, y);
+  const topCareerNames = occupations.slice(0, 3).map((occupation) => occupation.name).join(', ');
+  const topCourseNames = courses.slice(0, 2).map((course) => course.pathway).join(', ');
+  y = drawActionSteps(doc, [
+    { title: 'Review your profile', body: `Identify which parts of ${labelsText || 'your Holland themes'} describe you most accurately.` },
+    { title: 'Research career options', body: topCareerNames ? `Compare ${topCareerNames}.` : 'Build a shortlist of occupations related to your strongest themes.' },
+    { title: 'Check learning requirements', body: topCourseNames ? `Confirm current requirements for ${topCourseNames}.` : 'Identify accredited pathways and confirm current entry requirements.' },
+    { title: 'Discuss your choices', body: 'Review the shortlist with a counselor, teacher, mentor, parent, or relevant professional.' },
+    { title: 'Record a practical plan', body: 'Choose one primary path, one alternative, and one action to complete this week.' }
+  ], margin, y, width) + 6;
+
+  drawInfoPanel(
+    doc,
+    'Guidance note',
+    'Use current prospectuses, labour-market information, and qualified counseling before final decisions.',
+    margin,
+    y,
+    width,
+    52
+  );
+
+  drawFooters(doc);
 };
 
 module.exports = {
+  EXPECTED_RESULTS_PDF_PAGES,
+  MINISTRY_PHYSICAL_ADDRESS,
   renderResultsPdf
 };

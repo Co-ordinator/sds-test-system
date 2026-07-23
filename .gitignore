@@ -20,6 +20,10 @@ build/
 *.tar.gz
 *.tgz
 
+# Local database backups
+backup.sql
+*.dir/
+
 # IDEs
 .vscode/
 .idea/
@@ -33,6 +37,15 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Local/private diagnostics, exports, and generated deliverables
+/tmp/
+/output/
+/outputs/
+/logs downloaded from hostinger/
+/hostinger env.txt
+/Mbabane Central High School.docx
+/student_import_template*.csv
 
 # User uploaded files — ignore contents, keep directory structure
 backend/uploads/**

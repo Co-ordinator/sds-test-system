@@ -7,6 +7,7 @@ const { parse } = require('csv-parse/sync');
 const crypto = require('crypto');
 const { NotFoundError, BadRequestError, ConflictError } = require('../utils/errors/appError');
 const scoringService = require('./scoring.service');
+const { permanentlyDeleteUser, permanentlyDeleteUsers } = require('./userDeletion.service');
 
 const getAssessmentDisplayCode = (assessment) => {
   if (!assessment || (assessment.status !== 'completed' && !assessment.hollandCode)) return null;
@@ -36,6 +37,10 @@ module.exports = {
 
     return await User.findAll({
       attributes: { exclude: ['password'] },
+      include: [
+        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region'], required: false },
+        { model: Institution, as: 'workplace', attributes: ['id', 'name'], required: false }
+      ],
       order: [['createdAt', 'DESC']],
       where
     });
@@ -43,7 +48,11 @@ module.exports = {
 
   getUser: async (id) => {
     return await User.findByPk(id, {
-      attributes: { exclude: ['password'] }
+      attributes: { exclude: ['password'] },
+      include: [
+        { model: Institution, as: 'institution', attributes: ['id', 'name', 'type', 'region'], required: false },
+        { model: Institution, as: 'workplace', attributes: ['id', 'name'], required: false }
+      ]
     });
   },
 
@@ -62,16 +71,13 @@ module.exports = {
   },
 
   deleteUser: async (id) => {
-    const user = await User.findByPk(id);
-    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
-    await user.destroy();
-    return user;
+    return permanentlyDeleteUser(id);
   },
 
   bulkDeleteUsers: async (ids, currentUserId) => {
     if (!Array.isArray(ids) || ids.length === 0) throw new BadRequestError('ids array required', 'INVALID_BULK_IDS');
-    const safeIds = ids.filter(id => id !== currentUserId);
-    return await User.destroy({ where: { id: { [Op.in]: safeIds } } });
+    const result = await permanentlyDeleteUsers(ids, { excludeUserId: currentUserId });
+    return result.deleted;
   },
 
   bulkUpdateUsers: async (ids, updates) => {
@@ -408,7 +414,14 @@ module.exports = {
       limit: Number(limit)
     });
 
-    const unreadCount = notifications.filter(n => n.details?.isRead !== true).length;
+    const unreadCount = await AuditLog.count({
+      where: {
+        actionType: 'ASSESSMENT_COMPLETED_NOTIFY',
+        [Op.and]: [
+          AuditLog.sequelize.literal("COALESCE((details->>'isRead')::boolean, false) = false")
+        ]
+      }
+    });
     return { notifications, unreadCount };
   },
 
@@ -421,8 +434,13 @@ module.exports = {
   },
 
   markAllNotificationsRead: async () => {
-    const all = await AuditLog.findAll({ where: { actionType: 'ASSESSMENT_COMPLETED_NOTIFY' } });
-    await Promise.all(all.map(n => n.update({ details: { ...(n.details || {}), isRead: true } })));
+    const [, metadata] = await AuditLog.sequelize.query(`
+      UPDATE audit_logs
+      SET details = COALESCE(details, '{}'::jsonb) || '{"isRead": true}'::jsonb
+      WHERE action_type = 'ASSESSMENT_COMPLETED_NOTIFY'
+        AND COALESCE((details->>'isRead')::boolean, false) = false
+    `);
+    return Number(metadata?.rowCount || 0);
   },
 
   /* ─── Permissions ─────────────────────────────────────────────────────── */

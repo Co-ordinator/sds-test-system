@@ -2,59 +2,74 @@
 
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { User, EducationLevel, Occupation, Institution } = require('../models');
+const { User, EducationLevel, Occupation, Institution, AuthSession } = require('../models');
 const { Op } = require('sequelize');
 const { generateStudentCode } = require('../utils/generateStudentCode');
 const { hashValue, safeCompareHex } = require('../utils/security.util');
 const { BadRequestError, ConflictError, AuthError, NotFoundError } = require('../utils/errors/appError');
+const { permanentlyDeleteUser } = require('./userDeletion.service');
+const {
+  getGradeEducationLevel,
+  getEducationPairError
+} = require('../utils/profileEducation');
 
 const parsePositiveInt = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const EMAIL_OTP_LENGTH = 6;
-const EMAIL_OTP_TTL_MS = parsePositiveInt(process.env.EMAIL_OTP_TTL_MS, 10 * 60 * 1000);
-const EMAIL_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.EMAIL_OTP_RESEND_COOLDOWN_MS, 2 * 60 * 1000);
-const PASSWORD_RESET_OTP_TTL_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_TTL_MS, EMAIL_OTP_TTL_MS);
-const PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS, EMAIL_OTP_RESEND_COOLDOWN_MS);
+const toSeconds = (ms) => Math.ceil(ms / 1000);
 
-// Grade level text → education_levels.level mapping
-const GRADE_TO_EDUCATION_LEVEL = {
-  'Form 3 (Junior Secondary)': 1,
-  'Form 5 / O-Level (Senior Secondary)': 2,
-  'A-Level': 2,
-  'Certificate / Diploma': 3,
-  'Bachelor\'s degree': 4,
-  'Postgraduate': 5,
-};
+// Registration verification and password reset use the same default OTP
+// validity window. Either flow can still be overridden explicitly in env.
+const EMAIL_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.EMAIL_OTP_RESEND_COOLDOWN_MS, 2 * 60 * 1000);
+const OTP_TTL_MS = parsePositiveInt(process.env.EMAIL_OTP_TTL_MS, 5 * 60 * 1000);
+const OTP_TTL_MINUTES = Math.ceil(OTP_TTL_MS / 60000);
+const PASSWORD_RESET_OTP_TTL_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_TTL_MS, OTP_TTL_MS);
+const PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS = parsePositiveInt(process.env.PASSWORD_RESET_OTP_RESEND_COOLDOWN_MS, EMAIL_OTP_RESEND_COOLDOWN_MS);
 
 /** All required onboarding fields captured for Test Takers (no placeholder names — use onboarding_completed flag). */
 const hasOnboardingText = (value) => String(value ?? '').trim() !== '';
 const hasOnboardingNumber = (value) => value !== null && value !== undefined && String(value).trim() !== '';
 
-function computeTestTakerOnboardingComplete(u) {
-  if (!u || u.role !== 'Test Taker') return true;
-  if (!hasOnboardingText(u.firstName) || !hasOnboardingText(u.lastName)) return false;
-  if (!u.gender) return false;
-  if (!u.userType) return false;
-  if (!u.region) return false;
-  if (!hasOnboardingText(u.district)) return false;
-  if (!hasOnboardingText(u.address)) return false;
-  if (!u.preferredLanguage) return false;
-  if (!hasOnboardingText(u.gradeLevel)) return false;
+const TEST_TAKER_PROFILE_FIELDS = new Set([
+  'firstName', 'lastName', 'gender', 'userType', 'region', 'district', 'address',
+  'preferredLanguage', 'gradeLevel', 'educationLevel', 'currentInstitution',
+  'institutionId', 'workplaceName', 'workplaceInstitutionId', 'currentOccupation',
+  'currentOccupationId', 'yearsExperience', 'degreeProgram', 'yearOfStudy'
+]);
+
+function getMissingTestTakerProfileFields(u) {
+  if (!u || u.role !== 'Test Taker') return [];
+  const missing = [];
+  if (!hasOnboardingText(u.firstName)) missing.push('firstName');
+  if (!hasOnboardingText(u.lastName)) missing.push('lastName');
+  if (!u.gender) missing.push('gender');
+  if (!u.userType) missing.push('userType');
+  if (!u.region) missing.push('region');
+  if (!hasOnboardingText(u.district)) missing.push('district');
+  if (!hasOnboardingText(u.address)) missing.push('address');
+  if (!u.preferredLanguage) missing.push('preferredLanguage');
+  if (!hasOnboardingText(u.gradeLevel)) missing.push('gradeLevel');
+  if (!u.educationLevel) missing.push('educationLevel');
 
   if (u.userType === 'Professional') {
-    const hasWorkplace = hasOnboardingText(u.workplaceName) || !!u.workplaceInstitutionId;
-    const hasOccupation = hasOnboardingText(u.currentOccupation) || !!u.currentOccupationId;
-    return hasWorkplace && hasOccupation && hasOnboardingNumber(u.yearsExperience);
+    if (!hasOnboardingText(u.workplaceName) && !u.workplaceInstitutionId) missing.push('workplaceName');
+    if (!hasOnboardingText(u.currentOccupation) && !u.currentOccupationId) missing.push('currentOccupation');
+    if (!hasOnboardingNumber(u.yearsExperience)) missing.push('yearsExperience');
   }
   if (u.userType === 'High School Student' || u.userType === 'University Student') {
-    const hasInstitution = hasOnboardingText(u.currentInstitution) || !!u.institutionId;
-    if (u.userType === 'High School Student') return hasInstitution;
-    return hasInstitution && hasOnboardingText(u.degreeProgram) && hasOnboardingNumber(u.yearOfStudy);
+    if (!hasOnboardingText(u.currentInstitution) && !u.institutionId) missing.push('currentInstitution');
+    if (u.userType === 'University Student') {
+      if (!hasOnboardingText(u.degreeProgram)) missing.push('degreeProgram');
+      if (!hasOnboardingNumber(u.yearOfStudy)) missing.push('yearOfStudy');
+    }
   }
-  return true;
+  return missing;
+}
+
+function computeTestTakerOnboardingComplete(u) {
+  return getMissingTestTakerProfileFields(u).length === 0;
 }
 
 async function maybeSetOnboardingCompleted(userId) {
@@ -83,8 +98,12 @@ const parseNationalId = (nationalId) => {
 const signToken = (id, role) =>
   jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE });
 
-const signRefreshToken = (id, role) =>
-  jwt.sign({ id, role }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+const signRefreshToken = (id, role, sessionId) =>
+  jwt.sign(
+    { id, role, sid: sessionId },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: '7d', jwtid: crypto.randomUUID() }
+  );
 
 const hashToken = (tokenValue) => {
   if (!tokenValue) return null;
@@ -92,7 +111,6 @@ const hashToken = (tokenValue) => {
 };
 
 const OTP_LENGTH = 6;
-const OTP_TTL_MS = 15 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 
 // Resend throttling (per-account, server-enforced — the 30s client cooldown is UX only).
@@ -117,16 +135,120 @@ const generateEmailOtp = () => {
   return String(value).padStart(OTP_LENGTH, '0');
 };
 
-const PII_FIELDS_TO_SCRUB = [
-  'firstName', 'lastName', 'email', 'username', 'nationalId',
-  'phoneNumber', 'address', 'studentCode', 'studentNumber',
-  'workplaceName', 'currentInstitution', 'currentOccupation', 'organization',
-  'testAdministratorCode', 'dateOfBirth'
-];
+const createPasswordResetRecord = () => {
+  const otpCode = generateEmailOtp();
+  const sentAt = new Date();
+  return {
+    otpCode,
+    otpHash: hashToken(otpCode),
+    expiresAt: new Date(sentAt.getTime() + PASSWORD_RESET_OTP_TTL_MS),
+    sentAt
+  };
+};
+
+const clearLegacyRefreshFields = (user) => {
+  user.refreshToken = null;
+  user.refreshTokenExpires = null;
+  user.previousRefreshToken = null;
+  user.previousRefreshTokenExpires = null;
+};
+
+const revokeAllAuthSessions = async (user) => {
+  await AuthSession.destroy({ where: { userId: user.id } });
+  clearLegacyRefreshFields(user);
+};
+
+const issueAuthTokens = async (user) => {
+  const sessionId = crypto.randomUUID();
+  const token = signToken(user.id, user.role);
+  const refreshToken = signRefreshToken(user.id, user.role, sessionId);
+  await AuthSession.create({
+    id: sessionId,
+    userId: user.id,
+    refreshTokenHash: hashToken(refreshToken),
+    previousRefreshTokenHash: null,
+    expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    previousExpiresAt: null,
+    lastUsedAt: new Date(),
+    revokedAt: null
+  });
+  return { token, refreshToken, sessionId };
+};
+
+const rotateSessionRefreshToken = async ({ decoded, presentedHash }) => {
+  const user = await User.findByPk(decoded.id);
+  if (!user) {
+    throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
+  }
+
+  const now = Date.now();
+  const newRefreshToken = signRefreshToken(user.id, user.role, decoded.sid);
+  const [rotated] = await AuthSession.update({
+    previousRefreshTokenHash: presentedHash,
+    previousExpiresAt: new Date(now + REFRESH_TOKEN_REUSE_GRACE_MS),
+    refreshTokenHash: hashToken(newRefreshToken),
+    expiresAt: new Date(now + REFRESH_TOKEN_TTL_MS),
+    lastUsedAt: new Date(now)
+  }, {
+    where: {
+      id: decoded.sid,
+      userId: user.id,
+      refreshTokenHash: presentedHash,
+      revokedAt: null,
+      expiresAt: { [Op.gt]: new Date(now) }
+    }
+  });
+
+  if (rotated === 1) {
+    return {
+      newAccessToken: signToken(user.id, user.role),
+      newRefreshToken,
+      reuseDetected: false
+    };
+  }
+
+  // A second tab can legitimately arrive just after the atomic rotation.
+  const session = await AuthSession.findOne({
+    where: { id: decoded.sid, userId: user.id }
+  });
+  const previousMatches = session?.previousRefreshTokenHash
+    && safeCompareHex(session.previousRefreshTokenHash, presentedHash);
+  const previousValid = previousMatches
+    && !session.revokedAt
+    && session.previousExpiresAt
+    && new Date(session.previousExpiresAt).getTime() > now;
+
+  if (previousValid) {
+    return {
+      newAccessToken: signToken(user.id, user.role),
+      newRefreshToken: null,
+      reuseDetected: false
+    };
+  }
+
+  if (previousMatches && session && !session.revokedAt) {
+    await session.update({
+      revokedAt: new Date(now),
+      refreshTokenHash: hashToken(`revoked:${session.id}:${now}`),
+      previousRefreshTokenHash: null,
+      previousExpiresAt: null
+    });
+    const error = new AuthError(
+      'Refresh token was reused — this device session was revoked. Please sign in again.',
+      'REFRESH_TOKEN_REUSED',
+      401
+    );
+    error.reuseDetected = true;
+    throw error;
+  }
+
+  throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
+};
 
 module.exports = {
   signToken,
   signRefreshToken,
+  OTP_TTL_MINUTES,
 
   /* ─── Register ────────────────────────────────────────────────────────── */
   register: async ({ firstName, lastName, nationalId, email, password, consent }) => {
@@ -145,8 +267,14 @@ module.exports = {
       throw new BadRequestError('National ID must be exactly 13 digits', 'INVALID_NATIONAL_ID');
     }
 
+    const isResumableSignup = (candidate) =>
+      candidate
+      && !candidate.isEmailVerified
+      && candidate.role === 'Test Taker'
+      && !candidate.createdByTestAdministrator;
+
     const existingUser = await User.findOne({ where: { nationalIdHash: hashValue(cleanNationalId) } });
-    if (existingUser) {
+    if (existingUser && !isResumableSignup(existingUser)) {
       throw new ConflictError(
         'An account with this National ID already exists. If you didn\'t complete registration, request a new verification code or sign in.',
         'NATIONAL_ID_EXISTS'
@@ -156,17 +284,49 @@ module.exports = {
     const existingEmailUser = await User.findOne({
       where: { email: { [Op.iLike]: cleanEmail } }
     });
-    if (existingEmailUser) {
+    if (existingEmailUser && !isResumableSignup(existingEmailUser)) {
       throw new ConflictError(
         'An account with this email already exists. If you didn\'t complete registration, request a new verification code or sign in.',
         'EMAIL_EXISTS'
       );
     }
+    if (existingUser && existingEmailUser && existingUser.id !== existingEmailUser.id) {
+      throw new ConflictError(
+        'These details partially match existing incomplete registrations. Please contact support to resolve your account.',
+        'AMBIGUOUS_REGISTRATION'
+      );
+    }
 
     const emailOtp = generateEmailOtp();
     const emailOtpExpires = new Date(Date.now() + OTP_TTL_MS);
-    const studentCode = await generateStudentCode();
     const { dateOfBirth, gender } = parseNationalId(cleanNationalId);
+
+    const resumableUser = existingUser || existingEmailUser;
+    if (resumableUser) {
+      await resumableUser.update({
+        nationalId: cleanNationalId,
+        email: cleanEmail,
+        password,
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        dateOfBirth,
+        gender,
+        isConsentGiven: true,
+        consentDate: new Date(),
+        emailVerificationToken: hashToken(emailOtp),
+        emailVerificationExpires: emailOtpExpires,
+        emailVerificationAttempts: 0,
+        emailVerificationLastSentAt: new Date()
+      });
+      return {
+        user: resumableUser,
+        emailOtp,
+        resendAvailableInSeconds: toSeconds(RESEND_MIN_INTERVAL_MS),
+        resumed: true
+      };
+    }
+
+    const studentCode = await generateStudentCode();
 
     let user;
     try {
@@ -274,62 +434,16 @@ module.exports = {
     let token = null;
     let refreshToken = null;
     try {
-      token = signToken(user.id, user.role);
-      refreshToken = signRefreshToken(user.id, user.role);
-      user.refreshToken = hashToken(refreshToken);
-      user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-      user.previousRefreshToken = null;
-      user.previousRefreshTokenExpires = null;
-      await user.save();
+      const issued = await issueAuthTokens(user);
+      token = issued.token;
+      refreshToken = issued.refreshToken;
     } catch (_) {}
 
     return { user, token, refreshToken };
   },
 
-  verifyEmailOtp: async ({ email, code }) => {
-    if (!email?.trim()) {
-      throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
-    }
-    if (!code?.trim()) {
-      throw new BadRequestError('Verification code is required', 'OTP_REQUIRED');
-    }
-
-    const cleanEmail = String(email).trim().toLowerCase();
-    const cleanCode = String(code).trim();
-    if (!/^\d{6}$/.test(cleanCode)) {
-      throw new BadRequestError('Verification code must be 6 digits', 'INVALID_OTP_FORMAT');
-    }
-
-    const user = await User.findOne({
-      where: { email: { [Op.iLike]: cleanEmail } }
-    });
-
-    if (!user) {
-      throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
-    }
-
-    if (user.isEmailVerified) {
-      const { token, refreshToken } = await issueAuthTokens(user);
-      return { user, token, refreshToken, alreadyVerified: true };
-    }
-
-    if (!user.emailVerificationToken || !user.emailVerificationExpires || user.emailVerificationExpires <= new Date()) {
-      throw new BadRequestError('Verification code has expired. Request a new code and try again.', 'OTP_EXPIRED');
-    }
-
-    if (hashToken(cleanCode) !== user.emailVerificationToken) {
-      throw new BadRequestError('Incorrect verification code. Please check and try again.', 'INVALID_OTP');
-    }
-
-    user.isEmailVerified = true;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpires = null;
-    user.emailVerificationSentAt = null;
-    await user.save();
-
-    const { token, refreshToken } = await issueAuthTokens(user);
-    return { user, token, refreshToken, alreadyVerified: false };
-  },
+  verifyEmailOtp: async ({ email, code }) =>
+    module.exports.verifyEmail({ email, otp: code }),
 
   /* ─── Login ───────────────────────────────────────────────────────────── */
   login: async (identifier, password) => {
@@ -398,13 +512,7 @@ module.exports = {
     user.lockoutUntil = null;
     await user.save();
 
-    const token = signToken(user.id, user.role);
-    const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    user.previousRefreshToken = null;
-    user.previousRefreshTokenExpires = null;
-    await user.save();
+    const { token, refreshToken } = await issueAuthTokens(user);
 
     const { Permission } = require('../models');
     const userWithPerms = await User.findByPk(user.id, {
@@ -466,12 +574,74 @@ module.exports = {
       }
     }
 
-    // Grade Level → Education Level UUID
-    if (updates.gradeLevel) {
-      const levelNum = GRADE_TO_EDUCATION_LEVEL[updates.gradeLevel];
-      if (levelNum) {
-        const edLevel = await EducationLevel.findOne({ where: { level: levelNum } });
-        if (edLevel) updates.educationLevel = edLevel.id;
+    const effectiveGradeLevel = updates.gradeLevel !== undefined ? updates.gradeLevel : user.gradeLevel;
+    const effectiveUserType = updates.userType !== undefined ? updates.userType : user.userType;
+    const gradeLevelNum = getGradeEducationLevel(effectiveGradeLevel);
+    if (updates.gradeLevel && !gradeLevelNum) {
+      throw new BadRequestError(
+        'Select a supported current or highest grade.',
+        'INVALID_GRADE_LEVEL'
+      );
+    }
+    if (gradeLevelNum) {
+      if (effectiveUserType === 'University Student' && gradeLevelNum < 2) {
+        throw new BadRequestError(
+          'Education level cannot be lower than high school while studying at university.',
+          'EDUCATION_LEVEL_CONFLICT'
+        );
+      }
+      if (effectiveUserType === 'High School Student' && gradeLevelNum > 2) {
+        throw new BadRequestError(
+          'Education level cannot be a tertiary qualification while still in high school.',
+          'EDUCATION_LEVEL_CONFLICT'
+        );
+      }
+    }
+
+    let selectedEducationLevel = null;
+    if (updates.educationLevel) {
+      selectedEducationLevel = await EducationLevel.findByPk(updates.educationLevel);
+      if (!selectedEducationLevel) {
+        throw new BadRequestError('Select a valid education level.', 'INVALID_EDUCATION_LEVEL');
+      }
+    } else if (updates.educationLevel === undefined && user.educationLevel) {
+      selectedEducationLevel = await EducationLevel.findByPk(user.educationLevel);
+    }
+
+    // Onboarding captures a grade selection and derives the stable education
+    // level UUID. Profile editing sends both values and must keep them aligned.
+    if (updates.gradeLevel && updates.educationLevel === undefined) {
+      selectedEducationLevel = await EducationLevel.findOne({ where: { level: gradeLevelNum } });
+      if (!selectedEducationLevel) {
+        throw new BadRequestError('The selected education level is not configured.', 'EDUCATION_LEVEL_NOT_CONFIGURED');
+      }
+      updates.educationLevel = selectedEducationLevel.id;
+    }
+
+    const pairError = getEducationPairError({
+      gradeLevel: effectiveGradeLevel,
+      educationLevel: selectedEducationLevel
+    });
+    if (pairError) {
+      throw new BadRequestError(pairError, 'EDUCATION_LEVEL_CONFLICT');
+    }
+
+    const touchesTestTakerProfile = user.role === 'Test Taker'
+      && Object.keys(updates).some((key) => TEST_TAKER_PROFILE_FIELDS.has(key));
+    if (touchesTestTakerProfile) {
+      const effectiveProfile = {
+        ...(typeof user.get === 'function' ? user.get({ plain: true }) : user),
+        ...updates,
+        role: user.role
+      };
+      const missingFields = getMissingTestTakerProfileFields(effectiveProfile);
+      if (missingFields.length > 0) {
+        const error = new BadRequestError(
+          `Complete the required profile field "${missingFields[0]}" before saving.`,
+          'PROFILE_REQUIRED_FIELD_MISSING'
+        );
+        error.fields = missingFields;
+        throw error;
       }
     }
 
@@ -479,7 +649,7 @@ module.exports = {
     if (updates.currentOccupationId) {
       const occ = await Occupation.findByPk(updates.currentOccupationId);
       if (occ) updates.currentOccupation = occ.name;
-      else updates.currentOccupationId = null;
+      else throw new BadRequestError('Select a valid occupation.', 'INVALID_OCCUPATION');
     } else if (updates.currentOccupation && !updates.currentOccupationId) {
       const occText = updates.currentOccupation.trim();
       if (occText) {
@@ -499,7 +669,7 @@ module.exports = {
     if (updates.institutionId) {
       const inst = await Institution.findByPk(updates.institutionId);
       if (inst) updates.currentInstitution = inst.name;
-      else updates.institutionId = null;
+      else throw new BadRequestError('Select a valid institution.', 'INVALID_INSTITUTION');
     } else if (updates.currentInstitution && !updates.institutionId) {
       const instText = updates.currentInstitution.trim();
       if (instText) {
@@ -509,7 +679,8 @@ module.exports = {
           updates.institutionId = inst.id;
           updates.currentInstitution = inst.name;
         } else {
-          const newInst = await Institution.create({ name: instText, type: 'other', status: 'pending_review', submittedBy: userId });
+          const inferredType = effectiveUserType === 'High School Student' ? 'school' : 'other';
+          const newInst = await Institution.create({ name: instText, type: inferredType, status: 'pending_review', submittedBy: userId });
           updates.institutionId = newInst.id;
         }
       }
@@ -519,7 +690,7 @@ module.exports = {
     if (updates.workplaceInstitutionId) {
       const wpInst = await Institution.findByPk(updates.workplaceInstitutionId);
       if (wpInst) updates.workplaceName = wpInst.name;
-      else updates.workplaceInstitutionId = null;
+      else throw new BadRequestError('Select a valid workplace.', 'INVALID_WORKPLACE');
     } else if (updates.workplaceName && !updates.workplaceInstitutionId) {
       const wpText = updates.workplaceName.trim();
       if (wpText) {
@@ -537,6 +708,23 @@ module.exports = {
 
     if (Object.keys(updates).length === 0) {
       throw new BadRequestError('No valid fields to update', 'NO_VALID_UPDATES');
+    }
+
+    if (touchesTestTakerProfile) {
+      const effectiveProfile = {
+        ...(typeof user.get === 'function' ? user.get({ plain: true }) : user),
+        ...updates,
+        role: user.role
+      };
+      const missingFields = getMissingTestTakerProfileFields(effectiveProfile);
+      if (missingFields.length > 0) {
+        const error = new BadRequestError(
+          `Complete the required profile field "${missingFields[0]}" before saving.`,
+          'PROFILE_REQUIRED_FIELD_MISSING'
+        );
+        error.fields = missingFields;
+        throw error;
+      }
     }
 
     await user.update(updates);
@@ -615,6 +803,10 @@ module.exports = {
   },
 
   resetPasswordWithOtp: async ({ email, code, newPassword }) => {
+    const invalidResetCode = () => new BadRequestError(
+      'Reset code is invalid or has expired. Request a new code and try again.',
+      'INVALID_RESET_OTP'
+    );
     if (!email?.trim()) {
       throw new BadRequestError('Email is required', 'EMAIL_REQUIRED');
     }
@@ -632,34 +824,34 @@ module.exports = {
       where: { email: { [Op.iLike]: cleanEmail } }
     });
 
-    if (!user) throw new NotFoundError('No user found with that email', 'USER_NOT_FOUND');
+    if (!user) throw invalidResetCode();
     if (!user.passwordResetToken || !user.passwordResetExpires || user.passwordResetExpires <= new Date()) {
-      throw new BadRequestError('Reset code has expired. Request a new code and try again.', 'OTP_EXPIRED');
+      throw invalidResetCode();
     }
 
-    if (hashToken(cleanCode) !== user.passwordResetToken) {
-      throw new BadRequestError('Incorrect reset code. Please check and try again.', 'INVALID_OTP');
+    if (!safeCompareHex(hashToken(cleanCode), user.passwordResetToken)) {
+      throw invalidResetCode();
     }
 
     user.password = newPassword;
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
     user.passwordResetSentAt = null;
-    user.refreshToken = null;
-    user.refreshTokenExpires = null;
-    user.previousRefreshToken = null;
-    user.previousRefreshTokenExpires = null;
+
+    if (!user.isEmailVerified) {
+      user.isEmailVerified = true;
+      user.emailVerificationToken = null;
+      user.emailVerificationExpires = null;
+      user.emailVerificationAttempts = 0;
+    }
+
     user.failedLoginAttempts = 0;
     user.lockoutUntil = null;
     user.mustChangePassword = false;
+    await revokeAllAuthSessions(user);
     await user.save();
 
-    const token = signToken(user.id, user.role);
-    const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    await user.save();
-
+    const { token, refreshToken } = await issueAuthTokens(user);
     return { user, token, refreshToken };
   },
 
@@ -694,11 +886,8 @@ module.exports = {
     user.passwordResetToken = null;
     user.passwordResetExpires = null;
 
-    // C-3: invalidate every other session by rotating the family.
-    user.refreshToken = null;
-    user.refreshTokenExpires = null;
-    user.previousRefreshToken = null;
-    user.previousRefreshTokenExpires = null;
+    // C-3: invalidate every other browser/device session.
+    await revokeAllAuthSessions(user);
 
     // C-4: clicking the reset link proves email ownership.
     if (!user.isEmailVerified) {
@@ -715,21 +904,14 @@ module.exports = {
 
     await user.save();
 
-    const token = signToken(user.id, user.role);
-    const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    await user.save();
+    const { token, refreshToken } = await issueAuthTokens(user);
     return { user, token, refreshToken };
   },
 
   /* ─── Refresh Token (rotation + reuse detection) ──────────────────────── */
   /**
-   * Issues a new (access, refresh) pair and rotates the refresh-token family.
-   * The previously-current RT is parked in `previousRefreshToken` for a short
-   * grace window so concurrent in-flight refreshes from the same browser don't
-   * trip reuse detection. Any RT that matches the *previous* slot but not the
-   * current one is treated as a replay attack and burns the entire session.
+   * Issues a new (access, refresh) pair and rotates only the current
+   * browser/device session. Legacy cookies are migrated on first refresh.
    *
    * Returns `{ newAccessToken, newRefreshToken }` on success.
    */
@@ -744,7 +926,12 @@ module.exports = {
     }
 
     const presentedHash = hashToken(refreshTokenValue);
-    const user = await User.findOne({ where: { id: decoded.id } });
+    if (decoded.sid) {
+      return rotateSessionRefreshToken({ decoded, presentedHash });
+    }
+
+    // Compatibility path for cookies issued before auth_sessions existed.
+    const user = await User.findByPk(decoded.id);
     if (!user) {
       throw new AuthError('Invalid or expired refresh token', 'INVALID_REFRESH_TOKEN', 401);
     }
@@ -756,17 +943,15 @@ module.exports = {
       && safeCompareHex(user.refreshToken, presentedHash);
 
     if (currentValid) {
-      const newRefreshToken = signRefreshToken(user.id, user.role);
-      // Park the *just-rotated* hash in `previousRefreshToken` so concurrent
-      // in-flight refreshes don't get bounced as replays.
-      user.previousRefreshToken = user.refreshToken;
-      user.previousRefreshTokenExpires = new Date(now + REFRESH_TOKEN_REUSE_GRACE_MS);
-      user.refreshToken = hashToken(newRefreshToken);
-      user.refreshTokenExpires = new Date(now + REFRESH_TOKEN_TTL_MS);
+      const issued = await issueAuthTokens(user);
+      clearLegacyRefreshFields(user);
       await user.save();
 
-      const newAccessToken = signToken(user.id, user.role);
-      return { newAccessToken, newRefreshToken, reuseDetected: false };
+      return {
+        newAccessToken: issued.token,
+        newRefreshToken: issued.refreshToken,
+        reuseDetected: false
+      };
     }
 
     // If we get here and the *previous* RT slot matches, it could be either a
@@ -784,10 +969,7 @@ module.exports = {
       }
 
       // Outside grace window → token reuse → revoke the entire family.
-      user.refreshToken = null;
-      user.refreshTokenExpires = null;
-      user.previousRefreshToken = null;
-      user.previousRefreshTokenExpires = null;
+      clearLegacyRefreshFields(user);
       await user.save();
 
       const error = new AuthError('Refresh token was reused — session revoked. Please sign in again.', 'REFRESH_TOKEN_REUSED', 401);
@@ -802,6 +984,15 @@ module.exports = {
   logout: async (refreshTokenValue) => {
     if (refreshTokenValue) {
       const hashed = hashToken(refreshTokenValue);
+      const removedSessions = await AuthSession.destroy({
+        where: {
+          [Op.or]: [
+            { refreshTokenHash: hashed },
+            { previousRefreshTokenHash: hashed }
+          ]
+        }
+      });
+      if (removedSessions > 0) return;
       // Match either slot — current OR the just-rotated one. We don't trip
       // reuse-detection on logout; the user is explicitly revoking.
       const user = await User.findOne({
@@ -813,10 +1004,7 @@ module.exports = {
         }
       });
       if (user) {
-        user.refreshToken = null;
-        user.refreshTokenExpires = null;
-        user.previousRefreshToken = null;
-        user.previousRefreshTokenExpires = null;
+        clearLegacyRefreshFields(user);
         await user.save();
       }
     }
@@ -831,50 +1019,14 @@ module.exports = {
     return user;
   },
 
-  /* ─── Delete Account (soft, with PII scrub) ───────────────────────────── */
+  /* ─── Delete Account Permanently ──────────────────────────────────────── */
   /**
-   * Soft-deletes the user and scrubs PII fields so the row no longer
-   * reveals identity. Foreign-key references (assessments, audit logs) are
-   * preserved for regulatory reporting, but every relatable identifier is
-   * either nulled (releasing UNIQUE slots so the email/National-ID can be
-   * reused by a new account) or replaced with a benign placeholder.
-   *
-   * `User.paranoid = true` causes `destroy()` to set `deleted_at`, which is
-   * automatically filtered out by subsequent queries.
-   */
+   * Permanently removes the account and its user-owned assessment data so all
+   * credentials and unique identifiers can be reused for a fresh registration.
+  */
   deleteUserAccount: async (userId) => {
-    const user = await User.findByPk(userId);
-    if (!user) throw new NotFoundError('User not found', 'USER_NOT_FOUND');
-
-    // Capture before scrub so the caller can audit-log the original email.
-    const snapshot = {
-      id: user.id,
-      email: user.email,
-      role: user.role
-    };
-
-    for (const field of PII_FIELDS_TO_SCRUB) {
-      // The `nationalId` setter cascades to `nationalIdHash`, so setting null
-      // here also clears the hash and frees the UNIQUE slot.
-      user.set(field, null);
-    }
-    user.isActive = false;
-    user.refreshToken = null;
-    user.refreshTokenExpires = null;
-    user.previousRefreshToken = null;
-    user.previousRefreshTokenExpires = null;
-    user.passwordResetToken = null;
-    user.passwordResetExpires = null;
-    user.emailVerificationToken = null;
-    user.emailVerificationExpires = null;
-    user.lockoutUntil = null;
-    user.failedLoginAttempts = 0;
-    user.piiScrubbedAt = new Date();
-
-    await user.save();
-    await user.destroy(); // paranoid: sets deletedAt
-
-    return { user, snapshot };
+    const { snapshot, fileCleanupFailures } = await permanentlyDeleteUser(userId);
+    return { user: null, snapshot, fileCleanupFailures };
   },
 
   /* ─── Resend Verification ─────────────────────────────────────────────── */
@@ -962,21 +1114,14 @@ module.exports = {
     user.mustChangePassword = false;
 
     // Invalidate every active session (NIST 800-63B §7.1).
-    user.refreshToken = null;
-    user.refreshTokenExpires = null;
-    user.previousRefreshToken = null;
-    user.previousRefreshTokenExpires = null;
+    await revokeAllAuthSessions(user);
     user.failedLoginAttempts = 0;
     user.lockoutUntil = null;
     await user.save();
 
     // Re-issue tokens for the just-authenticated session so the user's
     // current device keeps working.
-    const accessToken = signToken(user.id, user.role);
-    const refreshToken = signRefreshToken(user.id, user.role);
-    user.refreshToken = hashToken(refreshToken);
-    user.refreshTokenExpires = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
-    await user.save();
+    const { token: accessToken, refreshToken } = await issueAuthTokens(user);
 
     return { user, accessToken, refreshToken };
   },

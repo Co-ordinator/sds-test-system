@@ -1,10 +1,12 @@
 const jwt = require('jsonwebtoken');
 const { AuditLog, User } = require('../models');
 
-// Error handler for JWT verification
-const handleJWTError = () => {
-  const error = new Error('Invalid token');
+// Distinguish routine expiry/missing-cookie responses from malformed tokens so
+// normal session renewal does not flood warning logs.
+const handleJWTError = (code, message) => {
+  const error = new Error(message);
   error.status = 401;
+  error.code = code;
   return error;
 };
 
@@ -13,7 +15,7 @@ const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1] || req.cookies?.accessToken;
 
   if (!token) {
-    return next(handleJWTError());
+    return next(handleJWTError('ACCESS_TOKEN_MISSING', 'Authentication is required'));
   }
 
   try {
@@ -21,7 +23,10 @@ const verifyToken = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    return next(handleJWTError());
+    if (error?.name === 'TokenExpiredError') {
+      return next(handleJWTError('ACCESS_TOKEN_EXPIRED', 'Session access token has expired'));
+    }
+    return next(handleJWTError('INVALID_ACCESS_TOKEN', 'Invalid access token'));
   }
 };
 

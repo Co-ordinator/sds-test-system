@@ -1,11 +1,13 @@
 jest.mock('../src/utils/logger', () => ({
   error: jest.fn(),
   info: jest.fn(),
-  warn: jest.fn()
+  warn: jest.fn(),
+  debug: jest.fn()
 }));
 
 const errorHandler = require('../src/middleware/errorHandling.middleware');
 const { ValidationError, AppError } = require('../src/utils/errors/appError');
+const logger = require('../src/utils/logger');
 
 const mockRes = () => {
   const res = {};
@@ -53,5 +55,31 @@ describe('error middleware', () => {
       message: 'Student not found',
       requestId: 'req-3'
     }));
+  });
+
+  it('does not record the routine unauthenticated session probe as an error', () => {
+    const req = { requestId: 'req-4', method: 'GET', originalUrl: '/api/v1/auth/me' };
+    const res = mockRes();
+    errorHandler(new AppError('Invalid token', { status: 401, code: 'REQUEST_ERROR', expose: true }), req, res, jest.fn());
+
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    expect(logger.error).not.toHaveBeenCalledWith(expect.objectContaining({
+      message: 'REQUEST_ERROR: Invalid token'
+    }));
+  });
+
+  it.each([
+    'ACCESS_TOKEN_MISSING',
+    'ACCESS_TOKEN_EXPIRED',
+    'REFRESH_TOKEN_MISSING',
+    'INVALID_REFRESH_TOKEN'
+  ])('logs routine session failure %s at debug level', (code) => {
+    jest.clearAllMocks();
+    const req = { requestId: 'req-session', method: 'POST', originalUrl: '/api/v1/auth/refresh-token' };
+    const res = mockRes();
+    errorHandler(new AppError('Session unavailable', { status: 401, code, expose: true }), req, res, jest.fn());
+
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });

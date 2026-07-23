@@ -3,7 +3,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell,
   PieChart, Pie, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts';
-import { MoreHorizontal, TrendingUp, TrendingDown, Minus, ChevronRight, Search } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, ChevronRight, Search } from 'lucide-react';
 import { GOV } from '../../theme/government';
 import DataTable from '../../components/data/DataTable';
 import { PIE_COLORS, DEMAND_COLORS, DEMAND_LABELS, RIASEC_COLORS, RIASEC_LABELS, QUAL_LABELS } from './analyticsConstants';
@@ -19,9 +19,6 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
         <p className="text-xs font-semibold leading-tight" style={{ color: GOV.textMuted }}>{title}</p>
         {sub && <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>{sub}</p>}
       </div>
-      <button className="p-0.5 rounded hover:bg-gray-100 flex-shrink-0" style={{ color: GOV.textHint }}>
-        <MoreHorizontal className="w-4 h-4" />
-      </button>
     </div>
     <div className={`flex-1 ${bodyClass}`}>{children}</div>
   </div>
@@ -352,7 +349,6 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
               <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>High-Demand Careers (Eswatini)</p>
               <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>Catalog careers marked as critical or high local demand</p>
             </div>
-            <button className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }}><MoreHorizontal className="w-4 h-4" /></button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px mx-4 mb-4 rounded-lg overflow-hidden" style={{ backgroundColor: GOV.borderLight }}>
             {highDemandCareers.map((career, i) => (
@@ -546,7 +542,6 @@ const AnalyticsCareersSection = ({ kgData, pipelineData, hollandDist = [] }) => 
                 Occupations in the catalog with primary RIASEC and demand levels (live data from the database)
               </p>
             </div>
-            <button type="button" className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }} aria-label="Section menu"><MoreHorizontal className="w-4 h-4" /></button>
           </div>
           <DataTable
             columns={careerKnowledgeColumns}

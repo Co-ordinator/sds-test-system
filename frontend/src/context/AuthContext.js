@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { clearAllQueuedProgress } from '../services/assessmentProgressQueue';
 import { profileNeedsOnboarding } from '../utils/profileOnboarding';
+import { isPublicRoute } from '../utils/authRoutes';
 import StartupScreen from '../components/ui/StartupScreen';
 
 export const AuthContext = createContext();
@@ -16,7 +18,13 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await api.get('/api/v1/auth/me', { skipAuthRetry: true });
+        // Allow the shared interceptor to renew an expired access token from
+        // the httpOnly refresh cookie before deciding that the session ended.
+        const response = await api.get('/api/v1/auth/me', {
+          // A visitor without cookies is anonymous, not an expired session.
+          // Still allow refresh so a real returning session is restored.
+          suppressSessionExpired: true
+        });
         const userData = response.data?.data?.user ?? response.data?.user;
         setUser(userData || null);
         setIsAuthenticated(!!userData);
@@ -35,7 +43,9 @@ export const AuthProvider = ({ children }) => {
     const handleSessionExpired = () => {
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/login');
+      if (!isPublicRoute(window.location.pathname)) {
+        navigate('/login', { replace: true });
+      }
     };
     window.addEventListener('auth:session-expired', handleSessionExpired);
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
@@ -67,6 +77,7 @@ export const AuthProvider = ({ children }) => {
       // Network/API error is non-fatal — clear local session anyway so the
       // user isn't trapped on an authenticated screen.
     } finally {
+      clearAllQueuedProgress();
       setUser(null);
       setIsAuthenticated(false);
       navigate('/', { replace: true });
@@ -80,7 +91,7 @@ export const AuthProvider = ({ children }) => {
       setUser(userData || null);
       return userData;
     } catch (err) {
-      console.error('Failed to refresh permissions:', err);
+      // Keep the current permission snapshot if the refresh request fails.
       throw err;
     }
   }, []);

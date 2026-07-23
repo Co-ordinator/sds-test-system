@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Your SDS Assessment Results</title>
+  <style>
+    @media only screen and (max-width: 600px) {
+      .mobile-pad { padding-left: 16px !important; padding-right: 16px !important; }
+      .result-code { font-size: 25px !important; letter-spacing: 3px !important; }
+      .score-label { font-size: 12px !important; }
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f5f7fb;color:#1f2937;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;word-break:normal;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+    Your Self-Directed Search Holland Code and career recommendations.
+  </div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#f5f7fb;">
+    <tr>
+      <td align="center" style="padding:20px 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:560px;border-collapse:collapse;background-color:#ffffff;border:1px solid #dbe4ee;">
+          <tr>
+            <td class="mobile-pad" style="padding:20px 24px;background-color:#0f2a58;color:#ffffff;font-size:20px;line-height:28px;font-weight:700;">
+              Your SDS Career Assessment Results
+            </td>
+          </tr>
+          <tr>
+            <td class="mobile-pad" style="padding:24px;color:#1f2937;font-size:15px;line-height:24px;">
+              <p style="margin:0 0 12px;">Hello {{firstName}},</p>
+              <p style="margin:0 0 18px;">Here are the results of your Self-Directed Search career assessment{{#if completedAt}} completed on {{completedAt}}{{/if}}.</p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
+                <tr>
+                  <td align="center" style="padding:4px 0 6px;">
+                    <span class="result-code" style="display:inline-block;padding:12px 16px;border:1px solid #b7cff0;background-color:#eef5ff;color:#0f2a58;font-family:'Courier New',monospace;font-size:28px;line-height:36px;letter-spacing:6px;font-weight:700;">{{hollandCode}}</span>
+                  </td>
+                </tr>
+                {{#if hollandLabel}}
+                <tr>
+                  <td align="center" style="padding:0 0 8px;color:#4b5563;font-size:13px;line-height:20px;">{{hollandLabel}}</td>
+                </tr>
+                {{/if}}
+              </table>
+
+              <p style="margin:22px 0 10px;color:#0f2a58;font-size:14px;line-height:20px;font-weight:700;text-transform:uppercase;">Your Interest Profile</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;table-layout:fixed;border-collapse:collapse;">
+                {{#each scores}}
+                <tr>
+                  <td class="score-label" width="42%" style="width:42%;padding:7px 6px 7px 0;border-bottom:1px solid #eef2f7;color:#1f2937;font-size:13px;line-height:18px;vertical-align:middle;overflow-wrap:anywhere;">{{this.letter}} - {{this.label}}</td>
+                  <td width="43%" style="width:43%;padding:7px 5px;border-bottom:1px solid #eef2f7;vertical-align:middle;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;background-color:#eef2f7;">
+                      <tr>
+                        <td width="{{this.score}}%" height="8" style="width:{{this.score}}%;height:8px;background-color:#2563eb;font-size:0;line-height:0;">&nbsp;</td>
+                        <td height="8" style="height:8px;font-size:0;line-height:0;">&nbsp;</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td width="15%" align="right" style="width:15%;padding:7px 0 7px 5px;border-bottom:1px solid #eef2f7;color:#1f2937;font-size:13px;line-height:18px;vertical-align:middle;">{{this.score}}</td>
+                </tr>
+                {{/each}}
+              </table>
+
+              {{#if recommendations.length}}
+              <p style="margin:22px 0 10px;color:#0f2a58;font-size:14px;line-height:20px;font-weight:700;text-transform:uppercase;">Top Career Recommendations</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:separate;border-spacing:0 8px;">
+                {{#each recommendations}}
+                <tr>
+                  <td style="padding:10px 12px;border:1px solid #e5e7eb;color:#1f2937;font-size:14px;line-height:21px;overflow-wrap:anywhere;">
+                    <strong style="color:#0f2a58;">{{this.title}}</strong><br>
+                    <span style="color:#6b7280;font-size:12px;line-height:18px;">{{this.matchPercentage}}% match - {{this.field}}</span>
+                  </td>
+                </tr>
+                {{/each}}
+              </table>
+              {{/if}}
+
+              <p style="margin:20px 0 0;">Sign in to the SDS Career Assessment System to explore your full results, recommended courses, and funding options.</p>
+            </td>
+          </tr>
+          <tr>
+            <td class="mobile-pad" align="center" style="padding:14px 24px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:18px;">
+              &copy; {{currentYear}} Ministry of Labour and Social Security - Kingdom of Eswatini
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -4,9 +4,9 @@ import {
   PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   ComposedChart, Line, Legend,
 } from 'recharts';
-import { MoreHorizontal } from 'lucide-react';
 import { GOV } from '../../theme/government';
 import { PIE_COLORS, RIASEC_LABELS } from './analyticsConstants';
+import { normalizeAgeGroupDistribution } from '../../utils/analyticsFilters';
 
 /* ── Card shell ── */
 const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' }) => (
@@ -16,9 +16,6 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
         <p className="text-xs font-semibold leading-tight" style={{ color: GOV.textMuted }}>{title}</p>
         {sub && <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>{sub}</p>}
       </div>
-      <button className="p-0.5 rounded hover:bg-gray-100 flex-shrink-0" style={{ color: GOV.textHint }}>
-        <MoreHorizontal className="w-4 h-4" />
-      </button>
     </div>
     <div className={`flex-1 ${bodyClass}`}>{children}</div>
   </div>
@@ -36,7 +33,7 @@ const DonutCenter = ({ cx, cy, total, label }) => (
 
 const AnalyticsOverviewSection = ({
   analytics, riasecData, pieData, regionChartData, userTypePieData, trendData,
-  kgData, completionRate, totalAssessments, completedAssessments,
+  kgData, segmentData, completionRate, totalAssessments, completedAssessments,
 }) => {
   const riasecDonutData = useMemo(() => {
     if (!riasecData?.length) return [];
@@ -69,6 +66,11 @@ const AnalyticsOverviewSection = ({
       name: d.gender ? d.gender.charAt(0).toUpperCase() + d.gender.slice(1) : 'Unknown',
       value: Number(d.count),
     })), [kgData]);
+
+  const ageGroupData = useMemo(
+    () => normalizeAgeGroupDistribution(segmentData?.byAgeGroup || []),
+    [segmentData]
+  );
 
   const completionPct = Math.min(Number(completionRate) || 0, 100);
 
@@ -219,6 +221,44 @@ const AnalyticsOverviewSection = ({
       </Card>
 
       {/* ── Row 3 ── */}
+
+      <Card
+        title="Age Group Distribution"
+        sub="Assessment participation and completion by age band"
+        className="col-span-12"
+      >
+        {ageGroupData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={ageGroupData} barGap={3} barCategoryGap="28%">
+              <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+              <XAxis dataKey="ageGroup" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+              <Tooltip />
+              <Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
+              <Bar
+                dataKey="started"
+                name="Assessments started"
+                fill="#2563eb"
+                fillOpacity={0.78}
+                radius={[3, 3, 0, 0]}
+                maxBarSize={44}
+              />
+              <Bar
+                dataKey="completed"
+                name="Assessments completed"
+                fill="#059669"
+                fillOpacity={0.82}
+                radius={[3, 3, 0, 0]}
+                maxBarSize={44}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[220px] flex items-center justify-center text-xs" style={{ color: GOV.textHint }}>
+            No age-group data is available for the selected filters.
+          </div>
+        )}
+      </Card>
 
       {/* Career Fields */}
       <Card title="Career Catalog Fields" sub="Occupation categories currently stored in the database" className="col-span-12 md:col-span-6 lg:col-span-4">

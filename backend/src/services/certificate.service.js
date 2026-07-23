@@ -1,9 +1,13 @@
 'use strict';
 
-const { Certificate, Assessment, Answer, User, Institution } = require('../models');
+const { Certificate, Assessment, Answer, User, Institution, Occupation } = require('../models');
 const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
+const {
+  assessmentAttributes,
+  getAssessmentOptionalColumnSupport
+} = require('../utils/assessmentColumns');
 
 const attachAssessmentDisplayCode = (assessment) => {
   if (!assessment) return assessment;
@@ -20,6 +24,35 @@ const attachCertificateDisplayCode = (certificate) => {
 };
 
 const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
+
+const CERTIFICATE_USER_ATTRIBUTES = [
+  'id', 'firstName', 'lastName', 'email', 'nationalId', 'studentCode',
+  'userType', 'institutionId', 'currentInstitution',
+  'workplaceInstitutionId', 'workplaceName',
+  'currentOccupationId', 'currentOccupation',
+  'region', 'district', 'degreeProgram', 'yearOfStudy', 'yearsExperience'
+];
+
+const certificateProfileIncludes = () => [
+  {
+    model: Institution,
+    as: 'institution',
+    attributes: ['id', 'name', 'region', 'district'],
+    required: false
+  },
+  {
+    model: Institution,
+    as: 'workplace',
+    attributes: ['id', 'name', 'region', 'district'],
+    required: false
+  },
+  {
+    model: Occupation,
+    as: 'occupation',
+    attributes: ['id', 'name'],
+    required: false
+  }
+];
 
 const pad = (n, w = 4) => String(n).padStart(w, '0');
 
@@ -55,15 +88,16 @@ module.exports = {
 
   /* ─── Generate (create/upsert) certificate ─────────────────────────────── */
   generateCertificate: async (assessmentId, generatedBy, options = {}) => {
+    const optionalColumns = await getAssessmentOptionalColumnSupport(Assessment.sequelize);
     const assessment = await Assessment.findByPk(assessmentId, {
+      attributes: assessmentAttributes({
+        certificateProfileSnapshot: optionalColumns.certificateProfileSnapshot
+      }),
       include: [{
         model: User,
         as: 'user',
-        attributes: [
-          'id', 'firstName', 'lastName', 'email', 'nationalId', 'studentCode',
-          'institutionId', 'currentInstitution', 'region', 'district'
-        ],
-        include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'region', 'district'] }]
+        attributes: CERTIFICATE_USER_ATTRIBUTES,
+        include: certificateProfileIncludes()
       }]
     });
 
@@ -92,11 +126,16 @@ module.exports = {
 
   /* ─── Get data for PDF download ────────────────────────────────────────── */
   getDownloadData: async (assessmentId, userId, userRole) => {
+    const optionalColumns = await getAssessmentOptionalColumnSupport(Assessment.sequelize);
     const assessment = await Assessment.findByPk(assessmentId, {
+      attributes: assessmentAttributes({
+        certificateProfileSnapshot: optionalColumns.certificateProfileSnapshot
+      }),
       include: [{
         model: User,
         as: 'user',
-        include: [{ model: Institution, as: 'institution', attributes: ['id', 'name', 'region', 'district'] }]
+        attributes: CERTIFICATE_USER_ATTRIBUTES,
+        include: certificateProfileIncludes()
       }]
     });
 
@@ -173,7 +212,9 @@ module.exports = {
 
   /* ─── Check if certificate exists ──────────────────────────────────────── */
   checkCertificate: async (assessmentId, userId, userRole) => {
-    const assessment = await Assessment.findByPk(assessmentId);
+    const assessment = await Assessment.findByPk(assessmentId, {
+      attributes: ['id', 'userId', 'status']
+    });
     if (!assessment || (assessment.userId !== userId && userRole !== 'System Administrator' && userRole !== 'Test Administrator')) {
       throw new ForbiddenError('Not authorized', 'CERTIFICATE_NOT_AUTHORIZED');
     }

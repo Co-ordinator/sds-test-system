@@ -6,7 +6,10 @@ const isTest = process.env.NODE_ENV === 'test';
 const baseConfig = {
   standardHeaders: true,
   legacyHeaders: false,
-  skip: () => isDevelopment || isTest
+  skip: (req) => {
+    if (isDevelopment || isTest) return true;
+    return String(req.originalUrl || req.url || '').startsWith('/api/v1/auth/');
+  }
 };
 
 const apiLimiter = rateLimit({

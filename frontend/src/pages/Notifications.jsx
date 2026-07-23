@@ -37,6 +37,7 @@ const Notifications = () => {
       await api.patch(`/api/v1/admin/notifications/${id}/read`);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, details: { ...n.details, isRead: true } } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
+      window.dispatchEvent(new CustomEvent('notifications:changed'));
     } catch { /* silent */ }
   };
 
@@ -44,6 +45,7 @@ const Notifications = () => {
     const t = n.actionType || '';
     const d = n.details || {};
     if (t === 'CERTIFICATE_READY' && d.assessmentId) return `/dashboard`;
+    if (t === 'ASSESSMENT_COMPLETED_NOTIFY' && d.assessmentId) return `/admin/results?assessmentId=${d.assessmentId}`;
     if (t === 'assessment_completed' && d.assessmentId) return `/results?assessmentId=${d.assessmentId}`;
     if (t === 'assessment_completed') return '/admin/results';
     if (t === 'user_registered' || t === 'user_created') return '/admin/users';
@@ -64,6 +66,7 @@ const Notifications = () => {
       await api.post('/api/v1/admin/notifications/mark-all-read');
       setNotifications(prev => prev.map(n => ({ ...n, details: { ...n.details, isRead: true } })));
       setUnreadCount(0);
+      window.dispatchEvent(new CustomEvent('notifications:changed'));
       showToast('All notifications marked as read');
     } catch { showToast('Failed', 'error'); }
   };

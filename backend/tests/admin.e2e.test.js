@@ -4,7 +4,13 @@ require('dotenv').config();
 
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'testsecret';
-process.env.TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+
+const hasIsolatedTestDatabase = Boolean(
+  process.env.TEST_DATABASE_URL
+  && process.env.TEST_DATABASE_URL !== process.env.DATABASE_URL
+  && process.env.RUN_DB_E2E === 'true'
+);
+const describeDb = hasIsolatedTestDatabase ? describe : describe.skip;
 
 const app = require('../src/app');
 const { sequelize, Question, Occupation, User, Permission } = require('../src/models');
@@ -28,9 +34,7 @@ const REQUIRED_PERMISSION_CODES = [
 ];
 
 beforeAll(async () => {
-  if (!process.env.TEST_DATABASE_URL) {
-    throw new Error('TEST_DATABASE_URL is required for tests');
-  }
+  if (!hasIsolatedTestDatabase) return;
   await sequelize.sync({ force: true });
   const admin = await User.create({
     id: ADMIN_ID,
@@ -51,15 +55,17 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  if (!hasIsolatedTestDatabase) return;
   await Question.destroy({ where: {} });
   await Occupation.destroy({ where: {} });
 });
 
 afterAll(async () => {
+  if (!hasIsolatedTestDatabase) return;
   await sequelize.close();
 });
 
-describe('Admin Questions', () => {
+describeDb('Admin Questions', () => {
   test('CRUD flow', async () => {
     const createRes = await request(app)
       .post('/api/v1/admin/questions')
@@ -128,7 +134,7 @@ describe('Admin Questions', () => {
   });
 });
 
-describe('Admin Occupations', () => {
+describeDb('Admin Occupations', () => {
   test('CRUD flow', async () => {
     const createRes = await request(app)
       .post('/api/v1/admin/occupations')

@@ -139,8 +139,8 @@ export default function ForgotPassword() {
       setFormError('Enter the 6-digit reset code sent to your email.');
       return;
     }
-    if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(newPassword)) {
-      setFormError('Use at least 8 characters with letters and numbers. Symbols are allowed.');
+    if (newPassword.length < 6) {
+      setFormError('Password must be at least 6 characters. Any characters are allowed.');
       return;
     }
     if (newPassword !== confirmPassword) {

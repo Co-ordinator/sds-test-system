@@ -3,11 +3,11 @@ const { v4: uuidv4 } = require('uuid');
 module.exports = {
   up: async (queryInterface, Sequelize) => {
     const levels = [
-      { level: 1, description: "Lower than matric" },
-      { level: 2, description: "High school education (matric)" },
-      { level: 3, description: "Training at college/technical college/on-the-job-training" },
-      { level: 4, description: "Training at teachers' college/technikon/university" },
-      { level: 5, description: "Postgraduate degree/university training plus experience" }
+      { level: 1, description: 'Lower Than High School' },
+      { level: 2, description: 'High School Level (including A-Level and IB Certificate)' },
+      { level: 3, description: 'Certificate / Diploma' },
+      { level: 4, description: "Bachelor's Degree" },
+      { level: 5, description: 'Postgraduate' }
     ];
 
     const timestamp = new Date();

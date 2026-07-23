@@ -7,11 +7,23 @@ import { useToast, Toast, ErrorBanner } from '../../../components/ui/StatusIndic
 import { useInstitutions } from '../../../hooks/useInstitutions';
 import { adminService } from '../../../services/adminService';
 import { PermissionGate } from '../../../context/PermissionContext';
+import { filterInstitutions, summarizeInstitutions } from '../../../utils/institutionFilters';
 
 const EMPTY_INST = { name: '', type: 'school', region: 'hhohho' };
 
 const AdminInstitutionsPanel = () => {
-  const { institutions, loading, error, search, setSearch, load, create, update, remove } = useInstitutions();
+  const {
+    institutions,
+    allInstitutions,
+    loading,
+    error,
+    search,
+    setSearch,
+    load,
+    create,
+    update,
+    remove
+  } = useInstitutions();
   const { toast, showToast, Toast: ToastComp } = useToast();
 
   const [editingInst, setEditingInst] = useState(null);
@@ -107,15 +119,14 @@ const AdminInstitutionsPanel = () => {
     } catch { showToast('Failed to delete institution', 'error'); }
   };
 
-  const pendingCount = institutions.filter(i => i.status === 'pending_review').length;
-
-  const filteredInstitutions = institutions.filter(i => {
-    if (typeFilter && i.type !== typeFilter) return false;
-    if (regionFilter && i.region !== regionFilter) return false;
-    if (statusFilter === 'pending' && i.status !== 'pending_review') return false;
-    if (statusFilter === 'approved' && i.status === 'pending_review') return false;
-    return true;
+  const completeInstitutionList = allInstitutions || institutions;
+  const filteredInstitutions = filterInstitutions(completeInstitutionList, {
+    search,
+    type: typeFilter,
+    region: regionFilter,
+    status: statusFilter
   });
+  const institutionSummary = summarizeInstitutions(filteredInstitutions, completeInstitutionList);
 
   const handleApprove = async (inst) => {
     try {
@@ -191,7 +202,9 @@ const AdminInstitutionsPanel = () => {
         <option value="approved">Approved</option>
         <option value="pending">Pending</option>
       </select>
-      <span className="text-xs" style={{ color: GOV.textMuted }}>{filteredInstitutions.length}{filteredInstitutions.length !== institutions.length ? ` / ${institutions.length}` : ''}{pendingCount > 0 ? ` · ${pendingCount} pending` : ''}</span>
+      <span className="text-xs" style={{ color: GOV.textMuted }}>
+        {institutionSummary.filtered} / {institutionSummary.total} · {institutionSummary.pending} pending
+      </span>
       <div className="ml-auto flex gap-2">
         <PermissionGate permission="institutions.import">
           <button type="button" onClick={downloadTemplate}

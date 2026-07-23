@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Filter, RefreshCw, Download
 } from 'lucide-react';
@@ -9,13 +9,14 @@ import AppShell from '../components/layout/AppShell';
 import FilterDialog from '../components/ui/FilterDialog';
 import { useAccessibility } from '../context/AccessibilityContext';
 import {
-  RIASEC_LABELS, REGION_LABELS, INSTITUTION_TYPE_LABELS, USER_TYPE_LABELS
+  RIASEC_LABELS, REGION_LABELS, INSTITUTION_TYPE_LABELS, USER_TYPE_LABELS, USER_TYPE_OPTIONS
 } from '../features/analytics/analyticsConstants';
 import AnalyticsOverviewSection from '../features/analytics/AnalyticsOverviewSection';
 import AnalyticsCareersSection from '../features/analytics/AnalyticsCareersSection';
 import AnalyticsMapSection from '../features/analytics/AnalyticsMapSection';
 import AnalyticsTrendsSection from '../features/analytics/AnalyticsTrendsSection';
 import AnalyticsFundingAlignmentSection from '../features/analytics/AnalyticsFundingAlignmentSection';
+import { compactAnalyticsFilters } from '../utils/analyticsFilters';
 
 const ANALYTICS_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -51,10 +52,10 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
   const [hollandDist, setHollandDist] = useState([]);
   const [trend, setTrend] = useState([]);
   const [regionalData, setRegionalData] = useState(null);
-  const [mapRegionalData, setMapRegionalData] = useState(null);
   const [kgData, setKgData] = useState(null);
   const [institutions, setInstitutions] = useState([]);
   const [institutionBreakdown, setInstitutionBreakdown] = useState(null);
+  const analyticsRequestRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [segmentData, setSegmentData] = useState(null);
   const [pipelineData, setPipelineData] = useState(null);
@@ -148,49 +149,71 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
 
   const handleExport = async (format) => {
     try {
-      const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
+      const f = compactAnalyticsFilters(filters);
       await analyticsService.exportReport(format, f);
     } catch {}
   };
 
   useEffect(() => {
-    api.get('/api/v1/institutions').then(r => setInstitutions(r.data?.data?.institutions || [])).catch(() => {});
+    api.get('/api/v1/institutions', { params: { status: 'approved' } }).then((response) => {
+      const institutionIds = new Set();
+      const uniqueInstitutions = (response.data?.data?.institutions || []).filter((institution) => {
+        const id = String(institution.id || '').trim();
+        if (!id || institutionIds.has(id)) return false;
+        institutionIds.add(id);
+        return true;
+      });
+      setInstitutions(uniqueInstitutions);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
+    const requestId = analyticsRequestRef.current + 1;
+    analyticsRequestRef.current = requestId;
     const fetchAll = async () => {
       try {
-        const f = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
-        const mapFilters = { ...f };
-        delete mapFilters.region;
-        const [overviewData, hollandData, trendData, regionalData, segmentData, fundingData, pipeline, kg, institutionData, unfilteredRegionalData] = await Promise.all([
-          analyticsService.getOverview(f),
-          analyticsService.getHollandDistribution(f),
-          analyticsService.getTrend(f),
-          analyticsService.getRegional(f),
-          analyticsService.getSegmentation(f),
-          analyticsService.getFundingAlignment(f),
-          analyticsService.getSkillsPipeline(f),
-          analyticsService.getKnowledgeGraph(f),
-          analyticsService.getInstitutionBreakdown(f),
-          filters.region ? analyticsService.getRegional(mapFilters) : Promise.resolve(null),
-        ]);
-        setAnalytics(overviewData);
-        setHollandDist(hollandData);
-        setTrend(trendData);
-        setRegionalData(regionalData);
-        setMapRegionalData(unfilteredRegionalData || regionalData);
-        setSegmentData(segmentData);
-        setFundingAlignmentData(fundingData);
-        setPipelineData(pipeline);
-        setKgData(kg);
-        setInstitutionBreakdown(institutionData);
-      } catch {
-        setAnalytics(null); setHollandDist([]); setTrend([]); setRegionalData(null); setMapRegionalData(null); setSegmentData(null); setFundingAlignmentData(null); setPipelineData(null); setKgData(null); setInstitutionBreakdown(null);
-      } finally { setLoading(false); }
+        const f = compactAnalyticsFilters(filters);
+        const tasks = {
+          overview: { run: () => analyticsService.getOverview(f), apply: setAnalytics, fallback: null },
+          holland: { run: () => analyticsService.getHollandDistribution(f), apply: setHollandDist, fallback: [] },
+          trend: { run: () => analyticsService.getTrend(f), apply: setTrend, fallback: [] },
+          regional: { run: () => analyticsService.getRegional(f), apply: setRegionalData, fallback: null },
+          segmentation: { run: () => analyticsService.getSegmentation(f), apply: setSegmentData, fallback: null },
+          funding: { run: () => analyticsService.getFundingAlignment(f), apply: setFundingAlignmentData, fallback: null },
+          pipeline: { run: () => analyticsService.getSkillsPipeline(f), apply: setPipelineData, fallback: null },
+          knowledge: { run: () => analyticsService.getKnowledgeGraph(f), apply: setKgData, fallback: null },
+          institutions: { run: () => analyticsService.getInstitutionBreakdown(f), apply: setInstitutionBreakdown, fallback: null },
+        };
+        const taskKeysByTab = {
+          dashboard: ['overview', 'holland', 'trend', 'regional', 'institutions'],
+          overview: ['overview', 'holland', 'trend', 'regional', 'segmentation', 'knowledge'],
+          career: ['holland', 'pipeline', 'knowledge'],
+          map: ['regional'],
+          trends: ['overview', 'holland', 'trend', 'segmentation', 'knowledge'],
+          funding: ['funding'],
+        };
+
+        // Run only the active tab's queries and keep them sequential. Several
+        // endpoints execute grouped queries internally; firing all nine at
+        // once exhausted the five-connection database pool during training.
+        for (const key of taskKeysByTab[activeTab] || taskKeysByTab.overview) {
+          if (requestId !== analyticsRequestRef.current) return;
+          const task = tasks[key];
+          try {
+            const value = await task.run();
+            if (requestId !== analyticsRequestRef.current) return;
+            task.apply(value);
+          } catch {
+            if (requestId !== analyticsRequestRef.current) return;
+            task.apply(task.fallback);
+          }
+        }
+      } finally {
+        if (requestId === analyticsRequestRef.current) setLoading(false);
+      }
     };
     setLoading(true); fetchAll();
-  }, [filters.institutionId, filters.institutionType, filters.region, filters.userType, filters.startDate, filters.endDate, refreshKey]);
+  }, [activeTab, filters.institutionId, filters.institutionType, filters.region, filters.userType, filters.startDate, filters.endDate, refreshKey]);
 
   /* Derived data */
   const riasecData = useMemo(() => analytics?.riasecAverages ? [
@@ -218,9 +241,14 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
     topCode: r.topCode || '--'
   })), [regionalData]);
 
-  const userTypePieData = useMemo(() => (regionalData?.userTypeDistribution || []).map(d => ({
-    name: USER_TYPE_LABELS[d.userType] || d.userType, value: Number(d.count || 0)
-  })), [regionalData]);
+  const userTypePieData = useMemo(() => {
+    const merged = {};
+    (regionalData?.userTypeDistribution || []).forEach((row) => {
+      const name = USER_TYPE_LABELS[row.userType] || row.userType;
+      merged[name] = (merged[name] || 0) + Number(row.count || 0);
+    });
+    return Object.entries(merged).map(([name, value]) => ({ name, value }));
+  }, [regionalData]);
 
   const completionRate = analytics?.completionRate ?? 0;
   const totalUsers = regionalData?.summary?.totalUsers ?? analytics?.totals?.users ?? 0;
@@ -408,7 +436,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
                 style={{ color: GOV.text }}
               >
                 <option value="">All User Types</option>
-                {Object.entries(USER_TYPE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                {USER_TYPE_OPTIONS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
             <div>
@@ -444,7 +472,7 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
             {activeTab === 'dashboard' && hasDashboardOverview && dashboardOverview({
               analytics,
               regionalData,
-              mapRegionalData: mapRegionalData || regionalData,
+              mapRegionalData: regionalData,
               hollandDist,
               trend,
               institutions,
@@ -457,7 +485,8 @@ export const AnalyticsPanel = ({ embedded = false, dashboardOverview = null }) =
               <AnalyticsOverviewSection
                 analytics={analytics} riasecData={riasecData} pieData={pieData}
                 regionChartData={regionChartData} userTypePieData={userTypePieData}
-                trendData={trendData} kgData={kgData} completionRate={completionRate}
+                trendData={trendData} kgData={kgData} segmentData={segmentData}
+                completionRate={completionRate}
                 totalUsers={totalUsers} totalAssessments={totalAssessments}
                 completedAssessments={completedAssessments}
               />

@@ -2,6 +2,9 @@ const adminService = require('../services/admin.service');
 const { AuditLog } = require('../models');
 const logger = require('../utils/logger');
 const { sendEmail } = require('../config/email.config');
+const AsyncTtlCache = require('../utils/asyncTtlCache');
+
+const notificationCache = new AsyncTtlCache({ ttlMs: 10000, maxEntries: 10 });
 
 module.exports = {
   getAllUsers: async (req, res, next) => {
@@ -35,8 +38,8 @@ module.exports = {
     try {
       logger.info({ actionType: 'USER_DELETION', message: `Attempting to delete user ${req.params.id}`, req, details: { deletedBy: req.user?.id } });
       await adminService.deleteUser(req.params.id);
-      await AuditLog.create({ userId: req.user?.id, actionType: 'USER_DELETED', description: 'User account deleted by admin', details: { resourceType: 'user', resourceId: req.params.id, requestMethod: req.method }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
-      logger.info({ actionType: 'USER_DELETION', message: `User deleted: ${req.params.id}`, req, details: { deletedBy: req.user?.id } });
+      await AuditLog.create({ userId: req.user?.id, actionType: 'USER_DELETED', description: 'User account permanently deleted by admin', details: { resourceType: 'user_deletion', requestMethod: req.method }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
+      logger.info({ actionType: 'USER_DELETION', message: 'User permanently deleted', req, details: { deletedBy: req.user?.id } });
       res.status(204).send();
     } catch (error) {
       if (error.code === 'USER_NOT_FOUND') {
@@ -95,7 +98,7 @@ module.exports = {
   bulkDeleteUsers: async (req, res, next) => {
     try {
       const deleted = await adminService.bulkDeleteUsers(req.body.ids, req.user?.id);
-      await AuditLog.create({ userId: req.user?.id, actionType: 'BULK_DELETE_USERS', description: `Bulk deleted ${deleted} users`, details: { ids: req.body.ids, count: deleted }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
+      await AuditLog.create({ userId: req.user?.id, actionType: 'BULK_DELETE_USERS', description: `Permanently deleted ${deleted} users`, details: { count: deleted }, ipAddress: req.ip, userAgent: req.headers['user-agent'] });
       logger.info({ actionType: 'BULK_DELETE_USERS', message: `Bulk deleted ${deleted} users`, req, details: { adminId: req.user?.id, count: deleted } });
       res.json({ status: 'success', data: { deleted } });
     } catch (error) {
@@ -156,7 +159,14 @@ module.exports = {
 
   getNotifications: async (req, res, next) => {
     try {
-      const { notifications, unreadCount } = await adminService.getNotifications(req.query.limit);
+      const parsedLimit = Number.parseInt(req.query.limit, 10);
+      const limit = Number.isFinite(parsedLimit)
+        ? Math.min(100, Math.max(1, parsedLimit))
+        : 50;
+      const { notifications, unreadCount } = await notificationCache.get(
+        `notifications:${limit}`,
+        () => adminService.getNotifications(limit)
+      );
       res.status(200).json({ status: 'success', data: { notifications, unreadCount } });
     } catch (error) {
       logger.error({ actionType: 'ADMIN_ACTION_FAILED', message: 'Failed to get notifications', req, details: { error: error.message } });
@@ -167,6 +177,7 @@ module.exports = {
   markNotificationRead: async (req, res, next) => {
     try {
       const log = await adminService.markNotificationRead(req.params.id);
+      notificationCache.clear();
       res.status(200).json({ status: 'success', data: { notification: log } });
     } catch (error) {
       if (error.code === 'NOTIFICATION_NOT_FOUND') return res.status(404).json({ status: 'error', message: error.message });
@@ -176,8 +187,13 @@ module.exports = {
 
   markAllNotificationsRead: async (req, res, next) => {
     try {
-      await adminService.markAllNotificationsRead();
-      res.status(200).json({ status: 'success', message: 'All notifications marked as read' });
+      const updatedCount = await adminService.markAllNotificationsRead();
+      notificationCache.clear();
+      res.status(200).json({
+        status: 'success',
+        message: 'All notifications marked as read',
+        data: { updatedCount }
+      });
     } catch (error) {
       next(error);
     }
@@ -191,7 +207,7 @@ module.exports = {
       try {
         await sendEmail({
           email: user.email,
-          subject: `Welcome to SDS - Your ${roleLabel} Account`,
+          subject: `Self-Directed Search System - Your ${roleLabel} Account`,
           template: 'user-welcome',
           context: {
             firstName: user.firstName,
@@ -240,7 +256,7 @@ module.exports = {
         try {
           await sendEmail({
             email: credential.email,
-            subject: 'Welcome to SDS - Your System Administrator Account',
+            subject: 'Self-Directed Search System - Your System Administrator Account',
             template: 'user-welcome',
             context: {
               email: credential.email,

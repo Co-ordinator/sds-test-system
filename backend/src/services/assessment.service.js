@@ -4,6 +4,26 @@ const { Assessment, Answer, Question, User } = require('../models');
 const { Op } = require('sequelize');
 const scoringService = require('./scoring.service');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors/appError');
+const {
+  ASSESSMENT_CORE_ATTRIBUTES,
+  getAssessmentDatabaseColumns
+} = require('../utils/assessmentColumns');
+
+const ASSESSMENT_CORE_DATABASE_COLUMNS = getAssessmentDatabaseColumns(Assessment);
+
+const QUESTION_COUNT_CACHE_MS = 60 * 1000;
+let questionCountCache = { value: null, expiresAt: 0 };
+
+const getTotalQuestionCount = async () => {
+  const now = Date.now();
+  if (Number.isInteger(questionCountCache.value) && questionCountCache.expiresAt > now) {
+    return questionCountCache.value;
+  }
+
+  const value = await Question.count();
+  questionCountCache = { value, expiresAt: now + QUESTION_COUNT_CACHE_MS };
+  return value;
+};
 
 const attachHollandCodeDisplay = (assessment) => {
   if (!assessment) return assessment;
@@ -26,6 +46,7 @@ module.exports = {
   startAssessment: async (userId) => {
     const existing = await Assessment.findOne({
       where: { userId, status: 'in_progress' },
+      attributes: ASSESSMENT_CORE_ATTRIBUTES,
       order: [['createdAt', 'DESC']]
     });
 
@@ -33,11 +54,19 @@ module.exports = {
       return { assessment: existing, resumed: true };
     }
 
-    const assessment = await Assessment.create({
-      userId,
-      status: 'in_progress',
-      progress: 0
-    });
+    const assessment = await Assessment.create(
+      {
+        userId,
+        status: 'in_progress',
+        progress: 0
+      },
+      {
+        fields: ['userId', 'status', 'progress'],
+        // Explicit RETURNING arrays are raw SQL column names in Sequelize.
+        // Use physical snake_case names so PostgreSQL never receives "scoreR" etc.
+        returning: ASSESSMENT_CORE_DATABASE_COLUMNS
+      }
+    );
 
     return { assessment, resumed: false };
   },
@@ -46,18 +75,15 @@ module.exports = {
     const assessments = await Assessment.findAll({
       where: { userId },
       order: [['createdAt', 'DESC']],
-      attributes: [
-        'id', 'status', 'progress', 'hollandCode', 'hollandCodeDisplay',
-        'scoreR', 'scoreI', 'scoreA', 'scoreS', 'scoreE', 'scoreC',
-        'completedAt', 'createdAt', 'updatedAt'
-      ]
+      attributes: ASSESSMENT_CORE_ATTRIBUTES
     });
     return assessments.map(attachHollandCodeDisplay);
   },
 
   getAssessment: async (assessmentId, userId) => {
     const assessment = await Assessment.findOne({
-      where: { id: assessmentId, userId }
+      where: { id: assessmentId, userId },
+      attributes: ASSESSMENT_CORE_ATTRIBUTES
     });
     if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
     return attachHollandCodeDisplay(assessment);
@@ -67,7 +93,8 @@ module.exports = {
 
   getProgress: async (assessmentId, userId) => {
     const assessment = await Assessment.findOne({
-      where: { id: assessmentId, userId }
+      where: { id: assessmentId, userId },
+      attributes: ASSESSMENT_CORE_ATTRIBUTES
     });
     if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
 
@@ -83,7 +110,8 @@ module.exports = {
 
   saveProgress: async (assessmentId, userId, answers) => {
     const assessment = await Assessment.findOne({
-      where: { id: assessmentId, userId }
+      where: { id: assessmentId, userId },
+      attributes: ASSESSMENT_CORE_ATTRIBUTES
     });
     if (!assessment || assessment.status !== 'in_progress') {
       throw new NotFoundError('Assessment not found or not in progress', 'ASSESSMENT_NOT_IN_PROGRESS');
@@ -93,7 +121,7 @@ module.exports = {
       throw new BadRequestError('answers array is required', 'INVALID_ANSWERS_PAYLOAD');
     }
 
-    const totalQuestions = await Question.count();
+    const totalQuestions = await getTotalQuestionCount();
 
     const normalizeValue = (v, section) => {
       const s = String(v).trim();
@@ -127,6 +155,7 @@ module.exports = {
       });
     }
 
+    let answeredCount = 0;
     const transaction = await Assessment.sequelize.transaction();
     try {
       if (validRows.length > 0) {
@@ -136,7 +165,7 @@ module.exports = {
         });
       }
 
-      const answeredCount = await Answer.count({ where: { assessmentId }, transaction });
+      answeredCount = await Answer.count({ where: { assessmentId }, transaction });
       const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
 
       await Assessment.update(
@@ -149,7 +178,6 @@ module.exports = {
       throw error;
     }
 
-    const answeredCount = await Answer.count({ where: { assessmentId } });
     const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
     return { progress: Number(progress.toFixed(2)), answeredCount };
   },
@@ -169,7 +197,8 @@ module.exports = {
 
   submitAssessment: async (assessmentId, userId) => {
     const assessment = await Assessment.findOne({
-      where: { id: assessmentId, userId }
+      where: { id: assessmentId, userId },
+      attributes: ASSESSMENT_CORE_ATTRIBUTES
     });
     if (!assessment || assessment.status !== 'in_progress') {
       throw new NotFoundError('Assessment not found or not in progress', 'ASSESSMENT_NOT_IN_PROGRESS');
@@ -187,6 +216,7 @@ module.exports = {
 
   getResults: async (assessmentId, userId, userRole) => {
     const assessment = await Assessment.findByPk(assessmentId, {
+      attributes: ASSESSMENT_CORE_ATTRIBUTES,
       include: [{
         model: User,
         as: 'user',
@@ -227,6 +257,7 @@ module.exports = {
 
   getResultsForPdf: async (assessmentId, userId, userRole) => {
     const assessment = await Assessment.findByPk(assessmentId, {
+      attributes: ASSESSMENT_CORE_ATTRIBUTES,
       include: [{ model: User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'institutionId', 'userType', 'gradeLevel', 'degreeProgram', 'yearOfStudy', 'yearsExperience'] }]
     });
 

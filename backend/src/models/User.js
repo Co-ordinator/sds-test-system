@@ -405,6 +405,16 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'must_change_password'
     },
+    loginCardCredentialNonce: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+      field: 'login_card_credential_nonce'
+    },
+    loginCardPasswordIssuedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'login_card_password_issued_at'
+    },
 
     // Test Taker journey: set true only when required profile fields are captured (server-side)
     onboardingCompleted: {
@@ -452,6 +462,13 @@ module.exports = (sequelize, DataTypes) => {
       beforeUpdate: async (user) => {
         // Hash password if changed
         if (user.changed('password')) {
+          // Normal password changes invalidate a reusable login-card
+          // credential. Login-card issuance changes the nonce and password in
+          // the same update, so its new nonce is intentionally retained.
+          if (!user.changed('loginCardCredentialNonce')) {
+            user.loginCardCredentialNonce = null;
+            user.loginCardPasswordIssuedAt = null;
+          }
           user.password = await bcrypt.hash(user.password, 10);
         }
         
@@ -487,6 +504,8 @@ module.exports = (sequelize, DataTypes) => {
     delete values.previousRefreshTokenExpires;
     delete values.failedLoginAttempts;
     delete values.lockoutUntil;
+    delete values.loginCardCredentialNonce;
+    delete values.loginCardPasswordIssuedAt;
     delete values.emailVerificationLastSentAt;
     delete values.emailVerificationResendCount;
     delete values.emailVerificationResendWindowStartedAt;
@@ -512,6 +531,12 @@ module.exports = (sequelize, DataTypes) => {
     User.hasMany(models.AuditLog, {
       foreignKey: 'userId',
       as: 'auditLogs'
+    });
+
+    User.hasMany(models.AuthSession, {
+      foreignKey: 'userId',
+      as: 'authSessions',
+      onDelete: 'CASCADE'
     });
 
     User.belongsTo(models.EducationLevel, {

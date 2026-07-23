@@ -1,5 +1,45 @@
 # SDS Test System Changelog
 
+## 2026-07-23
+
+### Client-Preferred UI Baseline
+
+- Reverted the contributor's broad replacement design because the client explicitly preferred the established/previous UI.
+- Confirmed the current landing page, navigation, dashboards, role journeys, and visual language as the client-approved baseline.
+- Retained and reconciled compatible functional QA fixes without reintroducing the rejected redesign.
+- Documented that future conflict resolution must preserve the approved UI unless the client explicitly authorizes another redesign.
+
+### QA Remediation And Reliability
+
+- Completed the applicable SDS QA remediation across authentication, profiles, assessment progress, analytics, institution scoping, login cards, FAQs, reporting, certificates, email templates, and data cleanup.
+- Added per-device refresh-token sessions so multiple trainees can use a shared account without one login invalidating the others.
+- Prevented anonymous startup checks from redirecting the public landing page to login.
+- Reduced notification polling and analytics query pressure observed in the hosted logs.
+- Added the national age-group distribution chart and preserved school-scoped Test Administrator behavior.
+- Updated certificate and results-PDF branding to `Pre-Service Tertiary Education & Training`.
+- Added the required non-destructive migrations and focused regression coverage.
+
+### Verification
+
+- Applied all pending local migrations and passed database verification.
+- Passed backend and frontend automated tests and production builds.
+- Verified the frontend and backend services locally without browser automation.
+
+## 2026-07-10
+
+### Assessment Reliability And Certificate Schema
+
+- Fixed `Failed to start assessment` / resume failures caused by an assessment model selecting optional columns from a database that had not yet received the matching migration.
+- Applied the non-destructive `20260710110000-add-certificate-profile-snapshot-to-assessments` migration to the connected PostgreSQL database.
+- Updated assessment lifecycle reads and creation responses to use only stable base assessment columns, preventing optional certificate fields from blocking Start or Resume.
+- Added schema-aware handling in scoring and certificate services: optional Holland display and certificate snapshot fields are used when present and safely omitted when a staged deployment has not applied them yet.
+- Added focused lifecycle compatibility tests for both starting a new assessment and resuming an existing assessment.
+
+### Verification
+
+- Passed focused assessment, scoring, certificate, and PDF test suites (25 tests).
+- Passed backend build and database seed-integrity verification.
+
 ## 2026-06-04
 
 ### Backend PDF Assets

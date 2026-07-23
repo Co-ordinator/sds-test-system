@@ -7,7 +7,7 @@
 | **Date** | March 2026 |
 | **Author** | SDS Development Team |
 | **Client** | Ministry of Labour and Social Security - Kingdom of Eswatini |
-| **Contact** | coordinator@bitsandpc.co.za |
+| **Contact** | notificationsdatamatics@gmail.com |
 
 ---
 
@@ -1163,7 +1163,7 @@ Measurement and Testing Unit
 P.O. Box 198, Mbabane H100
 Kingdom of Eswatini
 Tel: +268 4041971/2/3
-Email: coordinator@bitsandpc.co.za
+Email: notificationsdatamatics@gmail.com
 
 ---
 

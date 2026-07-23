@@ -10,16 +10,16 @@ const crypto = require('crypto');
 const randomSeedPassword = () => crypto.randomBytes(12).toString('base64url');
 
 const EDUCATION_LEVELS = [
-  { level: 1, description: 'Lower than matric' },
-  { level: 2, description: 'High school education (matric)' },
-  { level: 3, description: 'Training at college/technical college/on-the-job-training' },
-  { level: 4, description: "Training at teachers' college/technikon/university" },
-  { level: 5, description: 'Postgraduate degree/university training plus experience' }
+  { level: 1, description: 'Lower Than High School' },
+  { level: 2, description: 'High School Level (including A-Level and IB Certificate)' },
+  { level: 3, description: 'Certificate / Diploma' },
+  { level: 4, description: "Bachelor's Degree" },
+  { level: 5, description: 'Postgraduate' }
 ];
 
 const INSTITUTIONS = [
   { name: 'University of Eswatini', acronym: 'UNESWA', type: 'university', region: 'hhohho', district: 'Kwaluseni', accredited: true },
-  { name: 'Eswatini College of Technology', acronym: 'ECOT', type: 'college', region: 'manzini', district: 'Matsapha', accredited: true },
+  { name: 'Eswatini College of Technology', acronym: 'ECOT', type: 'tvet', region: 'hhohho', district: 'Mbabane', accredited: true },
   { name: 'Ngwane Teacher Training College', acronym: 'NTTC', type: 'college', region: 'hhohho', district: 'Mbabane', accredited: true },
   { name: 'Gwamile Vocational and Commercial Training Institute', acronym: 'GOVTI', type: 'vocational', region: 'hhohho', district: 'Matsapha', accredited: true },
   { name: 'Southern Africa Nazarene University', acronym: 'SANU', type: 'university', region: 'manzini', district: 'Manzini', accredited: true }

@@ -2,82 +2,46 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>SDS Verification Code</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Self-Directed Search System Verification Code</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #1f2937;
-      background-color: #f5f7fb;
-      margin: 0;
-      padding: 24px 0;
-    }
-    .container {
-      max-width: 560px;
-      margin: 0 auto;
-      background: #ffffff;
-      border: 1px solid #dbe4ee;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .header {
-      background-color: #0f2a58;
-      color: #ffffff;
-      padding: 20px 24px;
-      font-weight: 700;
-      font-size: 20px;
-    }
-    .content {
-      padding: 24px;
-    }
-    .code-wrap {
-      margin: 20px 0;
-      text-align: center;
-    }
-    .code {
-      display: inline-block;
-      font-family: "Courier New", monospace;
-      font-size: 30px;
-      letter-spacing: 8px;
-      font-weight: 700;
-      color: #0f2a58;
-      background: #eef5ff;
-      border: 1px solid #b7cff0;
-      border-radius: 10px;
-      padding: 12px 18px;
-    }
-    .note {
-      font-size: 14px;
-      color: #4b5563;
-      margin-top: 8px;
-      text-align: center;
-    }
-    .footer {
-      border-top: 1px solid #e5e7eb;
-      padding: 14px 24px;
-      font-size: 12px;
-      color: #6b7280;
-      text-align: center;
-    }
+    body { margin: 0; padding: 0; background: #ffffff; color: #111827; font-family: Arial, Helvetica, sans-serif; line-height: 1.6; }
+    .email { max-width: 680px; margin: 0 auto; padding: 32px 28px; }
+    .topbar { height: 5px; margin-bottom: 26px; background: linear-gradient(90deg, #2d8bc4 0 42%, #ffeb3b 42% 50%, #f44336 50% 58%, #ffeb3b 58% 66%, #2d8bc4 66% 100%); }
+    .eyebrow { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #2d8bc4; }
+    h1 { margin: 0 0 22px; padding-bottom: 18px; border-bottom: 1px solid #e5e7eb; font-size: 24px; line-height: 1.25; color: #07183d; }
+    p { margin: 0 0 16px; }
+    .code-label { margin: 22px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #4b5563; }
+    .code { display: block; margin: 0 0 8px; font-family: "Courier New", monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #07183d; }
+    .note { font-size: 13px; color: #4b5563; }
+    .security { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #374151; }
+    .footer { margin-top: 30px; padding-top: 18px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">Verify Your SDS Account</div>
-    <div class="content">
-      <p>Hello {{firstName}},</p>
-      <p>Use this one-time verification code to complete your SDS registration:</p>
+  <main class="email">
+    <div class="topbar"></div>
+    <p class="eyebrow">Ministry of Labour and Social Security</p>
+    <h1>Self-Directed Search System</h1>
 
-      <div class="code-wrap">
-        <span class="code">{{verificationCode}}</span>
-        <p class="note">This code expires in {{otpExpiresMinutes}} minutes.</p>
-      </div>
+    <p>Hello {{firstName}},</p>
+    <p>Thank you for registering on the Self-Directed Search System. Use the verification code below to confirm your email address and continue setting up your account.</p>
 
-      <p>If you did not request this code, you can ignore this email.</p>
+    <p class="code-label">Verification code</p>
+    <span class="code">{{verificationCode}}</span>
+    <p class="note">This code expires in {{otpExpiresMinutes}} minutes.</p>
+
+    <p>Return to the registration page and enter this code to continue.</p>
+
+    <div class="security">
+      For your security, do not share this code with anyone. If you did not create an SDS account, you can safely ignore this email.
     </div>
+
     <div class="footer">
-      &copy; 2026 Ministry of Labour and Social Security - Kingdom of Eswatini
+      <strong>Self-Directed Search System</strong><br>
+      Ministry of Labour and Social Security - Kingdom of Eswatini<br>
+      Powered by Datamatics Eswatini
     </div>
-  </div>
+  </main>
 </body>
 </html>

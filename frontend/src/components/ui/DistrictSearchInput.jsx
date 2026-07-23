@@ -26,6 +26,8 @@ export default function DistrictSearchInput({
   region = '',
   inputClassName = '',
   error = false,
+  inputId,
+  errorId,
 }) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -136,6 +138,7 @@ export default function DistrictSearchInput({
           aria-hidden
         />
         <input
+          id={inputId}
           type="text"
           value={query}
           onChange={handleInputChange}
@@ -150,6 +153,7 @@ export default function DistrictSearchInput({
           className={`form-control-with-icon pl-8 pr-8 ${inputClassName}`}
           style={{ color: GOV.text, ...(error && { borderColor: GOV.error }) }}
           aria-invalid={error ? 'true' : 'false'}
+          aria-describedby={errorId}
         />
         {query && (
           <button

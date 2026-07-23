@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Users, CheckCircle, TrendingUp, MoreHorizontal, Maximize2, Minimize2 } from 'lucide-react';
+import { MapPin, Users, CheckCircle, TrendingUp, Maximize2, Minimize2 } from 'lucide-react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip } from 'recharts';
 import { GOV } from '../../theme/government';
 import { REGION_COLORS, REGION_LABELS, RIASEC_COLORS } from './analyticsConstants';
@@ -279,7 +279,6 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: REGION_COLORS[selectedRegion] }} />
                   <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>{REGION_LABELS[selectedRegion]} Region</p>
                 </div>
-                <button className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }}><MoreHorizontal className="w-4 h-4" /></button>
               </div>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 <StatBadge icon={Users} label="Registered" value={selectedDetail.totalUsers} color="#2563eb" />
@@ -350,14 +349,13 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
               <p className="text-xs font-semibold" style={{ color: GOV.textMuted }}>Regional Intelligence Table</p>
               <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>Click a row to highlight region on map</p>
             </div>
-            <button className="p-0.5 rounded hover:bg-gray-100" style={{ color: GOV.textHint }}><MoreHorizontal className="w-4 h-4" /></button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead style={{ backgroundColor: GOV.blueLightAlt }}>
                 <tr>
-                  {['Region','Users','Completed','Avg / taker','Top code','R','I','A','S','E','C'].map(h => (
-                    <th key={h} className="px-4 py-3 text-xs uppercase font-semibold tracking-wide" style={{ color: GOV.textMuted }}>{h}</th>
+                  {['Region','Users','Completed','Avg / taker','Top code','R','I','A','S','E','C'].map((h, index) => (
+                    <th key={h} className={`px-4 py-3 text-xs uppercase font-semibold tracking-wide ${index === 0 || index === 4 ? 'text-left' : 'text-right'}`} style={{ color: GOV.textMuted }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -383,12 +381,12 @@ const AnalyticsMapSection = ({ regionalData, regionChartData, selectedRegion, on
                           {REGION_LABELS[r.region]}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold">{r.totalUsers}</td>
-                      <td className="px-4 py-3">{r.completedAssessments}</td>
-                      <td className="px-4 py-3 font-mono">{perTaker}</td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">{r.totalUsers}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{r.completedAssessments}</td>
+                      <td className="px-4 py-3 text-right font-mono">{perTaker}</td>
                       <td className="px-4 py-3 font-mono font-bold" style={{ color: GOV.blue }}>{r.topCode || '–'}</td>
                       {['avgR','avgI','avgA','avgS','avgE','avgC'].map((k, idx) => (
-                        <td key={k} className="px-4 py-3 font-mono" style={{ color: RIASEC_COLORS[['R','I','A','S','E','C'][idx]] }}>
+                        <td key={k} className="px-4 py-3 text-right font-mono" style={{ color: RIASEC_COLORS[['R','I','A','S','E','C'][idx]] }}>
                           {Number(r[k] || 0).toFixed(1)}
                         </td>
                       ))}

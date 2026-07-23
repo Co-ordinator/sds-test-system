@@ -156,11 +156,6 @@ const HBar = ({ value, max, width }) => (
   </div>
 );
 
-const gradeLabel = (rate) => {
-  const g = rate >= 80 ? 'A' : rate >= 60 ? 'B' : rate >= 40 ? 'C' : 'D';
-  return <span className="text-[10px] font-bold" style={{ color: C.TEXT }}>{g}</span>;
-};
-
 /* ── Pie chart palette — distinct professional tones ─────────────────── */
 const PIE_PAL = ['#F44336', '#FFEB3B', '#7FBEEB', '#457b9d', '#2d6a4f', '#6d6875'];
 function polarToCart(cx, cy, r, deg) {
@@ -437,14 +432,13 @@ const AdminReportsPanel = () => {
             {/* Scorecard table */}
             <SectionHead title="Regional Performance Scorecard" />
             <table className="w-full border-collapse text-[10px]" style={{ borderColor: C.BORDER }}>
-              <thead><THead cols={['Region', 'Grade', 'Participants', 'Completed', 'Completion Rate', 'Top Code']} /></thead>
+              <thead><THead cols={['Region', 'Participants', 'Completed', 'Completion Rate', 'Top Code']} /></thead>
               <tbody>
                 {regions.map((row, i) => {
                   const rate = row.completionRate || 0;
                   return (
                     <tr key={i} style={{ backgroundColor: i % 2 === 1 ? C.STRIPE : C.WHITE }}>
                       <td className="px-2 py-1.5 border-b font-semibold" style={{ borderColor: C.BORDER, color: C.TEXT }}>{REGION_LBL[row.region] || capF(row.region)}</td>
-                      <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER }}>{gradeLabel(rate)}</td>
                       <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER, color: C.TEXT }}>{fmtN(row.totalUsers)}</td>
                       <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER, color: C.TEXT }}>{fmtN(row.completedAssessments)}</td>
                       <td className="px-2 py-1.5 border-b" style={{ borderColor: C.BORDER, width: '22%' }}>
@@ -606,7 +600,7 @@ const AdminReportsPanel = () => {
           <div>
             <SectionHead title="Institution Performance Ranking (by Completion Rate)" />
             <table className="w-full border-collapse text-[10px]" style={{ borderColor: C.BORDER }}>
-              <thead><THead cols={['Institution', 'Grade', 'Type', 'Students', 'Completed', 'Completion Rate']} /></thead>
+              <thead><THead cols={['Institution', 'Type', 'Students', 'Completed', 'Completion Rate']} /></thead>
               <tbody>
                 {(preview.institutions || []).map((row, i) => {
                   const rate = row.completionRate || 0;
@@ -615,7 +609,6 @@ const AdminReportsPanel = () => {
                       <td className="px-2 py-1.5 border-b font-semibold" style={{ borderColor: C.BORDER, color: C.TEXT, maxWidth: 160 }}>
                         <span className="block truncate">{row.name || '—'}</span>
                       </td>
-                      <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER }}>{gradeLabel(rate)}</td>
                       <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER, color: C.TEXT }}>{capF(row.type)}</td>
                       <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER, color: C.TEXT }}>{fmtN(row.totalStudents)}</td>
                       <td className="px-2 py-1.5 border-b text-center" style={{ borderColor: C.BORDER, color: C.TEXT }}>{fmtN(row.completedAssessments)}</td>

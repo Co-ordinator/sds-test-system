@@ -12,6 +12,7 @@ router.use(verifyToken);
 router.use(requireCompletedOnboarding);
 
 router.post('/', restrictTo('Test Taker'), AssessmentController.startAssessment);
+router.post('/start', restrictTo('Test Taker'), AssessmentController.startAssessment);
 router.get('/', restrictTo('Test Taker'), AssessmentController.listMyAssessments);
 router.get('/questions', restrictTo('Test Taker'), AssessmentController.getQuestions);
 router.get('/:assessmentId', restrictTo('Test Taker'), AssessmentController.getAssessment);

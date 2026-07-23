@@ -189,6 +189,34 @@
     border: 2px solid #000000 !important;
   }
 
+  .high-contrast input,
+  .high-contrast select,
+  .high-contrast textarea {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    caret-color: #000000 !important;
+  }
+
+  .high-contrast input::placeholder,
+  .high-contrast textarea::placeholder {
+    color: #374151 !important;
+  }
+
+  .high-contrast [role='tooltip'],
+  .high-contrast [data-tooltip],
+  .high-contrast .tooltip {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+    border: 2px solid #000000 !important;
+  }
+
+  .high-contrast p,
+  .high-contrast span,
+  .high-contrast label,
+  .high-contrast small {
+    color: #000000;
+  }
+
   /* Keep sr-only behavior intact for assistive technology users. */
   .screen-reader-mode .sr-only {
     position: absolute;

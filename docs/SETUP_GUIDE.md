@@ -60,12 +60,15 @@ JWT_SECRET=your_super_secret_jwt_key_change_this_in_production_minimum_32_chars
 JWT_EXPIRE=24h
 JWT_REFRESH_EXPIRE=7d
 
-# Email (for production - optional in development)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASSWORD=your_app_password
-EMAIL_FROM=noreply@sds.gov.sz
+# Email / SMTP
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=notificationsdatamatics@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM_EMAIL=notificationsdatamatics@gmail.com
+SMTP_FROM_NAME=Self-Directed Search System
+SMTP_REPLY_TO=notificationsdatamatics@gmail.com
 
 # Frontend URL
 FRONTEND_URL=http://localhost:3000
@@ -73,6 +76,16 @@ FRONTEND_URL=http://localhost:3000
 # API Base URL
 API_BASE_URL=http://localhost:5000/api/v1
 ```
+
+### Email Deliverability Checklist
+
+For production, set `FRONTEND_URL` to the public site URL, for example:
+
+```env
+FRONTEND_URL=https://brown-cobra-764328.hostingersite.com
+```
+
+The SDS deployment sends system emails through `notificationsdatamatics@gmail.com`. Use a Gmail App Password in `SMTP_PASS`; do not use the normal mailbox password. Keep `SMTP_USER`, `SMTP_FROM_EMAIL`, and `SMTP_REPLY_TO` aligned to the same Gmail address so Gmail signs and authenticates the message consistently.
 
 Create `frontend/.env`:
 

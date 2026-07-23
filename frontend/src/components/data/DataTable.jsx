@@ -102,6 +102,11 @@ const DataTable = ({
     if (align === 'center') return 'text-center';
     return 'text-left';
   };
+  const justifyClass = (align) => {
+    if (align === 'right') return 'justify-end';
+    if (align === 'center') return 'justify-center';
+    return 'justify-start';
+  };
 
   const visibleKeys = useMemo(() => new Set(visible.map(getKey)), [visible, getKey]);
   const allPageSelected = selectable && visible.length > 0 && visible.every(r => sel.has(getKey(r)));
@@ -165,7 +170,7 @@ const DataTable = ({
                       className={`px-4 py-3 text-xs font-semibold uppercase select-none ${alignClass(col.align)} ${col.width || ''} ${col.sortable ? 'cursor-pointer hover:bg-blue-50' : ''}`}
                       onClick={col.sortable ? () => handleSort(col.key) : undefined}
                     >
-                      <span className="flex items-center gap-1 w-full">
+                      <span className={`flex w-full items-center gap-1 ${justifyClass(col.align)}`}>
                         {col.header}
                         <SortIcon col={col} />
                       </span>

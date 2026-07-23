@@ -25,7 +25,7 @@ const errorHandler = (err, req, res, next) => {
     responseBody.resendAvailableInSeconds = err.resendAvailableInSeconds;
   }
 
-  logger.error({
+  const logPayload = {
     actionType: 'SYSTEM',
     message: `${code}: ${err.message}`,
     req,
@@ -35,7 +35,27 @@ const errorHandler = (err, req, res, next) => {
       requestId,
       stack: process.env.NODE_ENV === 'production' ? undefined : err.stack
     }
-  });
+  };
+
+  const routineSessionCodes = new Set([
+    'ACCESS_TOKEN_MISSING',
+    'ACCESS_TOKEN_EXPIRED',
+    'REFRESH_TOKEN_MISSING',
+    'INVALID_REFRESH_TOKEN'
+  ]);
+  const isLegacyUnauthenticatedProbe =
+    code === 'REQUEST_ERROR' &&
+    String(req.originalUrl || req.url || '').includes('/api/v1/auth/me');
+  const isExpectedUnauthenticatedSession =
+    statusCode === 401 &&
+    (routineSessionCodes.has(code) || isLegacyUnauthenticatedProbe);
+  if (statusCode >= 500) {
+    logger.error(logPayload);
+  } else if (isExpectedUnauthenticatedSession) {
+    logger.debug(logPayload);
+  } else {
+    logger.warn(logPayload);
+  }
 
   return res.status(statusCode).json(responseBody);
 };

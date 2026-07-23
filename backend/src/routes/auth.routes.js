@@ -4,20 +4,18 @@ const validate = require('../middleware/validatation.middleware');
 const authValidation = require('../validations/auth.validation');
 const authController = require('../controllers/auth.controller');
 const { verifyToken } = require('../middleware/authentication.middleware');
-const { captchaRequired } = require('../middleware/captcha.middleware');
 
 // Note: /me endpoints are self-only by design (no resourceId param for selfOnly middleware)
 // Controllers use req.user.id to operate on the authenticated user's data only
 
 // Register route
-router.post('/register', captchaRequired, validate(authValidation.register), authController.register);
+router.post('/register', validate(authValidation.register), authController.register);
 
 // Email verification via 6-digit OTP
 router.post('/verify-email', validate(authValidation.verifyEmail), authController.verifyEmail);
 
-// Resend verification email (new OTP) — protected by CAPTCHA so an attacker
-// can't use this as a free email-flood relay against arbitrary inboxes.
-router.post('/resend-verification', captchaRequired, validate(authValidation.resendVerification), authController.resendVerificationEmail);
+// Resend verification email (new OTP)
+router.post('/resend-verification', validate(authValidation.resendVerification), authController.resendVerificationEmail);
 
 // Login route
 router.post('/login', validate(authValidation.login), authController.login);
@@ -36,7 +34,7 @@ router.get('/users/me/export', verifyToken, authController.exportUserData);
 router.delete('/users/me/account', verifyToken, authController.deleteUserAccount);
 
 // Forgot password (body: identifier = email or nationalId, or email)
-router.post('/forgot-password', captchaRequired, validate(authValidation.forgotPasswordBody), authController.forgotPassword);
+router.post('/forgot-password', validate(authValidation.forgotPasswordBody), authController.forgotPassword);
 
 // Reset password — token in body (preferred). Keep :token path as a deprecated
 // alias for any reset emails already in inboxes that point at the old URL.

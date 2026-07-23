@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useId } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useId, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User, LogOut, ChevronDown, ChevronRight, Home,
@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePermissions } from '../../context/PermissionContext';
-import { GOV, LOGO_ALT } from '../../theme/government';
+import { GOV, LOGO_ALT, OFFICIAL_TITLE } from '../../theme/government';
 import { useNotificationCount } from '../../hooks/useNotificationCount';
 import TestTakerSideNav from './TestTakerSideNav';
 import PoweredFooter from './PoweredFooter';
@@ -73,8 +73,9 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
   const location = useLocation();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const userMenuId = useId();
   const mobileNavId = useId();
+  const mobileMenuButtonRef = useRef(null);
+  const mobileNavPanelRef = useRef(null);
 
   const role = user?.role || 'Test Taker';
   const isTestTaker = role === 'Test Taker';
@@ -125,18 +126,40 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
   useEffect(() => { setMobileNavOpen(false); }, [location.pathname]);
 
   useEffect(() => {
-    if (!isTestTaker || !mobileNavOpen) return undefined;
-    const onKey = (e) => {
-      if (e.key === 'Escape') setMobileNavOpen(false);
+    if (!mobileNavOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (event.key !== 'Tab' || !mobileNavPanelRef.current) return;
+      const focusable = [...mobileNavPanelRef.current.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    requestAnimationFrame(() => {
+      mobileNavPanelRef.current?.querySelector('a[href], button:not([disabled])')?.focus();
+    });
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
+      mobileMenuButtonRef.current?.focus();
     };
-  }, [isTestTaker, mobileNavOpen]);
+  }, [mobileNavOpen]);
 
   const closeMobileNav = () => setMobileNavOpen(false);
 
@@ -249,7 +272,10 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
             <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
               <div className="flex h-16 items-center justify-between gap-4">
                 <Link to={dashboardPath} className="flex min-w-0 items-center gap-2" aria-label="Go to dashboard">
-                  <img src="/letterhead.png" alt={LOGO_ALT} className="h-12 w-auto object-contain" />
+                  <img src="/letterhead.png" alt={LOGO_ALT} className="h-10 w-auto max-w-[120px] object-contain sm:h-12 sm:max-w-none" />
+                  <span className="max-w-[125px] text-[9px] font-extrabold leading-tight sm:max-w-[190px] sm:text-xs" style={{ color: GOV.text }}>
+                    {OFFICIAL_TITLE}
+                  </span>
                 </Link>
 
                 <div className="hidden items-center gap-6 lg:flex">
@@ -280,11 +306,12 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                 </div>
 
                 <button
+                  ref={mobileMenuButtonRef}
                   type="button"
                   className="rounded-md border p-2 lg:hidden"
                   style={{ borderColor: GOV.border }}
                   aria-expanded={mobileNavOpen}
-                  aria-controls="test-taker-wide-nav-mobile"
+                  aria-controls={mobileNavId}
                   aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
                   onClick={() => setMobileNavOpen((o) => !o)}
                 >
@@ -301,9 +328,11 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
                     onClick={closeMobileNav}
                   />
                   <div
-                    id="test-taker-wide-nav-mobile"
+                    ref={mobileNavPanelRef}
+                    id={mobileNavId}
                     className="absolute left-0 right-0 top-full z-50 border-b bg-white px-4 py-4 shadow-[0_8px_24px_rgba(0,0,0,0.08)] sm:px-6 lg:hidden"
                     style={{ borderColor: GOV.border, backgroundColor: '#fff' }}
+                    aria-label="Mobile navigation"
                   >
                     <nav className="flex flex-col gap-3" aria-label="Primary mobile">
                       {navLinks.map(({ to, label, Icon, badge }) => {
@@ -365,87 +394,109 @@ export default function AppShell({ children, breadcrumbs: customBreadcrumbs, hid
             className="sticky top-0 z-20 border-b h-14"
             style={{ borderColor: GOV.border, backgroundColor: '#ffffff' }}
           >
-            <div className="relative h-full px-4 lg:px-6">
-              <div className="absolute top-1/2 z-10 flex -translate-y-1/2 items-center gap-2 sm:gap-3 left-3 sm:left-4 lg:left-6">
+            <div className="mx-auto flex h-full max-w-7xl items-center gap-2 px-3 sm:gap-3 sm:px-4 lg:px-6">
+              <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
                 <button
+                  ref={mobileMenuButtonRef}
                   type="button"
-                  className="lg:hidden p-1.5 rounded-md hover:bg-gray-100"
+                  className="rounded-md p-1.5 hover:bg-gray-100 lg:hidden"
                   onClick={() => setMobileNavOpen((o) => !o)}
+                  aria-expanded={mobileNavOpen}
+                  aria-controls={mobileNavId}
+                  aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
                 >
                   {mobileNavOpen ? <X className="w-5 h-5" style={{ color: GOV.text }} /> : <Menu className="w-5 h-5" style={{ color: GOV.text }} />}
                 </button>
 
                 <Link
                   to={dashboardPath}
-                  className="flex w-[150px] min-w-0 items-center sm:w-[180px] lg:w-[205px]"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2 lg:w-[250px] lg:flex-none"
                   aria-label="Go to dashboard"
                 >
                   <img
                     src="/letterhead.png"
-                    alt="Government of Eswatini"
-                    className="h-10 w-full object-contain object-left sm:h-11"
+                    alt={LOGO_ALT}
+                    className="h-9 w-auto max-w-[90px] object-contain object-left sm:h-10 sm:max-w-[120px]"
                   />
+                  <span className="max-w-[95px] text-[8px] font-extrabold leading-tight sm:max-w-[120px] sm:text-[10px]" style={{ color: GOV.text }}>
+                    {OFFICIAL_TITLE}
+                  </span>
                 </Link>
               </div>
 
-              <div className="max-w-7xl mx-auto px-6 lg:pl-[210px] lg:pr-[180px] h-full flex items-center">
-                <nav className="hidden lg:flex w-full items-center gap-0.5 min-w-0 overflow-x-auto custom-scrollbar">
-                  {navLinks.map(({ to, label, Icon, badge }) => {
-                    const active = isActive(to);
-                    return (
-                      <Link
-                        key={`${to}-${label}`}
-                        to={to}
-                        className="relative flex shrink-0 items-center gap-2 px-2.5 py-1.5 text-sm transition-colors whitespace-nowrap"
-                        style={
-                          active
-                            ? { color: GOV.blue, fontWeight: 700 }
-                            : { color: GOV.textMuted, fontWeight: 500 }
-                        }
-                      >
-                        <Icon className="w-4 h-4" />
-                        {label}
-                        {badge && notificationCount > 0 && (
-                          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">
-                            {notificationCount > 99 ? '99+' : notificationCount}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </div>
-
-              <div className="absolute top-1/2 z-10 -translate-y-1/2 right-3 sm:right-4 lg:right-6">
-                {userMenuButton}
-              </div>
-            </div>
-          </header>
-
-          {mobileNavOpen && (
-            <div className="lg:hidden border-b bg-white" style={{ borderColor: GOV.border }}>
-              <div className="max-w-7xl mx-auto px-6 py-2 space-y-1">
+              <nav className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 overflow-visible lg:flex" aria-label="Admin navigation">
                 {navLinks.map(({ to, label, Icon, badge }) => {
                   const active = isActive(to);
                   return (
                     <Link
-                      key={`m-${to}-${label}`}
+                      key={`${to}-${label}`}
                       to={to}
-                      className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
-                      style={active ? { backgroundColor: GOV.blueLightAlt, color: GOV.blue } : { color: GOV.textMuted }}
+                      className="relative flex h-9 min-w-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md px-2.5 text-sm transition-colors hover:bg-gray-50"
+                      style={
+                        active
+                          ? { color: GOV.blue, fontWeight: 700 }
+                          : { color: GOV.textMuted, fontWeight: 500 }
+                      }
+                      aria-label={label}
+                      title={label}
                     >
-                      <Icon className="w-4 h-4" />
-                      {label}
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="hidden xl:inline">{label}</span>
                       {badge && notificationCount > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
+                        <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
                           {notificationCount > 99 ? '99+' : notificationCount}
                         </span>
                       )}
                     </Link>
                   );
                 })}
+              </nav>
+
+              <div className="ml-auto shrink-0 lg:ml-0">
+                {userMenuButton}
               </div>
             </div>
+          </header>
+
+          {mobileNavOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+                style={{ top: '56px' }}
+                role="presentation"
+                onClick={closeMobileNav}
+              />
+              <div
+                ref={mobileNavPanelRef}
+                id={mobileNavId}
+                className="fixed left-0 right-0 z-40 max-h-[calc(100vh-56px)] overflow-y-auto border-b bg-white shadow-lg lg:hidden"
+                style={{ top: '56px', borderColor: GOV.border }}
+                aria-label="Mobile admin navigation"
+              >
+                <div className="max-w-7xl mx-auto px-6 py-2 space-y-1">
+                  {navLinks.map(({ to, label, Icon, badge }) => {
+                    const active = isActive(to);
+                    return (
+                      <Link
+                        key={`m-${to}-${label}`}
+                        to={to}
+                        onClick={closeMobileNav}
+                        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-semibold"
+                        style={active ? { backgroundColor: GOV.blueLightAlt, color: GOV.blue } : { color: GOV.textMuted }}
+                      >
+                        <Icon className="w-4 h-4" />
+                        {label}
+                        {badge && notificationCount > 0 && (
+                          <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ml-auto">
+                            {notificationCount > 99 ? '99+' : notificationCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </>
       )}

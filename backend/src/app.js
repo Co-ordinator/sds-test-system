@@ -10,6 +10,14 @@ const { apiLimiter } = require('./middleware/rateLimiting.middleware');
 const requestIdMiddleware = require('./middleware/requestId.middleware');
 
 const app = express();
+const trustProxySetting = process.env.TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? '1' : 'false');
+const trustProxyValue = trustProxySetting === 'true'
+  ? true
+  : trustProxySetting === 'false'
+    ? false
+    : Number.parseInt(trustProxySetting, 10);
+app.set('trust proxy', Number.isNaN(trustProxyValue) ? trustProxySetting : trustProxyValue);
+
 const normalizeOrigin = (origin) => String(origin || '').trim().replace(/\/$/, '');
 const configuredOrigins = [
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
@@ -79,13 +87,14 @@ const assessmentRoutes = require('./routes/assessment.routes');
 const resultRoutes = require('./routes/result.routes');
 const institutionRoutes = require('./routes/institution.routes');
 const counselorRoutes = require('./routes/counselor.routes');
-const qualificationRoutes = require('./routes/qualification.routes');
 const occupationRoutes = require('./routes/occupation.routes');
 const educationLevelRoutes = require('./routes/education-level.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const courseRoutes = require('./routes/course.routes');
 const reportRoutes = require('./routes/report.routes');
 const glossaryRoutes = require('./routes/glossary.routes');
+const faqRoutes = require('./routes/faq.routes');
+const testResultsRoutes = require('./routes/test-results.routes');
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
@@ -93,13 +102,14 @@ app.use('/api/v1/assessments', assessmentRoutes);
 app.use('/api/v1/results', resultRoutes);
 app.use('/api/v1/institutions', institutionRoutes);
 app.use('/api/v1/counselor', counselorRoutes);
-app.use('/api/v1/qualifications', qualificationRoutes);
 app.use('/api/v1/occupations', occupationRoutes);
 app.use('/api/v1/education-levels', educationLevelRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/courses', courseRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/glossary', glossaryRoutes);
+app.use('/api/v1/faqs', faqRoutes);
+app.use('/api/v1/test-results', testResultsRoutes);
 
 // Error handling
 app.use(errorHandler);

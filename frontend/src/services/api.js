@@ -67,11 +67,15 @@ const notifyAuthFailure = () => {
 
 // Response interceptor for handling errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    authFailureNotified = false;
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
     const skipAuthRetry = Boolean(originalRequest?.skipAuthRetry);
+    const suppressSessionExpired = Boolean(originalRequest?.suppressSessionExpired);
 
     // Handle 403 Forbidden - permission denied
     if (error.response?.status === 403) {
@@ -107,9 +111,12 @@ api.interceptors.response.use(
         processQueue(null, true);
         return api(originalRequest);
       } catch (err) {
-        const normalized = normalizeApiError(err);
+        const normalized = err?.uiMessage ? err : normalizeApiError(err);
         processQueue(normalized, null);
-        notifyAuthFailure();
+        const refreshStatus = err?.response?.status ?? err?.status;
+        if ((refreshStatus === 401 || refreshStatus === 403) && !suppressSessionExpired) {
+          notifyAuthFailure();
+        }
         return Promise.reject(normalized);
       } finally {
         isRefreshing = false;

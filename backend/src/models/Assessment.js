@@ -46,6 +46,13 @@ module.exports = (sequelize, DataTypes) => {
       comment: "Levels 1-5 from SDS Appendix"
     },
 
+    certificateProfileSnapshot: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: 'certificate_profile_snapshot',
+      comment: 'Non-sensitive certificate context captured when the assessment is first completed'
+    },
+
     userId: {
       type: DataTypes.UUID,
       allowNull: false,

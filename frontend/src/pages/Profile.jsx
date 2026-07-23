@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import Joi from 'joi';
 import { joiResolver } from '@hookform/resolvers/joi';
-import { useNavigate } from 'react-router-dom';
-import { Save, Download, Trash2, User, GraduationCap, Briefcase, Settings, Shield, Clock, Mail, Key, Eye, EyeOff, Upload, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { Save, Download, Trash2, User, GraduationCap, Briefcase, Settings, Shield, Clock, Mail, Key, Eye, EyeOff } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { GOV, TYPO } from '../theme/government';
@@ -14,6 +13,12 @@ import InstitutionSearchInput from '../components/ui/InstitutionSearchInput';
 import DistrictSearchInput from '../components/ui/DistrictSearchInput';
 import AccessibilityDialog from '../components/ui/AccessibilityDialog';
 import { Monitor } from 'lucide-react';
+import {
+  GENDER_OPTIONS,
+  GRADE_LEVEL_OPTIONS,
+  educationPairError,
+  normalizeGradeLevel,
+} from '../data/profileOptions';
 
 const inputStyle = {
   border: '0',
@@ -32,16 +37,6 @@ const ROLE_COLORS = {
 
 const STAFF_ROLES = new Set(['System Administrator', 'Test Administrator']);
 const TERTIARY_INSTITUTION_TYPES = 'university,college,tvet,vocational';
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
-
-const GRADE_LEVEL_OPTIONS = [
-  'Form 3 (Junior Secondary)',
-  'Form 5 / O-Level (Senior Secondary)',
-  'A-Level',
-  'Certificate / Diploma',
-  'Bachelor\'s degree',
-  'Postgraduate',
-];
 
 const USER_TYPE_LABELS = {
   'High School Student': 'High School Student',
@@ -50,7 +45,6 @@ const USER_TYPE_LABELS = {
 };
 
 export default function Profile() {
-  const navigate = useNavigate();
   const { user: authUser, setSession } = useAuth();
   const [userData, setUserData] = useState(null);
   const [saveStatus, setSaveStatus] = useState(null);
@@ -66,19 +60,10 @@ export default function Profile() {
   const phoneDigitsRef = useRef('');
   const [showAccessibilityDialog, setShowAccessibilityDialog] = useState(false);
 
-  // Qualifications state
-  const [qualifications, setQualifications] = useState([]);
-  const [qualLoading, setQualLoading] = useState(false);
-  const [qualUploading, setQualUploading] = useState(false);
-  const [qualError, setQualError] = useState('');
-  const [qualSuccess, setQualSuccess] = useState('');
-  const [qualForm, setQualForm] = useState({
-    title: '', documentType: 'certificate', issuedBy: '', issueDate: '', file: null
-  });
-  const [dragOver, setDragOver] = useState(false);
-
-  // Extended schema for profile fields - all fields are optional
+  // Role-dependent required fields are checked against both controlled search
+  // inputs and react-hook-form values immediately before submission.
   const schema = Joi.object({
+    gender: Joi.string().valid('male', 'female', 'other', 'prefer_not_to_say').optional().allow('', null).label('Gender'),
     region: Joi.string().valid('hhohho', 'manzini', 'lubombo', 'shiselweni').optional().allow('', null).label('Region'),
     district: Joi.string().optional().allow('', null).label('District'),
     address: Joi.string().optional().allow('', null).label('Address'),
@@ -96,7 +81,7 @@ export default function Profile() {
     preferredLanguage: Joi.string().valid('en', 'ss').optional().allow('', null).label('Preferred Language')
   });
 
-  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm({
+  const { register, handleSubmit, formState: { errors }, reset, watch, setError, clearErrors } = useForm({
     resolver: joiResolver(schema)
   });
   const selectedRegion = watch('region');
@@ -129,12 +114,13 @@ export default function Profile() {
         if (user) {
           setUserData(user);
           reset({
+            gender: user.gender || '',
             region: user.region || '',
             district: user.district || '',
             address: user.address || '',
             educationLevel: user.educationLevel || '',
             currentInstitution: user.currentInstitution || '',
-            gradeLevel: user.gradeLevel || '',
+            gradeLevel: normalizeGradeLevel(user.gradeLevel),
             degreeProgram: user.degreeProgram || '',
             yearOfStudy: user.yearOfStudy ?? '',
             employmentStatus: user.employmentStatus || '',
@@ -170,18 +156,6 @@ export default function Profile() {
   }, [reset]);
 
   useEffect(() => {
-    const fetchQualifications = async () => {
-      setQualLoading(true);
-      try {
-        const res = await api.get('/api/v1/qualifications');
-        setQualifications(res.data?.data?.qualifications || []);
-      } catch { /* silent */ }
-      finally { setQualLoading(false); }
-    };
-    fetchQualifications();
-  }, []);
-
-  useEffect(() => {
     const fetchEducationLevels = async () => {
       setEducationLevelsLoading(true);
       try {
@@ -193,75 +167,6 @@ export default function Profile() {
     fetchEducationLevels();
   }, []);
 
-  const handleQualFileSelect = (file) => {
-    if (!file) return;
-    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      setQualError('Only PDF, JPEG, PNG or WebP files are allowed.');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setQualError('File must be under 5 MB.');
-      return;
-    }
-    setQualError('');
-    setQualForm(p => ({ ...p, file }));
-  };
-
-  const handleQualUpload = async (e) => {
-    e.preventDefault();
-    if (!qualForm.title.trim()) { setQualError('Title is required.'); return; }
-    if (!qualForm.file) { setQualError('Please select a file.'); return; }
-    setQualError(''); setQualSuccess(''); setQualUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append('file', qualForm.file);
-      fd.append('title', qualForm.title.trim());
-      fd.append('documentType', qualForm.documentType);
-      if (qualForm.issuedBy) fd.append('issuedBy', qualForm.issuedBy.trim());
-      if (qualForm.issueDate) fd.append('issueDate', qualForm.issueDate);
-      const res = await api.post('/api/v1/qualifications', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      setQualifications(p => [res.data.data.qualification, ...p]);
-      setQualForm({ title: '', documentType: 'certificate', issuedBy: '', issueDate: '', file: null });
-      setQualSuccess('Document uploaded successfully.');
-      setTimeout(() => setQualSuccess(''), 4000);
-    } catch (err) {
-      setQualError(err.uiMessage || 'Upload failed. Please try again.');
-    } finally { setQualUploading(false); }
-  };
-
-  const handleQualDelete = async (id) => {
-    if (!window.confirm('Delete this qualification document?')) return;
-    try {
-      await api.delete(`/api/v1/qualifications/${id}`);
-      setQualifications(p => p.filter(q => q.id !== id));
-    } catch (err) {
-      setQualError(err.uiMessage || 'Delete failed.');
-    }
-  };
-
-  const getQualIcon = (mime) => {
-    if (mime === 'application/pdf') return '📄';
-    return '🖼️';
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const DOC_TYPE_LABELS = {
-    certificate: 'Certificate',
-    degree: 'Degree',
-    diploma: 'Diploma',
-    transcript: 'Transcript',
-    professional_licence: 'Professional Licence',
-    other: 'Other'
-  };
-
   const onSubmit = async (data) => {
     setIsSavingProfile(true);
     setSaveStatus(null);
@@ -271,6 +176,68 @@ export default function Profile() {
       const txt = String(value).trim();
       return txt.length > 0 ? txt : null;
     };
+    const requiredFieldNames = [
+      'gender', 'region', 'district', 'address', 'educationLevel', 'gradeLevel',
+      'preferredLanguage', 'currentInstitution', 'degreeProgram', 'yearOfStudy',
+      'currentOccupation', 'workplaceName', 'yearsExperience'
+    ];
+    clearErrors(requiredFieldNames);
+
+    if (isTestTaker) {
+      const validationErrors = {};
+      const requireValue = (name, value, label) => {
+        if (value === null || value === undefined || String(value).trim() === '') {
+          validationErrors[name] = `${label} is required.`;
+        }
+      };
+
+      requireValue('gender', data.gender, 'Gender');
+      requireValue('region', data.region, 'Region');
+      requireValue('district', district, 'District or town');
+      requireValue('address', data.address, 'Address');
+      requireValue('educationLevel', data.educationLevel, 'Education level');
+      requireValue('gradeLevel', data.gradeLevel, 'Current or highest grade');
+      requireValue('preferredLanguage', data.preferredLanguage, 'Preferred language');
+
+      if (canEditInstitution) {
+        requireValue('currentInstitution', institution.name, isHighSchoolTaker ? 'Current school' : 'Current institution');
+      }
+      if (isUniversityTaker) {
+        requireValue('degreeProgram', data.degreeProgram, 'Degree programme');
+        requireValue('yearOfStudy', data.yearOfStudy, 'Year of study');
+      }
+      if (isProfessionalTaker) {
+        requireValue('currentOccupation', occupation.name, 'Current occupation');
+        requireValue('workplaceName', workplace.name, 'Workplace or employer');
+        requireValue('yearsExperience', data.yearsExperience, 'Years of experience');
+      }
+
+      const pairMessage = educationPairError({
+        educationLevelId: data.educationLevel,
+        gradeLevel: data.gradeLevel,
+        educationLevels,
+      });
+      if (pairMessage) {
+        validationErrors.educationLevel = pairMessage;
+        validationErrors.gradeLevel = pairMessage;
+      }
+
+      if (Object.keys(validationErrors).length > 0) {
+        Object.entries(validationErrors).forEach(([name, message]) => {
+          setError(name, { type: 'manual', message });
+        });
+        setSaveStatus({
+          type: 'error',
+          message: 'Could not save profile. Complete the highlighted required fields.'
+        });
+        setIsSavingProfile(false);
+        requestAnimationFrame(() => {
+          document.querySelector('[aria-invalid="true"]')?.focus();
+        });
+        return;
+      }
+    }
+
     if (phoneDigitsRef.current && phoneDigitsRef.current.length !== 8) {
       setPhoneError('Phone number must have 8 digits after +268.');
       setSaveStatus({ type: 'error', message: 'Could not save: phone number must have 8 digits after +268.' });
@@ -287,6 +254,7 @@ export default function Profile() {
 
     if (isTestTaker) {
       Object.assign(payload, {
+        gender: data.gender,
         educationLevel: data.educationLevel || null,
         gradeLevel: normalizeText(data.gradeLevel),
         employmentStatus: data.employmentStatus || null,
@@ -332,12 +300,6 @@ export default function Profile() {
       const savedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       setSaveStatus({ type: 'success', message: `Profile saved successfully at ${savedAt}.` });
       setTimeout(() => setSaveStatus(null), 4000);
-      if (isTestTaker && updatedUser?.onboardingCompleted === false) {
-        navigate('/onboarding', {
-          replace: true,
-          state: { message: 'Complete the missing profile fields before continuing.' }
-        });
-      }
     } catch (err) {
       setSaveStatus({
         type: 'error',
@@ -389,11 +351,8 @@ export default function Profile() {
     if (!currentPw || !newPw || !confirmPw) {
       setPwStatus({ type: 'error', msg: 'All fields are required.' }); return;
     }
-    if (newPw.length < 8) {
-      setPwStatus({ type: 'error', msg: 'New password must be at least 8 characters.' }); return;
-    }
-    if (!PASSWORD_PATTERN.test(newPw)) {
-      setPwStatus({ type: 'error', msg: 'New password must include letters and numbers. Symbols are allowed.' }); return;
+    if (newPw.length < 6) {
+      setPwStatus({ type: 'error', msg: 'New password must be at least 6 characters.' }); return;
     }
     if (newPw !== confirmPw) {
       setPwStatus({ type: 'error', msg: 'New passwords do not match.' }); return;
@@ -518,6 +477,24 @@ export default function Profile() {
           {/* Personal Information Section */}
           <SectionCard icon={User} title="Personal Information">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {isTestTaker && (
+                <div>
+                  <FieldLabel>Gender *</FieldLabel>
+                  <select
+                    {...register('gender')}
+                    className={inputFocusClass}
+                    style={{ ...inputStyle, ...(errors.gender ? errorInputStyle : {}) }}
+                    aria-invalid={errors.gender ? 'true' : 'false'}
+                  >
+                    <option value="">Select gender</option>
+                    {GENDER_OPTIONS.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <FieldError error={errors.gender} />
+                </div>
+              )}
+
               <div>
                 <FieldLabel>Phone Number</FieldLabel>
                 <div
@@ -554,6 +531,7 @@ export default function Profile() {
                   }}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.region ? errorInputStyle : {}) }}
+                  aria-invalid={errors.region ? 'true' : 'false'}
                 >
                   <option value="">Select Region</option>
                   <option value="hhohho">Hhohho</option>
@@ -566,14 +544,16 @@ export default function Profile() {
 
               <div>
                 <FieldLabel>District / Town</FieldLabel>
-                <DistrictSearchInput
-                  value={district}
-                  onChange={(name) => setDistrict(name)}
+                  <DistrictSearchInput
+                    value={district}
+                    onChange={(name) => setDistrict(name)}
                   region={selectedRegion}
                   placeholder="Search for district or town..."
-                  error={!!errors.district}
-                />
-                <FieldError error={errors.district} />
+                    error={!!errors.district}
+                    inputId="profile-district"
+                    errorId={errors.district ? 'profile-district-error' : undefined}
+                  />
+                <div id="profile-district-error"><FieldError error={errors.district} /></div>
               </div>
 
               <div>
@@ -582,6 +562,7 @@ export default function Profile() {
                   {...register('address')}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.address ? errorInputStyle : {}) }}
+                  aria-invalid={errors.address ? 'true' : 'false'}
                 />
                 <FieldError error={errors.address} />
               </div>
@@ -598,6 +579,7 @@ export default function Profile() {
                     className={inputFocusClass}
                     style={{ ...inputStyle, ...(errors.educationLevel ? errorInputStyle : {}) }}
                     disabled={educationLevelsLoading}
+                    aria-invalid={errors.educationLevel ? 'true' : 'false'}
                   >
                     <option value="">Select Education Level</option>
                     {educationLevels.map((level) => (
@@ -615,6 +597,7 @@ export default function Profile() {
                     {...register('gradeLevel')}
                     className={inputFocusClass}
                     style={{ ...inputStyle, ...(errors.gradeLevel ? errorInputStyle : {}) }}
+                    aria-invalid={errors.gradeLevel ? 'true' : 'false'}
                   >
                     <option value="">Select grade or qualification</option>
                     {GRADE_LEVEL_OPTIONS.map((option) => (
@@ -636,8 +619,10 @@ export default function Profile() {
                       type={institutionTypeFilter}
                       userType={institutionUserTypeFilter}
                       error={!!errors.currentInstitution}
+                      inputId="profile-institution"
+                      errorId={errors.currentInstitution ? 'profile-institution-error' : undefined}
                     />
-                    <FieldError error={errors.currentInstitution} />
+                    <div id="profile-institution-error"><FieldError error={errors.currentInstitution} /></div>
                   </div>
                 )}
 
@@ -649,6 +634,7 @@ export default function Profile() {
                         {...register('degreeProgram')}
                         className={inputFocusClass}
                         style={{ ...inputStyle, ...(errors.degreeProgram ? errorInputStyle : {}) }}
+                        aria-invalid={errors.degreeProgram ? 'true' : 'false'}
                         placeholder="e.g. BSc Computer Science"
                       />
                       <FieldError error={errors.degreeProgram} />
@@ -662,6 +648,7 @@ export default function Profile() {
                         {...register('yearOfStudy')}
                         className={inputFocusClass}
                         style={{ ...inputStyle, ...(errors.yearOfStudy ? errorInputStyle : {}) }}
+                        aria-invalid={errors.yearOfStudy ? 'true' : 'false'}
                       />
                       <FieldError error={errors.yearOfStudy} />
                     </div>
@@ -700,6 +687,7 @@ export default function Profile() {
                     {...register('yearsExperience')}
                     className={inputFocusClass}
                     style={{ ...inputStyle, ...(errors.yearsExperience ? errorInputStyle : {}) }}
+                    aria-invalid={errors.yearsExperience ? 'true' : 'false'}
                   />
                   <FieldError error={errors.yearsExperience} />
                 </div>
@@ -712,8 +700,10 @@ export default function Profile() {
                     onChange={(name, id) => setOccupation({ name, occupationId: id })}
                     placeholder="Search for your occupation..."
                     error={!!errors.currentOccupation}
+                    inputId="profile-occupation"
+                    errorId={errors.currentOccupation ? 'profile-occupation-error' : undefined}
                   />
-                  <FieldError error={errors.currentOccupation} />
+                  <div id="profile-occupation-error"><FieldError error={errors.currentOccupation} /></div>
                 </div>
 
                 <div>
@@ -723,7 +713,11 @@ export default function Profile() {
                     institutionId={workplace.institutionId}
                     onChange={(name, id) => setWorkplace({ name, institutionId: id })}
                     placeholder="Search for your employer or organisation..."
+                    error={!!errors.workplaceName}
+                    inputId="profile-workplace"
+                    errorId={errors.workplaceName ? 'profile-workplace-error' : undefined}
                   />
+                  <div id="profile-workplace-error"><FieldError error={errors.workplaceName} /></div>
                   <p className="mt-1" style={{ color: GOV.textHint, fontSize: '0.75rem' }}>
                     Type to search registered organisations, or enter your workplace name.
                   </p>
@@ -757,6 +751,7 @@ export default function Profile() {
                   {...register('preferredLanguage')}
                   className={inputFocusClass}
                   style={{ ...inputStyle, ...(errors.preferredLanguage ? errorInputStyle : {}) }}
+                  aria-invalid={errors.preferredLanguage ? 'true' : 'false'}
                 >
                   <option value="en">English</option>
                   <option value="ss">SiSwati</option>
@@ -883,8 +878,13 @@ export default function Profile() {
                       style={inputStyle}
                       autoComplete={field === 'current' ? 'current-password' : 'new-password'}
                     />
-                    <button type="button" onClick={() => setShowPw(p => ({ ...p, [field]: !p[field] }))}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2" tabIndex={-1}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPw(p => ({ ...p, [field]: !p[field] }))}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2"
+                      aria-label={`${showPw[field] ? 'Hide' : 'Show'} ${labels[field].toLowerCase()}`}
+                      aria-pressed={showPw[field]}
+                    >
                       {showPw[field]
                         ? <EyeOff className="w-4 h-4" style={{ color: GOV.textMuted }} />
                         : <Eye className="w-4 h-4" style={{ color: GOV.textMuted }} />}
@@ -905,189 +905,6 @@ export default function Profile() {
             </button>
           </form>
         </SectionCard>
-
-        {/* Academic Qualifications / Certificates Section */}
-        {isTestTaker && (
-        <div className="rounded-md border overflow-hidden" style={{ borderColor: GOV.border, backgroundColor: 'white' }}>
-          <div className="flex items-center gap-2 px-5 py-4" style={{ borderBottom: `1px solid ${GOV.borderLight}` }}>
-            <GraduationCap size={16} style={{ color: GOV.blue }} />
-            <h2 className={TYPO.sectionTitle} style={{ color: GOV.text }}>Academic Qualifications &amp; Certificates</h2>
-          </div>
-
-          {/* Upload form */}
-          <form onSubmit={handleQualUpload} className="p-5 space-y-4" style={{ borderBottom: `1px solid ${GOV.borderLight}` }}>
-            <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-              Upload certificates, degrees, diplomas or transcripts (PDF, JPEG, PNG or WebP · max 5 MB each).
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Document title *</label>
-                <input
-                  type="text"
-                  value={qualForm.title}
-                  onChange={e => setQualForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="e.g. IGCSE Certificate 2022"
-                  className={inputFocusClass}
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Document type</label>
-                <select
-                  value={qualForm.documentType}
-                  onChange={e => setQualForm(p => ({ ...p, documentType: e.target.value }))}
-                  className={inputFocusClass}
-                  style={inputStyle}
-                >
-                  <option value="certificate">Certificate</option>
-                  <option value="degree">Degree</option>
-                  <option value="diploma">Diploma</option>
-                  <option value="transcript">Transcript</option>
-                  <option value="professional_licence">Professional Licence</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Issued by</label>
-                <input
-                  type="text"
-                  value={qualForm.issuedBy}
-                  onChange={e => setQualForm(p => ({ ...p, issuedBy: e.target.value }))}
-                  placeholder="e.g. University of Eswatini"
-                  className={inputFocusClass}
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label className={`block mb-1 ${TYPO.label}`} style={{ color: GOV.text }}>Issue date</label>
-                <input
-                  type="date"
-                  value={qualForm.issueDate}
-                  onChange={e => setQualForm(p => ({ ...p, issueDate: e.target.value }))}
-                  className={inputFocusClass}
-                  style={inputStyle}
-                />
-              </div>
-            </div>
-
-            {/* Drop zone */}
-            <div
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); handleQualFileSelect(e.dataTransfer.files[0]); }}
-              onClick={() => document.getElementById('qual-file-input').click()}
-              className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed cursor-pointer transition-colors py-6 px-4"
-              style={{
-                borderColor: dragOver ? GOV.blue : GOV.border,
-                backgroundColor: dragOver ? GOV.blueLight : '#fafafa'
-              }}
-            >
-              <input
-                id="qual-file-input"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp"
-                className="hidden"
-                onChange={e => handleQualFileSelect(e.target.files[0])}
-              />
-              <Upload className="w-6 h-6" style={{ color: GOV.textHint }} />
-              {qualForm.file ? (
-                <div className="text-center">
-                  <p className={`font-medium ${TYPO.bodySmall}`} style={{ color: GOV.text }}>{qualForm.file.name}</p>
-                  <p className={TYPO.hint} style={{ color: GOV.textMuted }}>{formatFileSize(qualForm.file.size)}</p>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <p className={TYPO.bodySmall} style={{ color: GOV.text }}>Drag & drop or <span style={{ color: GOV.blue }}>click to browse</span></p>
-                  <p className={TYPO.hint} style={{ color: GOV.textMuted }}>PDF, JPEG, PNG, WebP · max 5 MB</p>
-                </div>
-              )}
-            </div>
-
-            {qualError && (
-              <div className="flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: '#fef2f2', border: `1px solid #fecaca` }}>
-                <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: GOV.error }} />
-                <p className={TYPO.hint} style={{ color: GOV.error }}>{qualError}</p>
-              </div>
-            )}
-            {qualSuccess && (
-              <div className="flex items-center gap-2 rounded-md px-3 py-2" style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
-                <p className={TYPO.hint} style={{ color: '#059669' }}>{qualSuccess}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={qualUploading}
-              className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{ backgroundColor: GOV.blue }}
-            >
-              <Upload size={14} /> {qualUploading ? 'Uploading...' : 'Upload Document'}
-            </button>
-          </form>
-
-          {/* Uploaded list */}
-          <div className="p-5">
-            {qualLoading ? (
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>Loading documents...</p>
-            ) : qualifications.length === 0 ? (
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>No qualification documents uploaded yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {qualifications.map(q => (
-                  <li key={q.id} className="flex items-start gap-3 rounded-md border p-3" style={{ borderColor: GOV.borderLight }}>
-                    <span className="text-xl flex-shrink-0">{getQualIcon(q.mimeType)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-semibold truncate ${TYPO.bodySmall}`} style={{ color: GOV.text }}>{q.title}</p>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5">
-                        <span
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase"
-                          style={{ backgroundColor: GOV.blueLightAlt, color: GOV.blue }}
-                        >
-                          {DOC_TYPE_LABELS[q.documentType] || q.documentType}
-                        </span>
-                        {q.issuedBy && <span className={TYPO.hint} style={{ color: GOV.textMuted }}>{q.issuedBy}</span>}
-                        {q.issueDate && <span className={TYPO.hint} style={{ color: GOV.textMuted }}>{new Date(q.issueDate).toLocaleDateString()}</span>}
-                        <span className={TYPO.hint} style={{ color: GOV.textHint }}>{formatFileSize(q.fileSize)}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <a
-                        href={`${process.env.REACT_APP_API_URL || ''}/api/v1/qualifications/${q.id}/file`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          try {
-                            const res = await api.get(`/api/v1/qualifications/${q.id}/file`, { responseType: 'blob' });
-                            const url = window.URL.createObjectURL(new Blob([res.data], { type: q.mimeType }));
-                            window.open(url, '_blank');
-                          } catch { setQualError('Could not open file.'); }
-                        }}
-                        className="flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
-                        style={{ color: GOV.blue }}
-                        title="View document"
-                      >
-                        <ExternalLink size={13} /> View
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => handleQualDelete(q.id)}
-                        className="flex items-center gap-1 text-xs font-medium transition-colors hover:underline"
-                        style={{ color: GOV.error }}
-                        title="Delete document"
-                      >
-                        <Trash2 size={13} /> Delete
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-        )}
 
         {/* Data subject rights */}
         <div className="rounded-md border p-5" style={{ borderColor: GOV.border, backgroundColor: 'white' }}>

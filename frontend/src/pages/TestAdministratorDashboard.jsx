@@ -11,6 +11,10 @@ import CounselorStudentsPanel from '../features/counselor/CounselorStudentsPanel
 import CounselorImportPanel from '../features/counselor/CounselorImportPanel';
 import CounselorLoginCardsPanel from '../features/counselor/CounselorLoginCardsPanel';
 import CounselorAnalyticsPanel from '../features/counselor/CounselorAnalyticsPanel';
+import {
+  canSelectAnyInstitution,
+  getAssignedInstitutionName
+} from '../utils/administratorScope';
 
 const TABS = [
   { id: 'overview', label: 'Overview', Icon: Activity },
@@ -27,9 +31,9 @@ const TestAdministratorDashboard = () => {
   const [instFilter, setInstFilter] = useState('');
 
   const role = user?.role || '';
-  const isSystemAdmin = role === 'System Administrator';
+  const isSystemAdmin = canSelectAnyInstitution(role);
   const isTestAdmin = role === 'Test Administrator';
-  const isAdmin = isSystemAdmin || isTestAdmin;
+  const assignedInstitutionName = getAssignedInstitutionName(user);
   const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Counselor';
   const pageTitle = isSystemAdmin
     ? 'System Administrator - Student Management'
@@ -45,14 +49,14 @@ const TestAdministratorDashboard = () => {
   const {
     students, allStudents, institutionStats, hollandDist, loading, error,
     search, setSearch, completedCount, completionRate, load,
-  } = useStudentManagement({ isAdmin, institutionId: instFilter });
+  } = useStudentManagement({ isAdmin: isSystemAdmin, institutionId: instFilter });
 
   const { allInstitutions, load: loadInstitutions } = useInstitutions();
 
   useEffect(() => {
     load();
-    loadInstitutions();
-  }, [load, loadInstitutions]);
+    if (isSystemAdmin) loadInstitutions();
+  }, [isSystemAdmin, load, loadInstitutions]);
 
   const filteredStudents = useMemo(() => {
     if (!search) return students;
@@ -79,7 +83,7 @@ const TestAdministratorDashboard = () => {
               {pageSubtitle}
             </p>
           </div>
-          {isAdmin && (
+          {isSystemAdmin && (
             <div className="w-full sm:max-w-sm lg:max-w-md xl:max-w-lg shrink-0">
               <select
                 className="form-control text-sm"
@@ -139,7 +143,7 @@ const TestAdministratorDashboard = () => {
         {activeTab === 'students' && (
           <CounselorStudentsPanel
             students={filteredStudents}
-            isAdmin={isAdmin}
+            isAdmin={isSystemAdmin}
             loading={loading}
             error={error}
             onRefresh={load}
@@ -149,16 +153,18 @@ const TestAdministratorDashboard = () => {
         )}
         {activeTab === 'import' && (
           <CounselorImportPanel
-            isAdmin={isAdmin}
+            isAdmin={isSystemAdmin}
             institutions={allInstitutions}
+            assignedInstitutionName={assignedInstitutionName}
             onImportComplete={load}
           />
         )}
         {activeTab === 'logincards' && (
           <CounselorLoginCardsPanel
-            isAdmin={isAdmin}
+            isAdmin={isSystemAdmin}
             institutions={allInstitutions}
             userInstitutionId={user?.institutionId || ''}
+            userInstitutionName={assignedInstitutionName}
           />
         )}
         {activeTab === 'analytics' && (

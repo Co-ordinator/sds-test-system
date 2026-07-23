@@ -6,6 +6,7 @@ const {
 } = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const scoringService = require('./scoring.service');
+const { fillDailySeries, resolveDailyRange } = require('../utils/dailyDateSeries');
 
 const ASSESSMENT_SCORE_ATTRIBUTES = [
   'id', 'hollandCode', 'hollandCodeDisplay',
@@ -27,7 +28,18 @@ const buildFilters = (query = {}) => {
 
   if (institutionId) userWhere.institutionId = institutionId;
   if (region) userWhere.region = region;
-  if (userType) userWhere.userType = userType;
+  if (userType) {
+    const userTypeVariants = {
+      'High School Student': ['High School Student', 'school_student'],
+      'University Student': ['University Student', 'university_student'],
+      Professional: ['Professional', 'professional'],
+      school_student: ['High School Student', 'school_student'],
+      university_student: ['University Student', 'university_student'],
+      professional: ['Professional', 'professional']
+    };
+    const variants = userTypeVariants[userType] || [userType];
+    userWhere.userType = variants.length > 1 ? { [Op.in]: variants } : variants[0];
+  }
   if (institutionType) institutionWhere.type = institutionType;
 
   if (startDate || endDate) {
@@ -146,6 +158,12 @@ const analyticsService = {
     const totalAssessments = await Assessment.count({ where: assessmentWhere, include: assessmentInclude });
     const completedAssessments = await Assessment.count({ where: { ...assessmentWhere, status: 'completed' }, include: assessmentInclude });
     const completionRate = totalAssessments === 0 ? 0 : (completedAssessments / totalAssessments) * 100;
+    const usersWithAssessments = await Assessment.count({
+      where: assessmentWhere,
+      include: assessmentInclude,
+      distinct: true,
+      col: 'user_id'
+    });
 
     const averages = await Assessment.findOne({
       where: { ...assessmentWhere, status: 'completed' },
@@ -164,7 +182,14 @@ const analyticsService = {
     const totalUsers = await countUsers({ userWhere, userInclude });
 
     return {
-      totals: { users: totalUsers, testTakers: testTakerCount, testAdministrators: testAdministratorCount, assessments: totalAssessments, completedAssessments },
+      totals: {
+        users: totalUsers,
+        testTakers: testTakerCount,
+        testAdministrators: testAdministratorCount,
+        assessments: totalAssessments,
+        completedAssessments,
+        usersWithAssessments
+      },
       completionRate: Number(completionRate.toFixed(2)),
       riasecAverages: averages
     };
@@ -185,25 +210,40 @@ const analyticsService = {
     const assessmentCreatedAt = Assessment.sequelize.col('Assessment.created_at');
     const assessmentId = Assessment.sequelize.col('Assessment.id');
 
+    const granularity = query.granularity === 'day' ? 'day' : 'month';
     const trendWhere = { ...assessmentWhere };
-    if (!trendWhere.createdAt) {
-      trendWhere.createdAt = { [Op.gte]: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) };
-    } else if (!trendWhere.createdAt[Op.gte]) {
-      trendWhere.createdAt[Op.gte] = new Date(new Date().setFullYear(new Date().getFullYear() - 1));
+    let dailyRange = null;
+    if (granularity === 'day') {
+      dailyRange = resolveDailyRange(query);
+      trendWhere.createdAt = {
+        [Op.gte]: dailyRange.start,
+        [Op.lte]: dailyRange.end
+      };
+    } else {
+      const defaultStart = new Date(new Date().setFullYear(new Date().getFullYear() - 1));
+      if (!trendWhere.createdAt) {
+        trendWhere.createdAt = { [Op.gte]: defaultStart };
+      } else if (!trendWhere.createdAt[Op.gte]) {
+        trendWhere.createdAt[Op.gte] = defaultStart;
+      }
     }
 
     const trend = await Assessment.findAll({
       where: trendWhere,
       include: assessmentInclude,
       attributes: [
-        [Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt), 'month'],
+        [Assessment.sequelize.fn('DATE_TRUNC', granularity, assessmentCreatedAt), 'month'],
         [Assessment.sequelize.fn('COUNT', assessmentId), 'total'],
         [Assessment.sequelize.fn('SUM', Assessment.sequelize.literal("CASE WHEN \"Assessment\".\"status\"='completed' THEN 1 ELSE 0 END")), 'completed']
       ],
-      group: [Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt)],
-      order: [[Assessment.sequelize.fn('DATE_TRUNC', 'month', assessmentCreatedAt), 'ASC']],
+      group: [Assessment.sequelize.fn('DATE_TRUNC', granularity, assessmentCreatedAt)],
+      order: [[Assessment.sequelize.fn('DATE_TRUNC', granularity, assessmentCreatedAt), 'ASC']],
       raw: true
     });
+
+    if (granularity === 'day') {
+      return { trend: fillDailySeries(trend, dailyRange) };
+    }
 
     return { trend };
   },
@@ -262,7 +302,22 @@ const analyticsService = {
       }),
       User.findAll({
         where: { ...userWhere, userType: userWhere.userType || { [Op.ne]: null } },
-        attributes: [[col('User.user_type'), 'userType'], [fn('COUNT', col('User.id')), 'count']],
+        include: [
+          ...userInclude,
+          ...(Object.keys(assessmentWhere).length > 0
+            ? [{
+              model: Assessment,
+              as: 'assessments',
+              attributes: [],
+              required: true,
+              where: assessmentWhere
+            }]
+            : [])
+        ],
+        attributes: [
+          [col('User.user_type'), 'userType'],
+          [fn('COUNT', fn('DISTINCT', col('User.id'))), 'count']
+        ],
         group: [col('User.user_type')], raw: true
       })
     ]);
@@ -294,10 +349,19 @@ const analyticsService = {
         });
       }
     });
-    const seen = {};
+    const topByRegion = {};
     hollandByRegion.forEach(row => {
       const r = (row.region || '').toLowerCase();
-      if (regionMap[r] && !seen[r]) { regionMap[r].topCode = row.hollandCode; seen[r] = true; }
+      if (!regionMap[r]) return;
+      const count = Number(row.count) || 0;
+      const entry = topByRegion[r];
+      if (!entry) topByRegion[r] = { max: count, codes: [row.hollandCode] };
+      else if (count === entry.max && !entry.codes.includes(row.hollandCode)) {
+        entry.codes.push(row.hollandCode);
+      }
+    });
+    Object.entries(topByRegion).forEach(([regionKey, { codes }]) => {
+      regionMap[regionKey].topCode = codes.join(' / ');
     });
 
     const totalUsers = await countUsers({ userWhere, userInclude });
@@ -390,7 +454,11 @@ const analyticsService = {
 
     const results = Object.values(institutionMap)
       .map((row) => {
-        const topCode = Object.entries(row.codeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
+        const sortedCodes = Object.entries(row.codeCounts).sort((a, b) => b[1] - a[1]);
+        const maxCount = sortedCodes[0]?.[1] || 0;
+        const topCode = maxCount > 0
+          ? sortedCodes.filter(([, count]) => count === maxCount).map(([code]) => code).join(' / ')
+          : '-';
         return {
           institutionId: row.institutionId,
           institutionName: row.institutionName,
@@ -565,7 +633,24 @@ const analyticsService = {
   getSegmentation: async (query = {}) => {
     const { userWhere, assessmentWhere, userInclude } = buildFilters(query);
 
-    const [riasecByGender, riasecByUserType, hollandByGender] = await Promise.all([
+    const ageBucketSql = `CASE
+      WHEN "user"."date_of_birth" IS NULL THEN 'Unknown'
+      WHEN date_part('year', age("user"."date_of_birth")) < 15 THEN 'Under 15'
+      WHEN date_part('year', age("user"."date_of_birth")) BETWEEN 15 AND 19 THEN '15-19'
+      WHEN date_part('year', age("user"."date_of_birth")) BETWEEN 20 AND 24 THEN '20-24'
+      WHEN date_part('year', age("user"."date_of_birth")) BETWEEN 25 AND 34 THEN '25-34'
+      ELSE '35+'
+    END`;
+
+    const [
+      riasecByGender,
+      riasecByUserType,
+      hollandByGender,
+      byAgeGroup,
+      statusDistribution,
+      completionByGender,
+      completionByRegion
+    ] = await Promise.all([
       Assessment.findAll({
         where: { ...assessmentWhere, status: 'completed' },
         include: [{ model: User, as: 'user', required: true, attributes: [], where: { ...userWhere, gender: { [Op.ne]: null } }, include: userInclude }],
@@ -608,10 +693,92 @@ const analyticsService = {
         }],
         groupKey: 'gender',
         groupGetter: (assessment) => getIncludedUser(assessment)?.gender
+      }),
+      Assessment.findAll({
+        where: assessmentWhere,
+        include: [{
+          model: User,
+          as: 'user',
+          required: true,
+          attributes: [],
+          where: userWhere,
+          include: userInclude
+        }],
+        attributes: [
+          [Assessment.sequelize.literal(ageBucketSql), 'ageGroup'],
+          [fn('COUNT', col('Assessment.id')), 'total'],
+          [fn('SUM', Assessment.sequelize.literal("CASE WHEN \"Assessment\".\"status\"='completed' THEN 1 ELSE 0 END")), 'completed']
+        ],
+        group: [Assessment.sequelize.literal(ageBucketSql)],
+        order: [[Assessment.sequelize.literal(ageBucketSql), 'ASC']],
+        raw: true
+      }),
+      Assessment.findAll({
+        where: assessmentWhere,
+        include: [{
+          model: User,
+          as: 'user',
+          required: true,
+          attributes: [],
+          where: userWhere,
+          include: userInclude
+        }],
+        attributes: [
+          [col('Assessment.status'), 'status'],
+          [fn('COUNT', col('Assessment.id')), 'count']
+        ],
+        group: [col('Assessment.status')],
+        raw: true
+      }),
+      Assessment.findAll({
+        where: assessmentWhere,
+        include: [{
+          model: User,
+          as: 'user',
+          required: true,
+          attributes: [],
+          where: userWhere,
+          include: userInclude
+        }],
+        attributes: [
+          [Assessment.sequelize.literal(`COALESCE("user"."gender"::text, 'unknown')`), 'gender'],
+          [fn('COUNT', col('Assessment.id')), 'total'],
+          [fn('SUM', Assessment.sequelize.literal("CASE WHEN \"Assessment\".\"status\"='completed' THEN 1 ELSE 0 END")), 'completed']
+        ],
+        group: [Assessment.sequelize.literal(`COALESCE("user"."gender"::text, 'unknown')`)],
+        order: [[Assessment.sequelize.literal(`COALESCE("user"."gender"::text, 'unknown')`), 'ASC']],
+        raw: true
+      }),
+      Assessment.findAll({
+        where: assessmentWhere,
+        include: [{
+          model: User,
+          as: 'user',
+          required: true,
+          attributes: [],
+          where: userWhere,
+          include: userInclude
+        }],
+        attributes: [
+          [Assessment.sequelize.literal(`COALESCE("user"."region"::text, 'unknown')`), 'region'],
+          [fn('COUNT', col('Assessment.id')), 'total'],
+          [fn('SUM', Assessment.sequelize.literal("CASE WHEN \"Assessment\".\"status\"='completed' THEN 1 ELSE 0 END")), 'completed']
+        ],
+        group: [Assessment.sequelize.literal(`COALESCE("user"."region"::text, 'unknown')`)],
+        order: [[Assessment.sequelize.literal(`COALESCE("user"."region"::text, 'unknown')`), 'ASC']],
+        raw: true
       })
     ]);
 
-    return { riasecByGender, riasecByUserType, hollandByGender };
+    return {
+      riasecByGender,
+      riasecByUserType,
+      hollandByGender,
+      byAgeGroup,
+      statusDistribution,
+      completionByGender,
+      completionByRegion
+    };
   },
 
   /* ── 8. Skills Pipeline (30-day Holland momentum + emerging careers) ──────── */

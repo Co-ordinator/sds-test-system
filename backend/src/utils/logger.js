@@ -2,6 +2,11 @@ const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const { AuditLog } = require('../models');
 
+const LOG_LEVELS = new Set(['error', 'warn', 'info', 'http', 'debug']);
+const configuredLogLevel = LOG_LEVELS.has(String(process.env.LOG_LEVEL || '').toLowerCase())
+  ? String(process.env.LOG_LEVEL).toLowerCase()
+  : (process.env.NODE_ENV === 'development' ? 'debug' : 'info');
+
 // Custom transport for saving audit logs to database
 class DatabaseTransport extends winston.Transport {
   constructor(opts) {
@@ -47,7 +52,8 @@ const SENSITIVE_KEYS = new Set([
   'password', 'newpassword', 'currentpassword', 'confirmpassword',
   'token', 'accesstoken', 'refreshtoken', 'passwordresettoken', 'emailverificationtoken',
   'authorization', 'apikey', 'secret', 'nationalid', 'national_id',
-  'email', 'phonenumber', 'phone_number', 'address'
+  'email', 'phonenumber', 'phone_number', 'address', 'identifier', 'username',
+  'studentnumber', 'student_number', 'studentcode', 'student_code', 'answers'
 ]);
 
 const redactValue = (value) => {
@@ -131,7 +137,7 @@ const logger = winston.createLogger({
   transports: [
     // Console transport for development
     new winston.transports.Console({
-      level: process.env.NODE_ENV === 'development' ? 'debug' : 'info',
+      level: configuredLogLevel,
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
@@ -144,7 +150,7 @@ const logger = winston.createLogger({
       zippedArchive: true,
       maxSize: '20m',
       maxFiles: '14d',
-      level: 'info'
+      level: configuredLogLevel
     }),
     // Database transport for audit logs
     new DatabaseTransport({

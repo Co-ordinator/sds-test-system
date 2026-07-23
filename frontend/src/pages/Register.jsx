@@ -73,23 +73,23 @@ export default function Register() {
     <OnboardingLayout wide>
       {/* Outer card — centered, white, rounded, with shadow */}
       <div
-        className="mx-auto flex w-full min-w-0 max-w-[430px] flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_18px_45px_rgba(15,45,75,0.12)] lg:max-w-[860px] lg:min-h-[560px] lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
+        className="mx-auto flex w-full min-w-0 max-w-[430px] shrink-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_18px_45px_rgba(15,45,75,0.12)] lg:min-h-[560px] lg:max-w-[860px] lg:flex-row lg:rounded-none lg:border-0 lg:shadow-none"
         style={{ borderColor: GOV.border }}
       >
         {/* Left — illustration panel */}
         <div
-          className="relative flex h-32 shrink-0 items-center justify-center overflow-hidden bg-[#f6f9fc] px-4 sm:h-40 lg:h-auto lg:grow-0 lg:shrink-0 lg:basis-[42%] lg:bg-white lg:p-8"
+          className="relative flex h-24 shrink-0 items-center justify-center overflow-hidden bg-[#f6f9fc] px-4 sm:h-32 md:h-40 lg:h-auto lg:grow-0 lg:shrink-0 lg:basis-[42%] lg:bg-white lg:p-8"
         >
           <img
             src="/login_cover.png"
             alt=""
-            className="relative z-10 h-[190px] w-auto max-w-none object-contain sm:h-[230px] lg:h-auto lg:w-full lg:max-w-[500px]"
+            className="relative z-10 h-[155px] w-auto max-w-none object-contain sm:h-[195px] md:h-[230px] lg:h-auto lg:w-full lg:max-w-[500px]"
             style={{ maxWidth: '500px' }}
           />
         </div>
 
         {/* Right — form panel */}
-        <div className="flex min-h-0 flex-1 flex-col justify-center px-5 py-5 sm:px-7 lg:px-10 lg:py-8">
+        <div className="flex shrink-0 flex-col justify-start px-5 py-5 sm:px-7 lg:min-h-0 lg:flex-1 lg:shrink lg:justify-center lg:px-10 lg:py-8">
           {/* Heading block */}
           <div style={{ marginBottom: '0.95rem' }}>
             <h1
@@ -220,12 +220,11 @@ export default function Register() {
                 <input
                   {...register('password', {
                     required: 'Password is required.',
-                    minLength: { value: 12, message: 'Password must be at least 12 characters.' },
-                    pattern: { value: /^(?=.*[A-Za-z])(?=.*\d).{12,}$/, message: 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.' }
+                    minLength: { value: 6, message: 'Password must be at least 6 characters. Any characters are allowed.' }
                   })}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="new-password"
-                  placeholder="Password (at least 12 characters)"
+                  placeholder="Password (at least 6 characters)"
                   style={styles.input}
                 />
                 <button
@@ -233,6 +232,7 @@ export default function Register() {
                   onClick={() => setShowPassword(!showPassword)}
                   style={styles.eyeBtn}
                   tabIndex={-1}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword
                     ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -319,6 +319,7 @@ const styles = {
   },
   input: {
     flex: 1,
+    minWidth: 0,
     border: 'none',
     background: 'transparent',
     fontSize: '0.82rem',

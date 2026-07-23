@@ -1,142 +1,163 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
 import api from '../services/api';
-import OnboardingLayout from '../components/onboarding/OnboardingLayout';
-import { GOV, TYPO } from '../theme/government';
+import AuthShell from '../components/auth/AuthShell';
+
+const inputClass = (hasError) =>
+  `h-11 w-full rounded-md border bg-white px-3 text-sm font-medium text-[#111827] shadow-sm outline-none transition-colors placeholder:text-[#9ca3af] focus:border-[#2d8bc4] focus:ring-2 focus:ring-[#2d8bc4]/15 ${
+    hasError ? 'border-[#fecaca] bg-[#fffafa]' : 'border-[#d8e1ea]'
+  }`;
 
 export default function ResetPassword() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm();
-  const password = watch('password');
+  const submitReset = async (event) => {
+    event.preventDefault();
+    setFormError('');
+    setSuccessMessage('');
 
-  const onSubmit = async (data) => {
     if (!token) {
-      setError('Reset link is missing the security token. Please request a new password reset email.');
+      setFormError('Reset link is missing the security token. Please request a new reset code.');
       return;
     }
+    if (newPassword.length < 6) {
+      setFormError('Password must be at least 6 characters. Any characters are allowed.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setFormError('Passwords do not match.');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      // POST the token in the request body — keeps it out of NGINX access
-      // logs, browser DevTools network history, and Referer headers.
       await api.post('/api/v1/auth/reset-password', {
         token,
-        newPassword: data.password,
-        confirmPassword: data.confirmPassword
+        newPassword,
+        confirmPassword
       });
-      setSuccess(true);
-      setError('');
-      setTimeout(() => navigate('/login'), 3000);
-    } catch (err) {
-      setError(err?.uiMessage || err?.response?.data?.message || 'Password reset failed');
-      setSuccess(false);
+      setSuccessMessage('Password updated successfully. Redirecting to sign in...');
+      setTimeout(() => navigate('/login', { replace: true }), 1200);
+    } catch (error) {
+      setFormError(error?.uiMessage || error?.raw?.response?.data?.message || 'Password reset failed.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <OnboardingLayout>
-      <div className="w-full max-w-[420px] mx-auto">
-        <div
-          className="w-full bg-white rounded-md border overflow-hidden"
-          style={{ borderColor: GOV.border }}
-        >
-          <div className="px-6 pt-6 pb-1">
-            <h1 className={`${TYPO.pageTitle} text-center`} style={{ color: GOV.text }}>
-              Set new password
-            </h1>
-            <p className={`${TYPO.bodySmall} text-center mt-1`} style={{ color: GOV.textMuted }}>
-              Choose a new password for your account
-            </p>
+    <AuthShell
+      eyebrow="Account recovery"
+      title="Set new password"
+      subtitle="Choose a new password for your SDS account."
+      panelTitle="Secure password reset"
+      panelText="Use the reset link from your inbox to set a new password and continue to the SDS assessment workspace."
+    >
+      <form onSubmit={submitReset} className="space-y-4">
+        <div>
+          <label htmlFor="reset-new-password" className="mb-1.5 block text-xs font-bold text-[#374151]">
+            New password
+          </label>
+          <div className="relative">
+            <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="reset-new-password"
+              type={showNewPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              placeholder="At least 6 characters"
+              className={`${inputClass(!!formError)} pl-9 pr-10`}
+              aria-invalid={Boolean(formError)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowNewPassword((previous) => !previous)}
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+              aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+            >
+              {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
+          <p className="mt-1 text-xs font-medium text-[#6b7280]">
+            Use 6 or more characters. Symbols, spaces, and passphrases are allowed.
+          </p>
+        </div>
 
-          {success ? (
-            <div className="px-6 py-6 text-center" role="status" aria-live="polite">
-              <p className={TYPO.bodySmall} style={{ color: GOV.textMuted }}>
-                Password updated successfully. Redirecting to Login…
-              </p>
-              <Link
-                to="/login"
-                className={`inline-block mt-4 ${TYPO.hint} font-medium`}
-                style={{ color: GOV.blue }}
-              >
-                Go to Login
-              </Link>
-            </div>
-          ) : (
-            <form className="px-6 pt-4 pb-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
-              <div>
-                <label htmlFor="reset-password" className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>New password</label>
-                <input
-                  id="reset-password"
-                  type="password"
-                  autoComplete="new-password"
-                  {...register('password', {
-                    required: 'Required',
-                    minLength: { value: 12, message: 'At least 12 characters' },
-                    pattern: {
-                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/,
-                      message: 'At least 12 characters with both letters and numbers'
-                    }
-                  })}
-                  className={`form-control ${TYPO.body}`}
-                  style={{ color: GOV.text }}
-                  aria-invalid={errors.password ? 'true' : 'false'}
-                />
-                {errors.password && (
-                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.password.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="reset-confirm" className={`block ${TYPO.label} mb-1`} style={{ color: GOV.text }}>Confirm new password</label>
-                <input
-                  id="reset-confirm"
-                  type="password"
-                  {...register('confirmPassword', {
-                    required: 'Required',
-                    validate: (value) => value === password || 'Passwords must match'
-                  })}
-                  className={`form-control ${TYPO.body}`}
-                  style={{ color: GOV.text }}
-                  aria-invalid={errors.confirmPassword ? 'true' : 'false'}
-                />
-                {errors.confirmPassword && (
-                  <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.confirmPassword.message}</p>
-                )}
-              </div>
-
-              {error && (
-                <div
-                  className={`rounded-md px-3 py-2 ${TYPO.hint}`}
-                  style={{ backgroundColor: GOV.errorBg, color: GOV.error, border: `1px solid ${GOV.errorBorder}` }}
-                  role="alert"
-                  aria-live="assertive"
-                >
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className={`w-full py-2.5 rounded-md font-semibold ${TYPO.bodySmall} text-white transition-all duration-150 hover:scale-[1.02] active:scale-[0.98] hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100`}
-                style={{ backgroundColor: GOV.blue }}
-              >
-                {isSubmitting ? 'Updating…' : 'Update password'}
-              </button>
-            </form>
-          )}
-
-          <div className="px-6 pb-6 pt-0 text-center border-t" style={{ borderColor: GOV.borderLight }}>
-            <Link to="/login" className={`${TYPO.hint} font-medium`} style={{ color: GOV.blue }}>
-              Back to Login
-            </Link>
+        <div>
+          <label htmlFor="reset-confirm-password" className="mb-1.5 block text-xs font-bold text-[#374151]">
+            Confirm new password
+          </label>
+          <div className="relative">
+            <ShieldCheck className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6b7280]" aria-hidden="true" />
+            <input
+              id="reset-confirm-password"
+              type={showConfirmPassword ? 'text' : 'password'}
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              placeholder="Repeat new password"
+              className={`${inputClass(!!formError)} pl-9 pr-10`}
+              aria-invalid={Boolean(formError)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((previous) => !previous)}
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+            >
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
           </div>
         </div>
-      </div>
-    </OnboardingLayout>
+
+        {formError && (
+          <div
+            className="flex gap-2 rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-medium text-[#b91c1c]"
+            role="alert"
+            aria-live="assertive"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{formError}</span>
+          </div>
+        )}
+
+        {successMessage && (
+          <div
+            className="flex gap-2 rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-3 py-2 text-xs font-medium text-[#166534]"
+            role="status"
+            aria-live="polite"
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{successMessage}</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-[#2d8bc4] px-4 text-sm font-bold text-white shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:bg-[#256b9a] hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+        >
+          <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+          {isSubmitting ? 'Updating password...' : 'Update password'}
+        </button>
+
+        <div className="rounded-md bg-[#f7fbff] px-3 py-3 text-center text-xs font-medium text-[#4b5563]">
+          Remembered your password?{' '}
+          <Link to="/login" className="font-bold text-[#2d8bc4] hover:underline">
+            Back to sign in
+          </Link>
+        </div>
+      </form>
+    </AuthShell>
   );
 }

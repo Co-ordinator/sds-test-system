@@ -81,6 +81,8 @@ const ChangePassword = () => {
                   onClick={() => setShowCurrent(!showCurrent)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
                   style={{ color: GOV.textMuted }}
+                  aria-label={showCurrent ? 'Hide current password' : 'Show current password'}
+                  aria-pressed={showCurrent}
                 >
                   {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -100,11 +102,7 @@ const ChangePassword = () => {
                   type={showNew ? 'text' : 'password'}
                   {...register('newPassword', {
                     required: 'New password is required',
-                    minLength: { value: 12, message: 'Password must be at least 12 characters' },
-                    pattern: {
-                      value: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{12,}$/,
-                      message: 'Password must be at least 12 characters and contain both letters and numbers'
-                    }
+                    minLength: { value: 6, message: 'Password must be at least 6 characters. Any characters are allowed.' }
                   })}
                   autoComplete="new-password"
                   className={`form-control ${TYPO.body} pr-10`}
@@ -116,6 +114,8 @@ const ChangePassword = () => {
                   onClick={() => setShowNew(!showNew)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
                   style={{ color: GOV.textMuted }}
+                  aria-label={showNew ? 'Hide new password' : 'Show new password'}
+                  aria-pressed={showNew}
                 >
                   {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -124,7 +124,7 @@ const ChangePassword = () => {
                 <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.error }}>{errors.newPassword.message}</p>
               )}
               <p className={`mt-1 ${TYPO.hint}`} style={{ color: GOV.textMuted }}>
-                At least 12 characters with both letters and numbers
+                At least 6 characters. Symbols, spaces, and passphrases are allowed.
               </p>
             </div>
 
@@ -150,6 +150,8 @@ const ChangePassword = () => {
                   onClick={() => setShowConfirm(!showConfirm)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
                   style={{ color: GOV.textMuted }}
+                  aria-label={showConfirm ? 'Hide password confirmation' : 'Show password confirmation'}
+                  aria-pressed={showConfirm}
                 >
                   {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>

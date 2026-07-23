@@ -5,19 +5,10 @@ const { Op } = require('sequelize');
 const { bulkCreateStudents } = require('./studentImport.service');
 const scoringService = require('./scoring.service');
 const { BadRequestError, NotFoundError, ForbiddenError } = require('../utils/errors/appError');
-
-const generateTempCardPassword = () => {
-  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz0123456789!@#$%^&*';
-  let pwd = '';
-  for (let i = 0; i < 10; i += 1) {
-    pwd += charset.charAt(Math.floor(Math.random() * charset.length));
-  }
-  if (!/[A-Z]/.test(pwd)) pwd = `A${pwd.slice(1)}`;
-  if (!/[a-z]/.test(pwd)) pwd = `${pwd.slice(0, 1)}a${pwd.slice(2)}`;
-  if (!/\d/.test(pwd)) pwd = `${pwd.slice(0, pwd.length - 1)}7`;
-  if (!/[!@#$%^&*]/.test(pwd)) pwd = `${pwd.slice(0, pwd.length - 2)}!${pwd.slice(-1)}`;
-  return pwd;
-};
+const {
+  createLoginCardCredentialNonce,
+  deriveLoginCardPassword
+} = require('../utils/loginCardCredential');
 
 const normalizeGradeToken = (value) => {
   return String(value || '')
@@ -37,12 +28,22 @@ const resolveInstitutionId = (actor, queryParam) => {
   return actor.institutionId || null;
 };
 
+const assertAssignedInstitution = (actor, institutionId) => {
+  if (actor?.role === 'Test Administrator' && !institutionId) {
+    throw new ForbiddenError(
+      'This Test Administrator is not assigned to an institution. Ask a System Administrator to assign one.',
+      'TEST_ADMIN_INSTITUTION_REQUIRED'
+    );
+  }
+};
+
 const resolveScopedStudent = async (actorId, studentId) => {
   const actor = await User.findByPk(actorId);
   if (!actor) {
     throw new NotFoundError('Actor not found', 'ACTOR_NOT_FOUND');
   }
   const institutionId = resolveInstitutionId(actor, null);
+  assertAssignedInstitution(actor, institutionId);
 
   const where = { id: studentId, role: 'Test Taker' };
   if (actor.role !== 'System Administrator') {
@@ -64,6 +65,7 @@ module.exports = {
   getMyStudents: async (actorId, queryInstitutionId) => {
     const actor = await User.findByPk(actorId);
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
+    assertAssignedInstitution(actor, institutionId);
 
     const where = { role: 'Test Taker' };
     if (institutionId) where.institutionId = institutionId;
@@ -118,6 +120,7 @@ module.exports = {
   getInstitutionStats: async (actorId, queryInstitutionId) => {
     const actor = await User.findByPk(actorId);
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
+    assertAssignedInstitution(actor, institutionId);
 
     if (!institutionId) return { stats: null, hollandDistribution: [] };
 
@@ -208,9 +211,8 @@ module.exports = {
     return updated;
   },
 
-  getStudentResults: async (studentId) => {
-    const student = await User.findOne({ where: { id: studentId, role: 'Test Taker' } });
-    if (!student) throw new NotFoundError('Student not found', 'STUDENT_NOT_FOUND');
+  getStudentResults: async (actorId, studentId) => {
+    const { student } = await resolveScopedStudent(actorId, studentId);
 
     const assessments = await Assessment.findAll({
       where: { userId: student.id },
@@ -266,6 +268,7 @@ module.exports = {
   getLoginCardsData: async (actorId, queryInstitutionId, grade) => {
     const actor = await User.findByPk(actorId);
     const institutionId = resolveInstitutionId(actor, queryInstitutionId);
+    assertAssignedInstitution(actor, institutionId);
 
     if (!institutionId) throw new BadRequestError('Institution is required', 'INSTITUTION_REQUIRED');
 
@@ -276,7 +279,12 @@ module.exports = {
 
     const students = await User.findAll({
       where,
-      attributes: ['id', 'firstName', 'lastName', 'username', 'gradeLevel', 'className', 'studentNumber', 'studentCode', 'createdAt'],
+      attributes: [
+        'id', 'firstName', 'lastName', 'username', 'gradeLevel', 'className',
+        'studentNumber', 'studentCode', 'createdAt', 'password',
+        'mustChangePassword', 'loginCardCredentialNonce', 'loginCardPasswordIssuedAt',
+        'failedLoginAttempts', 'lockoutUntil'
+      ],
       include: [{
         model: SchoolStudent, as: 'schoolStudent', required: false,
         attributes: ['id', 'studentNumber', 'grade', 'className', 'loginCardPrinted']
@@ -302,11 +310,42 @@ module.exports = {
     const transaction = await User.sequelize.transaction();
     try {
       for (const student of filteredStudents) {
-        const tempPassword = generateTempCardPassword();
-        await student.update({
-          password: tempPassword,
-          mustChangePassword: true
-        }, { transaction });
+        let credentialNonce = student.loginCardCredentialNonce;
+        let tempPassword = credentialNonce && student.mustChangePassword
+          ? deriveLoginCardPassword(student.id, credentialNonce)
+          : null;
+        let credentialMatches = Boolean(
+          tempPassword
+          && await student.comparePassword(tempPassword)
+        );
+
+        if (!credentialMatches) {
+          credentialNonce = createLoginCardCredentialNonce();
+          tempPassword = deriveLoginCardPassword(student.id, credentialNonce);
+          await student.update({
+            password: tempPassword,
+            mustChangePassword: true,
+            loginCardCredentialNonce: credentialNonce,
+            loginCardPasswordIssuedAt: new Date(),
+            failedLoginAttempts: 0,
+            lockoutUntil: null,
+            refreshToken: null,
+            refreshTokenExpires: null,
+            previousRefreshToken: null,
+            previousRefreshTokenExpires: null
+          }, { transaction });
+
+          credentialMatches = await student.comparePassword(tempPassword);
+          if (!credentialMatches) {
+            throw new Error('Generated login-card password could not be verified');
+          }
+        } else if (student.failedLoginAttempts || student.lockoutUntil) {
+          await student.update({
+            failedLoginAttempts: 0,
+            lockoutUntil: null
+          }, { transaction });
+        }
+
         student.setDataValue('loginCardPassword', tempPassword);
       }
       await transaction.commit();

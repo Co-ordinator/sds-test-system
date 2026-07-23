@@ -26,6 +26,24 @@ describe('scoringService Holland display codes', () => {
     expect(displayCode).toBe('A/E R I');
   });
 
+  test('shows every letter in a multi-way strongest-rank tie deterministically', () => {
+    const totals = { R: 20, I: 20, A: 20, S: 10, E: 8, C: 4 };
+
+    const { primaryCode, displayCode } = scoringService.buildHollandCodes(totals, 0);
+
+    expect(primaryCode).toBe('RIA');
+    expect(displayCode).toBe('R/I/A S E');
+  });
+
+  test('keeps ordinary ranks separate when there is no tie', () => {
+    const totals = { R: 20, I: 18, A: 16, S: 14, E: 12, C: 10 };
+
+    const { primaryCode, displayCode } = scoringService.buildHollandCodes(totals, 0);
+
+    expect(primaryCode).toBe('RIA');
+    expect(displayCode).toBe('R I A');
+  });
+
   test('derives user-facing display code from scores instead of stored compact code', () => {
     const assessment = {
       hollandCode: 'SCA',

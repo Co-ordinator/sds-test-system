@@ -26,6 +26,8 @@ export default function InstitutionSearchInput({
   region = '',
   type = '',
   userType = '',
+  inputId,
+  errorId,
 }) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -104,6 +106,7 @@ export default function InstitutionSearchInput({
           aria-hidden
         />
         <input
+          id={inputId}
           type="text"
           value={query}
           onChange={handleInputChange}
@@ -118,6 +121,7 @@ export default function InstitutionSearchInput({
           className={`form-control-with-icon pl-8 ${allowClear && query ? 'pr-8' : ''} ${inputClassName}`}
           style={{ color: GOV.text, ...(error && { borderColor: GOV.error }) }}
           aria-invalid={error ? 'true' : 'false'}
+          aria-describedby={errorId}
         />
         {allowClear && query && (
           <button

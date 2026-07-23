@@ -13,6 +13,7 @@ import AdminSubjectsPanel from '../../features/admin/subjects/AdminSubjectsPanel
 import AdminCoursesPanel from '../../features/admin/courses/AdminCoursesPanel';
 import AdminEducationLevelsPanel from '../../features/admin/educationLevels/AdminEducationLevelsPanel';
 import AdminFundingPrioritiesPanel from '../../features/admin/funding/AdminFundingPrioritiesPanel';
+import AdminFaqsPanel from '../../features/admin/faqs/AdminFaqsPanel';
 import { useInstitutions } from '../../hooks/useInstitutions';
 import { usePermissions, PermissionGate } from '../../context/PermissionContext';
 import { useAccessibility } from '../../context/AccessibilityContext';
@@ -74,6 +75,13 @@ const SETTINGS_TABS = [
     Icon: Landmark,
     description: 'SLAS scholarship priority per programme',
     permission: 'courses.view',
+  },
+  {
+    id: 'faqs',
+    label: 'FAQs',
+    Icon: HelpCircle,
+    description: 'Publish help articles from support queries',
+    permission: null,
   },
 ];
 
@@ -183,6 +191,8 @@ const AdminSettingsPage = () => {
             <AdminFundingPrioritiesPanel />
           </PermissionGate>
         );
+      case 'faqs':
+        return <AdminFaqsPanel />;
       default:
         return <SystemConfigPanel />;
     }

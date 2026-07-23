@@ -4,7 +4,9 @@ const PDFDocument = require('pdfkit');
 const { AuditLog, sequelize } = require('../models');
 const certificateService = require('../services/certificate.service');
 const logger = require('../utils/logger');
+const { buildCertificateStatement } = require('../utils/certificateRecipient');
 const { drawLetterheadImage, resolveAssetPath } = require('../utils/pdfAssets');
+const { OFFICIAL_PROGRAM_TITLE } = require('../constants/brand');
 
 const resolveWatermarkPath = () => resolveAssetPath('watermark.png', ['PDF_WATERMARK_PATH', 'WATERMARK_PATH']);
 
@@ -23,20 +25,7 @@ const drawWatermark = (doc, pageW, pageH) => {
 const SECTION_MAP = { activities: 'I', competencies: 'II', occupations: 'III', self_estimates: 'IV' };
 const SECTION_LABELS = { activities: 'Activity', competencies: 'Competence', occupations: 'Occupation', self_estimates: 'Abilities' };
 const RIASEC_KEYS = ['R', 'I', 'A', 'S', 'E', 'C'];
-const REGION_LABELS = {
-  hhohho: 'HHOHHO',
-  manzini: 'MANZINI',
-  lubombo: 'LUBOMBO',
-  shiselweni: 'SHISELWENI',
-  multiple: 'MULTIPLE'
-};
-
-const getRegionLabel = (value) => REGION_LABELS[String(value || '').toLowerCase()];
-
-const cleanText = (value, fallback = '') => {
-  const text = String(value || '').trim();
-  return text || fallback;
-};
+const MINISTRY_PHYSICAL_ADDRESS = 'Ministry of Labour and Social Security, Inter-Ministerial Office Block, Mhlambanyatsi Road, Mbabane, Eswatini.';
 
 const formatUpperMonthYear = (dateValue) => {
   const date = dateValue ? new Date(dateValue) : new Date();
@@ -62,6 +51,23 @@ const drawCell = (doc, x, y, w, h, text, options = {}) => {
   doc.text(body, x + padding, textY, { width: w - padding * 2, align });
 };
 
+const drawPhysicalAddress = (doc, x, y, width) => {
+  let fontSize = 8.5;
+  doc.font('Helvetica').fontSize(fontSize);
+  while (fontSize > 7 && doc.widthOfString(MINISTRY_PHYSICAL_ADDRESS) > width) {
+    fontSize -= 0.25;
+    doc.fontSize(fontSize);
+  }
+  doc.fillColor('#374151');
+  doc.text(MINISTRY_PHYSICAL_ADDRESS, x, y, {
+    width,
+    align: 'center',
+    lineBreak: false
+  });
+  const textHeight = doc.heightOfString(MINISTRY_PHYSICAL_ADDRESS, { width, lineBreak: false });
+  return y + textHeight + 3;
+};
+
 /**
  * Build the SDS Certificate PDF and pipe it to a writable stream.
  */
@@ -84,16 +90,20 @@ async function buildCertificatePdf(res, assessment, sectionScores, hollandLetter
     width: pageW,
     maxHeight: 132
   });
-  const ruleY = letterhead ? Math.max(letterhead.bottom + 8, 150) : 136;
+  const addressY = letterhead ? letterhead.bottom + 2 : 122;
+  const addressBottom = drawPhysicalAddress(doc, lm, addressY, contentW);
+  const ruleY = Math.max(addressBottom + 3, 150);
   doc.moveTo(lm, ruleY).lineTo(pageW - rm, ruleY).strokeColor('#000000').lineWidth(0.8).stroke();
 
   // ── TITLE ──────────────────────────────────────────────────────────────
   const titleY = ruleY + 10;
   doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#000000');
   doc.text('SELF-DIRECTED –SEARCH (SDS) SUMMARY SHEET   CERTIFICATE', lm, titleY, { width: contentW, align: 'center', underline: false });
+  doc.font('Helvetica').fontSize(8.5).fillColor('#000000');
+  doc.text(OFFICIAL_PROGRAM_TITLE, lm, titleY + 13, { width: contentW, align: 'center' });
 
   // ── SCORE TABLE ────────────────────────────────────────────────────────
-  const tableY = titleY + 18;
+  const tableY = titleY + 31;
   const colWidths = [84, 58, 66, 58, 58, 66, 74]; // Sections + 6 RIASEC cols
   const totalTableW = colWidths.reduce((a, b) => a + b, 0);
   const tableX = lm + (contentW - totalTableW) / 2;
@@ -233,10 +243,6 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
   const contentW = pageW - lm - rm;
   const border = '#4b5563';
   const user = assessment.user || {};
-  const studentName = cleanText([user.firstName, user.lastName].filter(Boolean).join(' '), 'TEST TAKER').toUpperCase();
-  const pin = cleanText(user.nationalId || user.studentCode, 'NOT PROVIDED');
-  const institutionName = cleanText(user.institution?.name || user.currentInstitution, 'NOT SPECIFIED').toUpperCase();
-  const regionName = cleanText(getRegionLabel(user.region) || getRegionLabel(user.institution?.region), 'NOT SPECIFIED').toUpperCase();
   const testDate = formatUpperMonthYear(assessment.completedAt);
   const totals = {
     R: assessment.scoreR || 0,
@@ -256,17 +262,22 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
     maxHeight: 136
   });
   const headerBottom = letterhead ? letterhead.bottom : 138;
-  const dividerY = headerBottom + 8;
+  const addressY = headerBottom + 2;
+  const addressBottom = drawPhysicalAddress(doc, lm, addressY, contentW);
+  const dividerY = addressBottom + 3;
   doc.moveTo(lm, dividerY).lineTo(pageW - rm, dividerY).strokeColor('#111827').lineWidth(0.9).stroke();
 
   const departmentY = dividerY + 14;
   doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#1f2933');
-  doc.text('NATIONAL EMPLOYMENT SERVICES DEPARTMENT', lm, departmentY, { width: contentW, align: 'center' });
-  doc.text('MEASUREMENT AND TESTING UNIT', lm, departmentY + 15, { width: contentW, align: 'center' });
+  doc.text(OFFICIAL_PROGRAM_TITLE, lm, departmentY, { width: contentW, align: 'center' });
 
   doc.font('Helvetica').fontSize(8.5).fillColor('#111827');
-  const certifyText = `This is to certify that ${studentName}  PIN: ${pin} completed a Self-Directed Search test in: ${testDate} at: ${institutionName} located in the: ${regionName} REGION.`;
-  const certifyY = departmentY + 44;
+  const certifyText = buildCertificateStatement({
+    user,
+    snapshot: assessment.certificateProfileSnapshot ?? null,
+    testDate
+  });
+  const certifyY = departmentY + 29;
   const certifyOptions = { width: contentW - 52, align: 'left', lineGap: 2 };
   const certifyHeight = doc.heightOfString(certifyText, certifyOptions);
   doc.text(certifyText, lm + 26, certifyY, certifyOptions);
@@ -275,7 +286,7 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
   doc.font('Times-Bold').fontSize(13).fillColor('#111827');
   doc.text('SELF-DIRECTED SEARCH (SDS) SUMMARY SHEET CERTIFICATE', lm, titleY, { width: contentW, align: 'center' });
 
-  const tableY = titleY + 24;
+  const tableY = titleY + 25;
   const colWidths = [82, 70, 78, 60, 60, 78, 88];
   const totalTableW = colWidths.reduce((a, b) => a + b, 0);
   const tableX = lm + (contentW - totalTableW) / 2;
@@ -358,6 +369,9 @@ async function buildSummaryCertificatePdf(res, assessment, sectionScores, hollan
 }
 
 // ── Admin: generate certificate for a completed assessment ─────────────────
+// Exported so certificate rendering can be regression-tested with synthetic data.
+module.exports.buildSummaryCertificatePdf = buildSummaryCertificatePdf;
+
 module.exports.generateCertificate = async (req, res, next) => {
   try {
     const { assessmentId } = req.params;

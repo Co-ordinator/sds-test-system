@@ -2,6 +2,11 @@ const { Answer, Assessment, Occupation, EducationLevel, AuditLog, User, Course, 
 const { Op } = require('sequelize');
 const { NotFoundError } = require('../utils/errors/appError');
 const { decorateOccupation } = require('../utils/occupationDisplay');
+const { buildCertificateProfileSnapshot } = require('../utils/certificateProfileSnapshot');
+const {
+  assessmentAttributes,
+  getAssessmentOptionalColumnSupport
+} = require('../utils/assessmentColumns');
 
 /**
  * Holland Code → Career Focus description per user type
@@ -431,15 +436,46 @@ class ScoringService {
    * Main entry point to finalize an assessment
    */
   async finalizeAssessment(assessmentId) {
+    const optionalColumns = await getAssessmentOptionalColumnSupport(sequelize);
     const transaction = await sequelize.transaction();
 
     try {
       const assessment = await Assessment.findByPk(assessmentId, {
-        include: ['user'],
-        transaction
+        attributes: assessmentAttributes({
+          certificateProfileSnapshot: optionalColumns.certificateProfileSnapshot
+        }),
+        include: [{
+          model: User,
+          as: 'user',
+          include: [
+            {
+              model: Institution,
+              as: 'institution',
+              attributes: ['name', 'region', 'district'],
+              required: false
+            },
+            {
+              model: Institution,
+              as: 'workplace',
+              attributes: ['name', 'region', 'district'],
+              required: false
+            },
+            {
+              model: Occupation,
+              as: 'occupation',
+              attributes: ['name'],
+              required: false
+            }
+          ]
+        }],
+        transaction,
+        lock: { level: transaction.LOCK.UPDATE, of: Assessment }
       });
 
       if (!assessment) throw new NotFoundError('Assessment not found', 'ASSESSMENT_NOT_FOUND');
+      if (assessment.status !== 'in_progress') {
+        throw new NotFoundError('Assessment not found or not in progress', 'ASSESSMENT_NOT_IN_PROGRESS');
+      }
 
       const answers = await Answer.findAll({ 
         where: { assessmentId },
@@ -473,7 +509,7 @@ class ScoringService {
 
       const { primaryCode: hollandCode, displayCode: hollandCodeDisplay } = this.buildHollandCodes(totals, 0);
 
-      await assessment.update({
+      const completionValues = {
         scoreR: totals.R,
         scoreI: totals.I,
         scoreA: totals.A,
@@ -481,11 +517,23 @@ class ScoringService {
         scoreE: totals.E,
         scoreC: totals.C,
         hollandCode,
-        hollandCodeDisplay,
         status: 'completed',
         completedAt: new Date(),
         educationLevelAtTest: assessment.user.educationLevel 
-      }, { transaction });
+      };
+
+      if (optionalColumns.hollandCodeDisplay) {
+        completionValues.hollandCodeDisplay = hollandCodeDisplay;
+      }
+
+      const existingSnapshot = assessment.get?.('certificateProfileSnapshot')
+        ?? assessment.certificateProfileSnapshot
+        ?? null;
+      if (optionalColumns.certificateProfileSnapshot && existingSnapshot === null) {
+        completionValues.certificateProfileSnapshot = buildCertificateProfileSnapshot(assessment.user);
+      }
+
+      await assessment.update(completionValues, { transaction });
 
       const recommendations = await this.getRecommendations(
         hollandCode, 

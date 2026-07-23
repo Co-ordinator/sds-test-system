@@ -5,8 +5,18 @@ const logger = require('../utils/logger');
 const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 const { drawLetterheadImage } = require('../utils/pdfAssets');
+const AsyncTtlCache = require('../utils/asyncTtlCache');
 
 const getHollandDisplayCode = (row) => row?.hollandCodeDisplay || row?.hollandCode || row?.holland_code || '';
+const analyticsCache = new AsyncTtlCache({ ttlMs: 30000, maxEntries: 200 });
+const analyticsCacheKey = (req, section) => {
+  const query = Object.entries(req.query || {})
+    .sort(([left], [right]) => left.localeCompare(right));
+  return JSON.stringify([req.user?.id || 'anonymous', section, query]);
+};
+const cachedAnalytics = (req, section, loader) => (
+  analyticsCache.get(analyticsCacheKey(req, section), loader)
+);
 
 /**
  * Analytics Controller — HTTP layer only.
@@ -18,7 +28,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics ─────────────────────────────────────────────── */
   getOverview: async (req, res, next) => {
     try {
-      const data = await analyticsService.getOverview(req.query);
+      const data = await cachedAnalytics(req, 'overview', () => analyticsService.getOverview(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch analytics overview', req, details: { error: error.message } });
@@ -29,7 +39,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/holland-distribution ────────────────────────── */
   getHollandDistribution: async (req, res, next) => {
     try {
-      const data = await analyticsService.getHollandDistribution(req.query);
+      const data = await cachedAnalytics(req, 'holland', () => analyticsService.getHollandDistribution(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch Holland distribution', req, details: { error: error.message } });
@@ -40,7 +50,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/trend ───────────────────────────────────────── */
   getTrend: async (req, res, next) => {
     try {
-      const data = await analyticsService.getTrend(req.query);
+      const data = await cachedAnalytics(req, 'trend', () => analyticsService.getTrend(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch assessment trend', req, details: { error: error.message } });
@@ -51,7 +61,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/regional ───────────────────────────────────── */
   getRegional: async (req, res, next) => {
     try {
-      const data = await analyticsService.getRegional(req.query);
+      const data = await cachedAnalytics(req, 'regional', () => analyticsService.getRegional(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch regional analytics', req, details: { error: error.message } });
@@ -62,7 +72,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/institutions ────────────────────────────────── */
   getInstitutionBreakdown: async (req, res, next) => {
     try {
-      const data = await analyticsService.getInstitutionBreakdown(req.query);
+      const data = await cachedAnalytics(req, 'institutions', () => analyticsService.getInstitutionBreakdown(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch institution analytics', req, details: { error: error.message } });
@@ -73,7 +83,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/knowledge-graph ─────────────────────────────── */
   getKnowledgeGraph: async (req, res, next) => {
     try {
-      const data = await analyticsService.getKnowledgeGraph(req.query);
+      const data = await cachedAnalytics(req, 'knowledge', () => analyticsService.getKnowledgeGraph(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch knowledge graph analytics', req, details: { error: error.message } });
@@ -84,7 +94,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/segmentation ────────────────────────────────── */
   getSegmentation: async (req, res, next) => {
     try {
-      const data = await analyticsService.getSegmentation(req.query);
+      const data = await cachedAnalytics(req, 'segmentation', () => analyticsService.getSegmentation(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch segmentation analytics', req, details: { error: error.message } });
@@ -95,7 +105,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/skills-pipeline ─────────────────────────────── */
   getSkillsPipeline: async (req, res, next) => {
     try {
-      const data = await analyticsService.getSkillsPipeline(req.query);
+      const data = await cachedAnalytics(req, 'pipeline', () => analyticsService.getSkillsPipeline(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch skills pipeline', req, details: { error: error.message } });
@@ -106,7 +116,7 @@ const AnalyticsController = {
   /* ── GET /api/v1/analytics/funding-alignment ───────────────────────── */
   getFundingAlignment: async (req, res, next) => {
     try {
-      const data = await analyticsService.getFundingAlignmentAnalytics(req.query);
+      const data = await cachedAnalytics(req, 'funding', () => analyticsService.getFundingAlignmentAnalytics(req.query));
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       logger.error({ actionType: 'ANALYTICS_ERROR', message: 'Failed to fetch funding alignment analytics', req, details: { error: error.message } });

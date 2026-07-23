@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const { GRADE_TO_EDUCATION_LEVEL } = require('../utils/profileEducation');
 
 // Luhn algorithm implementation
 const luhnCheck = (num) => {
@@ -43,11 +44,12 @@ const validateNationalId = (value, helpers) => {
   return value;
 };
 
-// Password requirements: min 12 chars, at least 1 letter and 1 number.
-// OWASP Authentication Cheat Sheet considers < 15 chars without MFA weak; we
-// land at 12 as a pragmatic floor that still rules out the bulk of bot-tier
-// password lists.
-const passwordPattern = /^(?=.*[A-Za-z])(?=.*\d).{12,}$/;
+// Password requirements: minimum length only. Do not force composition rules:
+// users may use any characters, including symbols, spaces, passphrases, or
+// password-manager generated values.
+const passwordPattern = /^[\s\S]{6,}$/;
+const passwordMessage = 'Password must be at least 6 characters. Any characters are allowed.';
+const newPasswordMessage = 'New password must be at least 6 characters. Any characters are allowed.';
 
 const phonePattern = /^\+268\d{8}$/;
 
@@ -74,7 +76,7 @@ const register = Joi.object({
     'any.required': 'Email is required'
   }),
   password: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
+    'string.pattern.base': passwordMessage,
     'any.required': 'Password is required'
   }),
   consent: Joi.boolean().valid(true).required().messages({
@@ -97,7 +99,7 @@ const login = Joi.object({
 
 const resetPassword = Joi.object({
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
+    'string.pattern.base': passwordMessage,
     'any.required': 'New password is required'
   }),
   password: Joi.string().pattern(passwordPattern).optional(),
@@ -114,7 +116,7 @@ const resetPasswordWithToken = Joi.object({
     'any.required': 'Reset token is required'
   }),
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'Password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
+    'string.pattern.base': passwordMessage,
     'any.required': 'New password is required'
   }),
   password: Joi.string().pattern(passwordPattern).optional(),
@@ -151,7 +153,7 @@ const updateProfile = Joi.object({
   address: Joi.string().allow('', null),
   educationLevel: Joi.string().uuid().allow('', null),
   currentInstitution: Joi.string().allow('', null),
-  gradeLevel: Joi.string().allow('', null),
+  gradeLevel: Joi.string().valid(...Object.keys(GRADE_TO_EDUCATION_LEVEL)).allow('', null),
   employmentStatus: Joi.string().valid('student', 'employed', 'unemployed', 'self_employed', 'other').allow('', null),
   currentOccupation: Joi.string().allow('', null),
   currentOccupationId: Joi.string().uuid().allow('', null),
@@ -200,7 +202,7 @@ const resetPasswordWithOtp = Joi.object({
     'any.required': 'Reset code is required'
   }),
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'New password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
+    'string.pattern.base': newPasswordMessage,
     'any.required': 'New password is required'
   }),
   confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({
@@ -214,7 +216,7 @@ const changePassword = Joi.object({
     'any.required': 'Current password is required'
   }),
   newPassword: Joi.string().pattern(passwordPattern).required().messages({
-    'string.pattern.base': 'New password must be at least 12 characters and contain both letters and numbers. Symbols are allowed.',
+    'string.pattern.base': newPasswordMessage,
     'any.required': 'New password is required'
   }),
   confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required().messages({

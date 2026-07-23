@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 
 const listInstitutions = async (req, res, next) => {
   try {
-    const institutions = await institutionService.listInstitutions();
+    const institutions = await institutionService.listInstitutions({ status: req.query.status });
     logger.info({ actionType: 'INSTITUTION_LIST', message: `Fetched ${institutions.length} institutions`, req });
     res.status(200).json({ status: 'success', data: { institutions } });
   } catch (error) {

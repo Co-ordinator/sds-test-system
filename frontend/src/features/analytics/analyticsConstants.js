@@ -12,6 +12,11 @@ export const USER_TYPE_LABELS = {
   university_student: 'University',
   professional: 'Professional',
 };
+export const USER_TYPE_OPTIONS = [
+  { value: 'High School Student', label: 'High School' },
+  { value: 'University Student', label: 'University' },
+  { value: 'Professional', label: 'Professional' },
+];
 export const REGION_LABELS = { hhohho: 'Hhohho', manzini: 'Manzini', lubombo: 'Lubombo', shiselweni: 'Shiselweni' };
 export const INSTITUTION_TYPE_LABELS = { university: 'University', college: 'College', tvet: 'TVET', school: 'School', vocational: 'Vocational', other: 'Other' };
 export const DEMAND_COLORS = { critical: '#dc2626', very_high: '#ea580c', high: '#d97706', medium: '#2563eb', low: '#6b7280' };

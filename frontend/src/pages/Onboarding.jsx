@@ -17,6 +17,11 @@ import {
   getTownsForRegion,
   townBelongsToRegion,
 } from '../data/eswatiniLocations';
+import {
+  GENDER_OPTIONS,
+  GRADE_LEVEL_OPTIONS,
+  normalizeGradeLevel,
+} from '../data/profileOptions';
 
 const USER_TYPE_META = {
   school_student: { label: 'High School Student', Icon: GraduationCap, color: '#F44336', step2Label: 'Your School', step3Label: 'Academic Details', description: 'Discover careers and choose the right subjects for your future.' },
@@ -41,21 +46,12 @@ const BACKEND_TO_FRONTEND_USER_TYPE = {
 
 const normalizeUserType = (value) => BACKEND_TO_FRONTEND_USER_TYPE[value] || '';
 
-const GENDERS = ['Male', 'Female'];
 const LANGUAGES = ['English', 'SiSwati'];
-const GRADES = [
-  'Form 3 (Junior Secondary)',
-  'Form 5 / O-Level (Senior Secondary)',
-  'A-Level',
-  'Certificate / Diploma',
-  "Bachelor's degree",
-  'Postgraduate',
-];
 
 const LANGUAGE_TO_BACKEND = { English: 'en', SiSwati: 'ss' };
 const LANGUAGE_FROM_BACKEND = { en: 'English', ss: 'SiSwati' };
-const GENDER_FROM_BACKEND = { male: 'Male', female: 'Female' };
-const DEFAULT_GRADE = 'Form 5 / O-Level (Senior Secondary)';
+const GENDER_FROM_BACKEND = Object.fromEntries(GENDER_OPTIONS.map(({ value, label }) => [value, label]));
+const GENDER_TO_BACKEND = Object.fromEntries(GENDER_OPTIONS.map(({ value, label }) => [label, value]));
 const TERTIARY_INSTITUTION_TYPES = 'university,college,tvet,vocational';
 
 const isBlank = (value) => String(value ?? '').trim() === '';
@@ -71,7 +67,7 @@ const buildInitialForm = (user = {}) => ({
   workplaceName: user.workplaceName || '',
   workplaceInstitutionId: user.workplaceInstitutionId || null,
   preferredLanguage: LANGUAGE_FROM_BACKEND[user.preferredLanguage] || 'English',
-  highestGrade: user.gradeLevel || DEFAULT_GRADE,
+  highestGrade: normalizeGradeLevel(user.gradeLevel),
   degreeProgram: user.degreeProgram || '',
   yearOfStudy: hasSelectionValue(user.yearOfStudy) ? String(user.yearOfStudy) : '',
   currentOccupation: user.currentOccupation || '',
@@ -258,7 +254,7 @@ export default function Onboarding() {
     };
 
     return {
-      gender: form.gender === 'Male' ? 'male' : form.gender === 'Female' ? 'female' : null,
+      gender: GENDER_TO_BACKEND[form.gender] || null,
       region: REGION_TO_BACKEND[form.region] || (form.region ? form.region.toLowerCase() : null),
       district: (form.townCity || '').trim() || null,
       address: (form.areaNeighborhood || '').trim() || null,
@@ -396,7 +392,7 @@ export default function Onboarding() {
                 Gender *
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {GENDERS.map((g) => (
+                {GENDER_OPTIONS.map(({ label: g }) => (
                   <button
                     key={g}
                     type="button"
@@ -655,7 +651,8 @@ export default function Onboarding() {
                 className={`form-control ${TYPO.body}`}
                 style={{ color: GOV.text }}
               >
-                {GRADES.map((g) => (
+                <option value="">Select grade or qualification</option>
+                {GRADE_LEVEL_OPTIONS.map((g) => (
                   <option key={g} value={g}>{g}</option>
                 ))}
               </select>

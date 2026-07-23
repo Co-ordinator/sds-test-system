@@ -87,7 +87,7 @@ class AssessmentController {
   async saveProgress(req, res, next) {
     try {
       const { progress, answeredCount } = await assessmentService.saveProgress(req.params.assessmentId, req.user.id, req.body.answers);
-      logger.info({ actionType: 'ASSESSMENT_PROGRESS_SAVED', message: `Progress saved for assessment ${req.params.assessmentId}`, req, details: { assessmentId: req.params.assessmentId, answeredCount, progress } });
+      logger.debug({ actionType: 'ASSESSMENT_PROGRESS_SAVED', message: `Progress saved for assessment ${req.params.assessmentId}`, req, details: { assessmentId: req.params.assessmentId, answeredCount, progress } });
       return res.status(200).json({ status: 'success', data: { progress } });
     } catch (error) {
       logger.error({ actionType: 'ASSESSMENT_PROGRESS_FAILED', message: 'Failed to save progress', req, details: { error: error.message, stack: error.stack } });

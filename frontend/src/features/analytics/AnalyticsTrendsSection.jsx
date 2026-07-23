@@ -3,9 +3,8 @@ import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   BarChart, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
 } from 'recharts';
-import { MoreHorizontal } from 'lucide-react';
 import { GOV } from '../../theme/government';
-import { RIASEC_COLORS, RIASEC_LABELS, PIE_COLORS, DOW_LABELS, USER_TYPE_LABELS } from './analyticsConstants';
+import { RIASEC_COLORS, RIASEC_LABELS, PIE_COLORS, DOW_LABELS, USER_TYPE_LABELS, REGION_LABELS } from './analyticsConstants';
 
 /* ── Shared Card (matches Overview) ── */
 const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' }) => (
@@ -15,9 +14,6 @@ const Card = ({ title, sub, children, className = '', bodyClass = 'px-4 pb-4' })
         <p className="text-xs font-semibold leading-tight" style={{ color: GOV.textMuted }}>{title}</p>
         {sub && <p className="text-xs mt-0.5" style={{ color: GOV.textHint }}>{sub}</p>}
       </div>
-      <button className="p-0.5 rounded hover:bg-gray-100 flex-shrink-0" style={{ color: GOV.textHint }}>
-        <MoreHorizontal className="w-4 h-4" />
-      </button>
     </div>
     <div className={`flex-1 ${bodyClass}`}>{children}</div>
   </div>
@@ -97,6 +93,22 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
   }, [segmentData]);
 
   const hollandTotal = useMemo(() => hollandDist.reduce((s, x) => s + Number(x.count), 0), [hollandDist]);
+  const completionByGenderData = useMemo(
+    () => (segmentData?.completionByGender || []).map((row) => ({
+      group: GENDER_LEGEND_LABELS[row.gender] || row.gender || 'Unknown',
+      started: Number(row.total || 0),
+      completed: Number(row.completed || 0),
+    })),
+    [segmentData]
+  );
+  const completionByRegionData = useMemo(
+    () => (segmentData?.completionByRegion || []).map((row) => ({
+      group: REGION_LABELS[row.region] || (row.region === 'unknown' ? 'Unknown' : row.region),
+      started: Number(row.total || 0),
+      completed: Number(row.completed || 0),
+    })),
+    [segmentData]
+  );
 
   return (
     <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))', gridAutoRows: 'min-content' }}>
@@ -196,6 +208,72 @@ const AnalyticsTrendsSection = ({ trendData, riasecData, hollandDist, kgData, se
               });
             })()}
           </div>
+        ) : <Empty h={240} />}
+      </Card>
+
+      <Card title="Completion Status Breakdown" sub="All assessments by current status" className="col-span-12 lg:col-span-6">
+        {(segmentData?.statusDistribution || []).length > 0 ? (
+          <div className="space-y-2 pt-2">
+            {(() => {
+              const rows = segmentData.statusDistribution.map((row) => ({
+                status: row.status,
+                count: Number(row.count || 0)
+              }));
+              const total = rows.reduce((sum, row) => sum + row.count, 0) || 1;
+              const statusMeta = {
+                completed: { label: 'Completed', color: '#059669' },
+                in_progress: { label: 'In Progress', color: '#d97706' },
+                expired: { label: 'Expired', color: '#dc2626' },
+              };
+              return rows.map(({ status, count }) => {
+                const meta = statusMeta[status] || { label: status, color: '#6b7280' };
+                const percentage = Math.round((count / total) * 100);
+                return (
+                  <div key={status} className="flex items-center gap-2">
+                    <span className="min-w-[6rem] text-xs font-semibold" style={{ color: GOV.text }}>{meta.label}</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full" style={{ backgroundColor: GOV.borderLight }}>
+                      <div className="h-full rounded-full" style={{ width: `${percentage}%`, backgroundColor: meta.color }} />
+                    </div>
+                    <span className="w-16 text-right text-xs tabular-nums" style={{ color: GOV.textMuted }}>
+                      {count} ({percentage}%)
+                    </span>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        ) : <Empty h={240} />}
+      </Card>
+
+      <Card title="Completion by Gender" sub="Started and completed assessments; unknown values are retained" className="col-span-12 lg:col-span-6">
+        {completionByGenderData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={completionByGenderData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+              <XAxis dataKey="group" tick={{ fontSize: 9 }} interval={0} />
+              <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+              <Tooltip />
+              <Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
+              <Bar dataKey="started" name="Started" fill="#2563eb" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="completed" name="Completed" fill="#059669" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : <Empty h={240} />}
+      </Card>
+
+      <Card title="Completion by Region" sub="Started and completed assessments by profile region" className="col-span-12 lg:col-span-6">
+        {completionByRegionData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={completionByRegionData}>
+              <CartesianGrid strokeDasharray="3 3" stroke={GOV.borderLight} />
+              <XAxis dataKey="group" tick={{ fontSize: 9 }} interval={0} />
+              <YAxis tick={{ fontSize: 9 }} allowDecimals={false} />
+              <Tooltip />
+              <Legend iconSize={7} wrapperStyle={{ fontSize: 9 }} />
+              <Bar dataKey="started" name="Started" fill="#2563eb" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+              <Bar dataKey="completed" name="Completed" fill="#059669" fillOpacity={0.75} radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         ) : <Empty h={240} />}
       </Card>
 
